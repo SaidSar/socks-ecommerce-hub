@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+/* Paleta SOKKO — genera utilidades como bg-washi, text-sumi, border-aka */
+@theme {
+  --color-washi: #faf8f5;
+  --color-sumi: #1a1a1a;
+  --color-aka: #d32f2f;
+
+  --font-sans: 'Inter', 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    @apply bg-washi text-sumi antialiased;
+  }
+}
