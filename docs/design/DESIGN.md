@@ -530,4 +530,4 @@ Cuando la API exista, solo cambia `productService.js` (mapear `variants` a `stoc
   - 1 × $420 → falta $379, envío $99, total $519.00, IVA $71.59.
   - 2 × $420 → envío "Cortesía", total $840.00, IVA $115.86, sello visible.
 - [x] `CONTEXTO_MAESTRO.md` actualizado (§1.3).
-- [ ] PR `feat/home-kyoto-artisan` → `main` con capturas en 1440 px y 390 px.
+- [x] PR `feat/home-kyoto-artisan` → `main` con capturas en 1440 px y 390 px.
