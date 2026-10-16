@@ -319,7 +319,7 @@ export default {
 - **Criterio:** agregar la misma pieza/tono/talla tres veces con `stock = 3` deja `qty = 3`; una cuarta no cambia nada.
 
 ### Fase 4 — Componentes atómicos
-- [ ] `brand/Logo.jsx`, `product/KnitTabi.jsx`, `product/ToneSwatches.jsx`, `product/SizeSelector.jsx` según contratos de §6.
+- [x] `brand/Logo.jsx`, `product/KnitTabi.jsx`, `product/ToneSwatches.jsx`, `product/SizeSelector.jsx` según contratos de §6.
 - **Criterio:** dos `KnitTabi` en la misma página no comparten IDs de `<pattern>` ni `<clipPath>` (usar `useId()`).
 
 ### Fase 5 — Layout
