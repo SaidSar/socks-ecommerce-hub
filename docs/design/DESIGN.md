@@ -243,7 +243,8 @@ export default {
         sand: { DEFAULT: '#ECE5DC', 2: '#E3DACD' },
         ink: { DEFAULT: '#23211E', soft: '#6A645C' },
         laca: { DEFAULT: '#A62B2B', hover: '#8F2424' },
-        matcha: '#606C5A',
+        'laca-dark-bg': '#C8473F',
+        matcha: '#5A6654',
         moss: '#8F9779',
       },
       fontFamily: {
@@ -430,7 +431,7 @@ estado local: tone (primer tono), size ('M'), done (bool, 1.6 s)
      - bajo el umbral: "Faltan **$X** para su envío de cortesía." (`$X` en `laca`, no itálica)
      - alcanzado: "Su envío a cualquier punto de México corre por nuestra cuenta."
   3. Lista de `CartLine` o estado vacío (空 · "Su bolsa aún está vacía" · "Elija una pieza en el atelier.").
-  4. Pie `bg-sand/70`: checkbox furoshiki (`accent-color: #606C5A`) con texto "Envolver en furoshiki de lino reutilizable" + "Sin costo. Sin plásticos; el paño sirve después como pañuelo o bolsa."; desglose Subtotal / Envío / IVA incluido (16 %) / **Total MXN**; CTA "Proceder al Pago Seguro" (`bg-laca hover:bg-laca-hover`, deshabilitado si no hay líneas); leyenda "Tarjeta o OXXO Pay".
+  4. Pie `bg-sand/70`: checkbox furoshiki (clase `accent-matcha`, sin hex escrito a mano) con texto "Envolver en furoshiki de lino reutilizable" + "Sin costo. Sin plásticos; el paño sirve después como pañuelo o bolsa."; desglose Subtotal / Envío / IVA incluido (16 %) / **Total MXN**; CTA "Proceder al Pago Seguro" (`bg-laca hover:bg-laca-hover`, deshabilitado si no hay líneas); leyenda "Tarjeta o OXXO Pay".
 - El CTA en esta fase solo muestra "Conectando con pago seguro…" 2.2 s. **No** navegar ni llamar API (`// TODO(checkout)`).
 - Implementar **focus trap** (Tab/Shift+Tab ciclan dentro del panel).
 

@@ -16,7 +16,7 @@
     --ink: #23211E;
     --ink-soft: #6A645C;
     --laca: #A62B2B;
-    --matcha: #606C5A;
+    --matcha: #5A6654;
     --moss: #8F9779;
     --font-serif: "Cormorant Garamond", "Cormorant", "Garamond", "Times New Roman", serif;
     --font-sans: "Work Sans", "Helvetica Neue", system-ui, sans-serif;
@@ -53,7 +53,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script>
   tailwind.config = { theme: { extend: { colors: {
-    linen: "#F4F0EB", sand: "#ECE5DC", sand2: "#E3DACD", ink: "#23211E", inks: "#6A645C", laca: "#A62B2B", matcha: "#606C5A", moss: "#8F9779"
+    linen: "#F4F0EB", sand: "#ECE5DC", sand2: "#E3DACD", ink: "#23211E", inks: "#6A645C", laca: "#A62B2B", matcha: "#5A6654", moss: "#8F9779"
   } } } };
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -509,7 +509,7 @@ function Drawer({ open, onClose, items, setQty, remove }) {
 
         <div className="px-7 py-6 border-t border-ink/10 bg-sand/70">
           <label className="flex items-start gap-3 cursor-pointer mb-5">
-            <input id="furoshiki" type="checkbox" checked={furoshiki} onChange={e => setFuroshiki(e.target.checked)} className="mt-1 accent-[#606C5A]" />
+            <input id="furoshiki" type="checkbox" checked={furoshiki} onChange={e => setFuroshiki(e.target.checked)} className="mt-1 accent-matcha" />
             <span className="text-[13px] leading-snug">
               <span className="text-ink">Envolver en furoshiki de lino reutilizable</span><br/>
               <span className="text-inks">Sin costo. Sin plásticos; el paño sirve después como pañuelo o bolsa.</span>
