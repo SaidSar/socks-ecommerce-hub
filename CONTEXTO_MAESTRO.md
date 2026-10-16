@@ -32,7 +32,7 @@ ser coherente con este documento.
 | `ink-soft` | `#6A645C` | Texto secundario y metadatos |
 | `laca` | `#A62B2B` | Acento único: CTA de pago, sello, "pocos ejemplares", énfasis en itálica |
 | `laca-hover` | `#8F2424` | Hover del CTA de pago |
-| `matcha` | `#606C5A` | Etiquetas de sección (eyebrows), tags de material, estado "agregado" |
+| `matcha` | `#5A6654` | Etiquetas de sección (eyebrows), tags de material, estado "agregado" (ajustado para pasar 4.5:1 sobre sand) |
 | `moss` | `#8F9779` | **Solo bordes y puntos decorativos.** No usar como color de texto |
 
 Tipografía: **Cormorant Garamond** (`font-serif`, titulares y precios), **Work Sans**

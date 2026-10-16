@@ -47,7 +47,7 @@ socks-ecommerce-hub/
 
 | `linen` | `sand` | `ink` | `ink-soft` | `laca` | `matcha` | `moss` |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `#F4F0EB` | `#ECE5DC` | `#23211E` | `#6A645C` | `#A62B2B` | `#606C5A` | `#8F9779` |
+| `#F4F0EB` | `#ECE5DC` | `#23211E` | `#6A645C` | `#A62B2B` | `#5A6654` | `#8F9779` |
 
 Especificación de diseño completa en [`docs/design/DESIGN.md`](docs/design/DESIGN.md).
 

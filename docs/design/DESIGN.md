@@ -32,7 +32,8 @@
 | `ink-soft` | `#6A645C` | Texto secundario y metadatos |
 | `laca` | `#A62B2B` | Acento único: CTA de pago, sello, "pocos ejemplares", énfasis en itálica |
 | `laca-hover` | `#8F2424` | Hover del CTA de pago |
-| `matcha` | `#606C5A` | Etiquetas de sección (eyebrows), tags de material, estado "agregado" |
+| `laca-dark-bg` | `#C8473F` | Solo sobre fondo `ink` (kanji 侘寂 de Filosofía); contraste 3.4:1, válido para texto grande |
+| `matcha` | `#5A6654` | Etiquetas de sección (eyebrows), tags de material, estado "agregado" · ajustado para pasar 4.5:1 sobre sand |
 | `moss` | `#8F9779` | **Solo bordes y puntos decorativos.** No usar como color de texto (no pasa contraste AA) |
 
 **Regla del rojo:** `laca` aparece como máximo en: sol del logo, sol del hero, palabra *Renace*, filtro activo, numeración de láminas, aviso de pocos ejemplares, progreso de envío, sello 無料配送 y botón "Proceder al Pago Seguro". Nada más.
