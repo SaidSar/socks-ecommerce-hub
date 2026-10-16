@@ -311,11 +311,11 @@ export default {
 - **Criterio:** `getHomePieces()` devuelve las 6 piezas; `formatMXN(420)` → `"$420"`, `formatMXN(57.93, 2)` → `"$57.93"`.
 
 ### Fase 3 — Estado global del carrito
-- [ ] `context/CartContext.jsx` con `useReducer`; acciones `ADD`, `SET_QTY`, `REMOVE`, `TOGGLE_GIFT`, `OPEN`, `CLOSE`, `HYDRATE`.
-- [ ] Selectores derivados con `useMemo` según §4.4. No guardar subtotal/total en el estado.
-- [ ] Persistencia en `localStorage` (`sokko.cart.v1`) con `try/catch`; no persistir `isOpen`.
-- [ ] `hooks/useCart.js` lanza error claro si se usa fuera del provider.
-- [ ] `App.jsx`: `<CartProvider>` envolviendo `<BrowserRouter>` con ruta `/` → `<Home />`.
+- [x] `context/CartContext.jsx` con `useReducer`; acciones `ADD`, `SET_QTY`, `REMOVE`, `TOGGLE_GIFT`, `OPEN`, `CLOSE`, `HYDRATE`.
+- [x] Selectores derivados con `useMemo` según §4.4. No guardar subtotal/total en el estado.
+- [x] Persistencia en `localStorage` (`sokko.cart.v1`) con `try/catch`; no persistir `isOpen`.
+- [x] `hooks/useCart.js` lanza error claro si se usa fuera del provider.
+- [x] `App.jsx`: `<CartProvider>` envolviendo `<BrowserRouter>` con ruta `/` → `<Home />`.
 - **Criterio:** agregar la misma pieza/tono/talla tres veces con `stock = 3` deja `qty = 3`; una cuarta no cambia nada.
 
 ### Fase 4 — Componentes atómicos
