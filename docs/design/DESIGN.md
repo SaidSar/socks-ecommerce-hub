@@ -323,7 +323,7 @@ export default {
 - **Criterio:** dos `KnitTabi` en la misma página no comparten IDs de `<pattern>` ni `<clipPath>` (usar `useId()`).
 
 ### Fase 5 — Layout
-- [ ] `TopBar`, `Navbar` (desktop + menú móvil + buscador desplegable), `Footer`.
+- [x] `TopBar`, `Navbar` (desktop + menú móvil + buscador desplegable), `Footer`.
 - **Criterio:** el header es sticky, el menú móvil se abre/cierra con botón con `aria-expanded`, y los cuatro enlaces llevan a su sección sin que el header tape el título.
 
 ### Fase 6 — Secciones del Home

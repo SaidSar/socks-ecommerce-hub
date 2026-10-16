@@ -95,3 +95,14 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Gutter lateral: 16 px (48 px desde md) respetando el área segura del dispositivo (DESIGN.md §8). */
+@utility gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+
+  @media (width >= 48rem) {
+    padding-left: max(48px, env(safe-area-inset-left, 0px));
+    padding-right: max(48px, env(safe-area-inset-right, 0px));
+  }
+}
