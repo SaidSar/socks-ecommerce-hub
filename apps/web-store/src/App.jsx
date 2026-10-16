@@ -1,20 +1,18 @@
 import ApiStatus from './components/ApiStatus'
 
+// Pantalla temporal de verificación de tokens (Fase 1). Se reemplaza por el Router en la Fase 3.
 function App() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      {/* Sello hanko */}
-      <div className="mb-10 flex size-14 items-center justify-center bg-aka text-xl font-bold text-washi">
-        ソ
-      </div>
+    <main className="linen-tex flex min-h-screen flex-col items-center justify-center bg-linen px-6 text-center text-ink">
+      <p className="text-[11px] tracking-[.32em] text-matcha uppercase">El elogio del detalle</p>
 
-      <h1 className="text-5xl font-light tracking-[0.3em] sm:text-6xl">
-        SOKKO <span className="text-3xl tracking-normal text-sumi/60 sm:text-4xl">(ソッコ)</span>
+      <h1 className="mt-6 font-serif text-[clamp(46px,7.4vw,104px)] leading-[.98] font-light">
+        Confort que <em className="text-laca italic">Renace</em>
       </h1>
 
-      <div className="my-8 h-px w-16 bg-aka" />
-
-      <p className="text-lg tracking-wide text-sumi/70">Confort que Renace cada paso</p>
+      <p className="mt-6 font-jp text-sm tracking-[.6em] text-laca" aria-hidden="true">
+        足袋工房
+      </p>
 
       <div className="mt-14">
         <ApiStatus />

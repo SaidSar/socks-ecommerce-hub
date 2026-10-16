@@ -43,11 +43,13 @@ socks-ecommerce-hub/
  localhost:5173                     localhost:5080
 ```
 
-## Paleta
+## Paleta — Kyoto Artisan
 
-| `washi` | `sumi` | `aka` |
-|:---:|:---:|:---:|
-| `#FAF8F5` | `#1A1A1A` | `#D32F2F` |
+| `linen` | `sand` | `ink` | `ink-soft` | `laca` | `matcha` | `moss` |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `#F4F0EB` | `#ECE5DC` | `#23211E` | `#6A645C` | `#A62B2B` | `#606C5A` | `#8F9779` |
+
+Especificación de diseño completa en [`docs/design/DESIGN.md`](docs/design/DESIGN.md).
 
 ## Requisitos
 

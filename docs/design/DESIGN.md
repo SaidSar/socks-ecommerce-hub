@@ -217,15 +217,15 @@ Selectores a exponer desde `useCart()`: `items, count, subtotal, shipping, total
 ## 5. Plan de implementación por fases
 
 ### Fase 1 — Fundaciones visuales
-- [ ] `index.html`: agregar en `<head>`:
+- [x] `index.html`: agregar en `<head>`:
   ```html
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Work+Sans:wght@300;400;500&family=Shippori+Mincho:wght@400;600&display=swap" />
   ```
-- [ ] `tailwind.config.js` con el bloque de §5.1.
-- [ ] `src/index.css` con el bloque de §5.2.
-- [ ] Actualizar sección 2 de `CONTEXTO_MAESTRO.md` (§1.3).
+- [x] `tailwind.config.js` con el bloque de §5.1.
+- [x] `src/index.css` con el bloque de §5.2.
+- [x] Actualizar sección 2 de `CONTEXTO_MAESTRO.md` (§1.3).
 - **Criterio de aceptación:** una página de prueba con `bg-linen text-ink font-serif` renderiza Cormorant sobre lino sin fallback visible.
 
 #### 5.1 `tailwind.config.js`

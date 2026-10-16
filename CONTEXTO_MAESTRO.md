@@ -19,18 +19,32 @@ ser coherente con este documento.
 
 ### 1.1 Paleta de colores
 
-| Token   | Hex       | Uso                                                        |
-|---------|-----------|------------------------------------------------------------|
-| `washi` | `#FAF8F5` | Fondo principal (papel *washi*): superficies, lienzo       |
-| `sumi`  | `#1A1A1A` | Tinta *sumi*: texto, tipografía, bordes, elementos primarios |
-| `aka`   | `#D32F2F` | Rojo *aka* (sello *hanko*): acentos, CTAs, estados activos |
+> **Dirección visual aprobada: Kyoto Artisan & Botanical Wabi-Sabi (Propuesta 3).**
+> Especificación completa en `docs/design/DESIGN.md`. Sustituye a la paleta Zen original
+> (`washi #FAF8F5`, `sumi #1A1A1A`, `aka #D32F2F`).
+
+| Token Tailwind | Hex | Uso |
+|---|---|---|
+| `linen` | `#F4F0EB` | Fondo base de la página y del drawer |
+| `sand` | `#ECE5DC` | Secciones alternas, tarjetas de imagen, top bar |
+| `sand-2` | `#E3DACD` | Estados deshabilitados, hover de superficies |
+| `ink` | `#23211E` | Texto principal, trazos, bordes al 10–20 % de opacidad |
+| `ink-soft` | `#6A645C` | Texto secundario y metadatos |
+| `laca` | `#A62B2B` | Acento único: CTA de pago, sello, "pocos ejemplares", énfasis en itálica |
+| `laca-hover` | `#8F2424` | Hover del CTA de pago |
+| `matcha` | `#606C5A` | Etiquetas de sección (eyebrows), tags de material, estado "agregado" |
+| `moss` | `#8F9779` | **Solo bordes y puntos decorativos.** No usar como color de texto |
+
+Tipografía: **Cormorant Garamond** (`font-serif`, titulares y precios), **Work Sans**
+(`font-sans`, cuerpo y botones) y **Shippori Mincho** (`font-jp`, kanji decorativos).
 
 ### 1.2 Principios visuales
 
 - **Ma (間)** — espacio negativo generoso; menos elementos, más aire.
 - **Kanso (簡素)** — simplicidad; sin ornamentos innecesarios.
-- El rojo `aka` se usa con moderación: solo para acciones principales y acentos.
-- Tipografía sobria, jerarquía clara, bordes finos.
+- **Wabi-sabi (侘寂)** — texturas de lino, láminas botánicas, belleza de lo imperfecto.
+- El rojo `laca` se usa con moderación: solo en los puntos enumerados en DESIGN.md §1.1.
+- Esquinas rectas, bordes finos, sin sombras de tarjeta.
 
 ---
 
