@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import CartDrawer from '../components/cart/CartDrawer'
 import AtelierCatalog from '../components/home/AtelierCatalog'
 import Filosofia from '../components/home/Filosofia'
 import HeroEditorial from '../components/home/HeroEditorial'
@@ -71,6 +72,7 @@ export default function Home() {
         <Filosofia />
       </main>
       <Footer />
+      <CartDrawer />
     </>
   )
 }

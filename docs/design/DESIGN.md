@@ -332,8 +332,8 @@ export default {
 - **Criterio:** visualmente equivalente al mockup en 1440 px, 1024 px y 390 px.
 
 ### Fase 7 — Drawer del carrito
-- [ ] `CartDrawer`, `CartLine`, `BrushProgress` (§6.9–6.11).
-- [ ] `hooks/useLockBodyScroll.js` activo mientras el drawer está abierto.
+- [x] `CartDrawer`, `CartLine`, `BrushProgress` (§6.9–6.11).
+- [x] `hooks/useLockBodyScroll.js` activo mientras el drawer está abierto.
 - **Criterio:** se abre desde el Navbar y tras "Adquirir Pieza" (500 ms después del clic); cierra con `Esc`, clic en fondo y botón ✕; el foco va al botón de cierre al abrir y regresa al disparador al cerrar.
 
 ### Fase 8 — Accesibilidad, responsive y pulido
