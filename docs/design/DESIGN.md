@@ -305,9 +305,9 @@ export default {
 ```
 
 ### Fase 2 — Datos, servicio y utilidades
-- [ ] `config/commerce.js`, `data/catalog.mock.js`, `services/productService.js` (§4.1–4.3).
-- [ ] `utils/currency.js`: `formatMXN(n, decimals = 0)` → `"$" + n.toLocaleString('es-MX', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })`.
-- [ ] `utils/scroll.js`: `scrollToId(id)` que resta la altura del header (`68px + 12px` de margen) y respeta `prefers-reduced-motion`.
+- [x] `config/commerce.js`, `data/catalog.mock.js`, `services/productService.js` (§4.1–4.3).
+- [x] `utils/currency.js`: `formatMXN(n, decimals = 0)` → `"$" + n.toLocaleString('es-MX', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })`.
+- [x] `utils/scroll.js`: `scrollToId(id)` que resta la altura del header (`68px + 12px` de margen) y respeta `prefers-reduced-motion`.
 - **Criterio:** `getHomePieces()` devuelve las 6 piezas; `formatMXN(420)` → `"$420"`, `formatMXN(57.93, 2)` → `"$57.93"`.
 
 ### Fase 3 — Estado global del carrito
