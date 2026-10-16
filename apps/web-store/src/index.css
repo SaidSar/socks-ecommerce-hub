@@ -1,16 +1,109 @@
 @import 'tailwindcss';
 
-/* Paleta SOKKO — genera utilidades como bg-washi, text-sumi, border-aka */
+/*
+ * Tokens Kyoto Artisan (DESIGN.md §1, §5.1).
+ * Tailwind v4: el bloque `theme.extend` de §5.1 se traduce a @theme con los mismos nombres
+ * (bg-linen, bg-sand-2, text-ink-soft, bg-laca-hover, font-jp, animate-stamp…).
+ */
 @theme {
-  --color-washi: #faf8f5;
-  --color-sumi: #1a1a1a;
-  --color-aka: #d32f2f;
+  --color-linen: #f4f0eb;
+  --color-sand: #ece5dc;
+  --color-sand-2: #e3dacd;
+  --color-ink: #23211e;
+  --color-ink-soft: #6a645c;
+  --color-laca: #a62b2b;
+  --color-laca-hover: #8f2424;
+  --color-laca-dark-bg: #c8473f; /* solo sobre fondo ink, texto grande */
+  --color-matcha: #5a6654;
+  --color-moss: #8f9779;
 
-  --font-sans: 'Inter', 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Cormorant Garamond', 'Cormorant', 'Garamond', 'Times New Roman', serif;
+  --font-sans: 'Work Sans', 'Helvetica Neue', system-ui, sans-serif;
+  --font-jp: 'Shippori Mincho', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+
+  --animate-fade: fade 0.6s ease;
+  --animate-stamp: stamp 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes stamp {
+    from {
+      transform: scale(1.6) rotate(-12deg);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1) rotate(-6deg);
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {
   html {
-    @apply bg-washi text-sumi antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-linen text-ink font-sans font-light antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-laca);
+    outline-offset: 3px;
+  }
+}
+
+@utility linen-tex {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(35, 33, 30, 0.018) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(35, 33, 30, 0.014) 0 1px, transparent 1px 4px);
+}
+
+@utility swatch-tex {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.08) 0 1px, transparent 1px 3px);
+}
+
+@utility vertical {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Gutter lateral: 16 px (48 px desde md) respetando el área segura del dispositivo (DESIGN.md §8). */
+@utility gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+
+  @media (width >= 48rem) {
+    padding-left: max(48px, env(safe-area-inset-left, 0px));
+    padding-right: max(48px, env(safe-area-inset-right, 0px));
   }
 }

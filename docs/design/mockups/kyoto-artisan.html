@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SOKKO Kyoto Artisan Mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Work+Sans:wght@300;400;500&family=Shippori+Mincho:wght@400;600&display=swap">
+<style>
+  /* Layout: gallery walls. Generous asymmetric margins, vertical kanji in the gutters, museum-label cards, one lacquer-red seal per view. Single linen theme by design. */
+  :root {
+    --linen: #F4F0EB;
+    --sand: #ECE5DC;
+    --sand-2: #E3DACD;
+    --ink: #23211E;
+    --ink-soft: #6A645C;
+    --laca: #A62B2B;
+    --matcha: #5A6654;
+    --moss: #8F9779;
+    --font-serif: "Cormorant Garamond", "Cormorant", "Garamond", "Times New Roman", serif;
+    --font-sans: "Work Sans", "Helvetica Neue", system-ui, sans-serif;
+    --font-jp: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+    color-scheme: light;
+  }
+  html, body { background: var(--linen); color: var(--ink); }
+  body { font-family: var(--font-sans); font-weight: 300; -webkit-font-smoothing: antialiased; }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--linen); }
+  .gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  @media (min-width: 768px) { .gutter { padding-left: max(48px, env(safe-area-inset-left, 0px)); padding-right: max(48px, env(safe-area-inset-right, 0px)); } }
+  .serif { font-family: var(--font-serif); }
+  .jp { font-family: var(--font-jp); }
+  .vertical { writing-mode: vertical-rl; text-orientation: upright; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { text-wrap: balance; }
+  .linen-tex {
+    background-image:
+      repeating-linear-gradient(0deg, rgba(35,33,30,.018) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(35,33,30,.014) 0 1px, transparent 1px 4px);
+  }
+  .swatch-tex { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 1px, transparent 1px 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,.08) 0 1px, transparent 1px 3px); }
+  .fade { animation: fade .6s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .stamp { animation: stamp .5s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes stamp { from { transform: scale(1.6) rotate(-12deg); opacity: 0; } to { transform: scale(1) rotate(-6deg); opacity: 1; } }
+  :focus-visible { outline: 1px solid var(--laca); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  #root:empty::after { content: "Preparando el atelier…"; display: block; padding: 48px 16px; font-family: var(--font-serif); font-size: 20px; color: var(--ink-soft); }
+</style>
+
+<div id="root"></div>
+
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { theme: { extend: { colors: {
+    linen: "#F4F0EB", sand: "#ECE5DC", sand2: "#E3DACD", ink: "#23211E", inks: "#6A645C", laca: "#A62B2B", lacadk: "#C8473F", matcha: "#5A6654", moss: "#8F9779"
+  } } } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+const FREE_SHIPPING = 799;
+const SHIPPING = 99;
+const IVA = 0.16;
+const mxn = (n) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const mxn2 = (n) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const TONES = {
+  sumi:   { name: "Tinta Sumi",   hex: "#2C2925", line: "#F4F0EB" },
+  washi:  { name: "Blanco Washi", hex: "#EFE8DC", line: "#23211E" },
+  laca:   { name: "Rojo Laca",    hex: "#9E2F2C", line: "#F4F0EB" },
+  matcha: { name: "Oliva Matcha", hex: "#6E7A5E", line: "#F4F0EB" },
+};
+const SIZES = [["S", "22–24 cm"], ["M", "25–27 cm"], ["L", "28–30 cm"]];
+
+const PIECES = [
+  { id: 7,  name: "Tabi Origami Noche", jp: "折紙・夜", material: "Algodón peinado D-200 · pliegue en empeine", price: 420, tones: ["sumi","washi"],          stock: { sumi: 3, washi: 12 }, edition: "Elaboración limitada · 120 pares" },
+  { id: 12, name: "Lino Komorebi",      jp: "木漏れ日", material: "Lino y algodón · tinte de té verde",       price: 380, tones: ["matcha","washi"],        stock: { matcha: 9, washi: 4 } },
+  { id: 3,  name: "Kintsugi Washi",     jp: "金継ぎ",   material: "Algodón peinado · costura dorada visible",  price: 460, tones: ["washi","sumi","laca"],   stock: { washi: 2, sumi: 8, laca: 6 }, edition: "Elaboración limitada · 80 pares" },
+  { id: 21, name: "Hanami Laca",        jp: "花見",     material: "Algodón peinado · pigmento mineral rojo",   price: 395, tones: ["laca","washi"],          stock: { laca: 11, washi: 15 } },
+  { id: 15, name: "Tsuchi Raíz",        jp: "土",       material: "Algodón y bambú · teñido con tierra ocre",  price: 360, tones: ["matcha","sumi"],         stock: { matcha: 14, sumi: 3 } },
+  { id: 9,  name: "Mizu Calma",         jp: "水",       material: "Algodón peinado · punto tubular sin costura", price: 340, tones: ["washi","matcha","sumi"], stock: { washi: 20, matcha: 7, sumi: 10 } },
+];
+const FEW = 4;
+
+/* ---------- Calceta Tabi con textura de punto ---------- */
+function KnitTabi({ tone = "washi", className = "", strokeW = 2.2 }) {
+  const t = TONES[tone];
+  const uid = useMemo(() => Math.random().toString(36).slice(2, 8), []);
+  const D = "M84 22 H142 V118 C142 146 150 166 162 180 C178 198 172 226 146 228 H62 C40 228 30 214 33 199 C36 188 47 183 58 181 L70 177 C82 168 84 148 84 128 Z";
+  return (
+    <svg viewBox="0 0 220 250" className={className} role="img" aria-label={`Calceta tabi en ${t.name}`}>
+      <defs>
+        <pattern id={`k${uid}`} width="7" height="6" patternUnits="userSpaceOnUse">
+          <rect width="7" height="6" fill={t.hex} />
+          <path d="M0.5 0.5 L3.5 5 L6.5 0.5" fill="none" stroke={t.line} strokeOpacity=".16" strokeWidth=".8" />
+        </pattern>
+        <clipPath id={`c${uid}`}><path d={D} /></clipPath>
+      </defs>
+      <g clipPath={`url(#c${uid})`}>
+        <rect width="220" height="250" fill={`url(#k${uid})`} />
+        <rect x="80" y="18" width="70" height="24" fill="rgba(0,0,0,.07)" />
+        {Array.from({ length: 5 }).map((_, i) => <line key={i} x1={88 + i * 12} y1="20" x2={88 + i * 12} y2="42" stroke={t.line} strokeOpacity=".22" strokeWidth="1.2" />)}
+        <path d="M128 196 C140 192 156 196 170 206 L170 240 L120 240 Z" fill="rgba(0,0,0,.08)" />
+      </g>
+      <path d={D} fill="none" stroke="var(--ink)" strokeWidth={strokeW} strokeLinejoin="round" />
+      <path d="M58 186 C66 196 66 214 56 227" fill="none" stroke="var(--ink)" strokeWidth={strokeW} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Logo() {
+  return (
+    <span className="flex items-center gap-3 select-none">
+      <svg viewBox="0 0 48 48" className="w-9 h-9" aria-hidden="true">
+        <circle cx="19" cy="23" r="7" fill="var(--laca)" />
+        <path d="M20 6 H32 V22 C32 28 34 31 37 34 C41 38 39 43 34 43 H14 C10 43 8 40 9 37 C10 35 12 34 14 34 L17 33 C20 31 20 27 20 24 Z" fill="none" stroke="var(--ink)" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M14 35 C16 37 16 41 14 43" fill="none" stroke="var(--ink)" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+      <span className="leading-none">
+        <span className="block serif text-[22px] tracking-[.28em]">SOKKO</span>
+        <span className="block jp text-[10px] tracking-[.6em] text-laca mt-1">足袋工房</span>
+      </span>
+    </span>
+  );
+}
+
+const Ic = {
+  search: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" {...p}><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>,
+  bag:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" {...p}><path d="M5.5 8.5h13l-1 11.5h-11z"/><path d="M9 8.5c0-2.5 1.3-4 3-4s3 1.5 3 4"/></svg>,
+  close:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" {...p}><path d="M6 6l12 12M18 6L6 18"/></svg>,
+  menu:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" {...p}><path d="M4 9h16M7 15h13"/></svg>,
+};
+
+/* ---------- Top bar + Nav ---------- */
+const NAV = [["El Origen", "origen"], ["Colección Tabi", "atelier"], ["Tejidos Botánicos", "materia"], ["Filosofía", "filosofia"]];
+const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+function TopBar() {
+  return (
+    <div className="bg-sand gutter border-b border-ink/10" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <p className="max-w-7xl mx-auto py-2.5 text-center text-[12px] tracking-[.06em] text-inks">
+        Envío de cortesía a todo México a partir de {mxn(FREE_SHIPPING)} MXN <span className="mx-2 text-laca">·</span> <span className="serif italic text-[14px]">Cada par tejido con respeto al pie</span>
+      </p>
+    </div>
+  );
+}
+
+function Nav({ count, bump, onCart, query, setQuery }) {
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { if (searching) inputRef.current?.focus(); }, [searching]);
+  return (
+    <header className="sticky z-40 gutter" style={{ top: "env(safe-area-inset-top, 0px)" }}>
+      <div className="max-w-7xl mx-auto mt-3 bg-linen/85 backdrop-blur border border-ink/10 px-5 md:px-8 h-[68px] flex items-center gap-6">
+        <button className="lg:hidden -ml-1" aria-label="Abrir menú" aria-expanded={open} onClick={() => setOpen(o => !o)}><Ic.menu className="w-6 h-6" /></button>
+        <a href="#origen" aria-label="SOKKO inicio"><Logo /></a>
+        <nav className="hidden lg:flex items-center gap-9 ml-6 text-[12.5px] tracking-[.12em] uppercase" aria-label="Principal">
+          {NAV.map(([l, id]) => (
+            <button key={id} onClick={() => go(id)} className="group relative py-2 text-inks hover:text-ink transition-colors">
+              {l}<span className="absolute left-0 right-0 -bottom-0.5 h-px bg-laca scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+            </button>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2">
+            <button aria-label="Buscar" onClick={() => setSearching(s => !s)} className="text-inks hover:text-ink"><Ic.search className="w-5 h-5" /></button>
+            <input ref={inputRef} id="busqueda" value={query} onChange={e => setQuery(e.target.value)} placeholder="¿Qué pieza busca su paso?"
+              className={`bg-transparent border-b border-ink/20 outline-none serif italic text-[16px] transition-all duration-500 placeholder:text-inks/60 ${searching || query ? "w-56 opacity-100" : "w-0 opacity-0"}`} />
+          </div>
+          <button onClick={onCart} aria-label={`Bolsa, ${count} piezas`} className="relative flex items-center gap-2 text-ink hover:text-laca transition-colors">
+            <Ic.bag className="w-[22px] h-[22px]" />
+            <span key={bump} className="serif text-[17px] tnum fade">({count})</span>
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div className="lg:hidden max-w-7xl mx-auto bg-linen border border-t-0 border-ink/10 px-5 py-4 flex flex-col gap-3 fade">
+          <input id="busqueda-m" value={query} onChange={e => setQuery(e.target.value)} placeholder="¿Qué pieza busca su paso?" className="bg-transparent border-b border-ink/20 outline-none serif italic text-[17px] py-1" />
+          {NAV.map(([l, id]) => <button key={id} onClick={() => { go(id); setOpen(false); }} className="text-left serif text-[20px]">{l}</button>)}
+        </div>
+      )}
+    </header>
+  );
+}
+
+/* ---------- Hero ---------- */
+function Hero() {
+  const [tone, setTone] = useState("washi");
+  return (
+    <section id="origen" className="gutter linen-tex relative overflow-hidden">
+      <span aria-hidden="true" className="absolute jp text-ink/[.035] leading-none select-none pointer-events-none" style={{ fontSize: "clamp(220px,34vw,460px)", right: "-4%", top: "-6%" }}>水</span>
+      <span aria-hidden="true" className="absolute jp text-ink/[.035] leading-none select-none pointer-events-none" style={{ fontSize: "clamp(160px,24vw,320px)", left: "38%", bottom: "-14%" }}>土</span>
+      <div className="relative max-w-7xl mx-auto grid lg:grid-cols-12 gap-10 py-14 md:py-24 items-end">
+        <div className="hidden lg:flex lg:col-span-1 justify-center self-start pt-4">
+          <span className="vertical jp text-[14px] tracking-[.7em] text-laca">細部への礼讃</span>
+        </div>
+        <div className="lg:col-span-6 min-w-0">
+          <p className="text-[11px] tracking-[.32em] uppercase text-matcha">El elogio del detalle · Colección I</p>
+          <h1 className="serif font-light leading-[.98] mt-6 text-[clamp(46px,7.4vw,104px)] tracking-[-.01em]">
+            Confort que <em className="italic text-laca">Renace</em><br/>en Cada Paso
+          </h1>
+          <p className="mt-8 max-w-[34rem] text-[15.5px] leading-[1.85] text-inks">
+            Algodón peinado de cosecha selecta, tejido a 200 agujas y cerrado a mano en la punta dividida. Una pieza pensada para durar, que se suaviza con el tiempo y con la forma de su pie.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center gap-8">
+            <button onClick={() => go("atelier")} className="group relative overflow-hidden border border-ink px-9 py-4 text-[12px] tracking-[.28em] uppercase">
+              <span className="absolute inset-0 bg-ink translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
+              <span className="relative group-hover:text-linen transition-colors duration-500">Descubrir la Colección</span>
+            </button>
+            <button onClick={() => go("materia")} className="serif italic text-[18px] text-inks hover:text-ink underline decoration-ink/25 underline-offset-[6px]">La materia prima →</button>
+          </div>
+        </div>
+        <figure className="lg:col-span-5 min-w-0">
+          <div className="relative bg-sand border border-ink/10 aspect-[4/5] max-w-[480px] ml-auto">
+            <div className="absolute inset-4 border border-ink/10" />
+            <div className="absolute w-[30%] aspect-square rounded-full bg-laca/90 left-[20%] top-[24%]" />
+            <KnitTabi key={tone} tone={tone} className="absolute inset-0 m-auto h-[78%] fade drop-shadow-[0_24px_24px_rgba(35,33,30,.12)]" />
+            <span className="absolute right-6 top-8 vertical jp text-[12px] tracking-[.5em] text-inks">折紙・夜</span>
+          </div>
+          <figcaption className="max-w-[480px] ml-auto mt-4 flex items-end justify-between gap-4">
+            <div>
+              <p className="serif text-[22px] leading-tight">Tabi Origami Noche</p>
+              <p className="text-[12px] text-inks mt-1">Pieza n.º 07 · Algodón peinado D-200</p>
+            </div>
+            <div className="flex gap-2" role="radiogroup" aria-label="Tono de la pieza">
+              {["washi", "sumi", "laca", "matcha"].map(k => (
+                <button key={k} role="radio" aria-checked={tone === k} aria-label={TONES[k].name} title={TONES[k].name} onClick={() => setTone(k)}
+                  className={`w-6 h-6 rounded-full swatch-tex transition ${tone === k ? "ring-1 ring-ink ring-offset-[3px] ring-offset-linen" : "ring-1 ring-ink/15"}`}
+                  style={{ backgroundColor: TONES[k].hex }} />
+              ))}
+            </div>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Curaduría de la materia prima ---------- */
+const Plate = {
+  cotton: () => (
+    <svg viewBox="0 0 120 140" className="w-full h-full" fill="none" stroke="var(--ink)" strokeWidth="1">
+      <path d="M60 140 C60 110 58 92 60 70" /><path d="M60 100 C48 96 40 88 36 78" /><path d="M36 78 c-6 -2 -8 -10 -2 -12 c6 -2 10 4 8 10" />
+      <circle cx="60" cy="46" r="14" fill="#FBF9F6" /><circle cx="46" cy="58" r="12" fill="#FBF9F6" /><circle cx="74" cy="58" r="12" fill="#FBF9F6" /><circle cx="60" cy="64" r="11" fill="#FBF9F6" />
+      <path d="M50 72 L60 66 L70 72 M60 66 V78" stroke="var(--matcha)" />
+    </svg>
+  ),
+  tabi: () => (
+    <svg viewBox="0 0 120 140" className="w-full h-full" fill="none" stroke="var(--ink)" strokeWidth="1">
+      <path d="M46 14 H78 V66 C78 82 82 92 89 100 C98 110 94 126 80 126 H34 C22 126 16 118 18 110 C20 104 26 101 32 100 L38 98 C45 93 46 82 46 72 Z" />
+      <path d="M32 103 C37 109 37 119 31 126" stroke="var(--laca)" strokeWidth="1.4" />
+      <path d="M14 104 l-6 -4 M14 112 h-8" stroke="var(--laca)" /><text x="2" y="134" fontSize="7" fill="var(--ink-soft)" stroke="none" fontFamily="Work Sans">hallux libre</text>
+    </svg>
+  ),
+  pigment: () => (
+    <svg viewBox="0 0 120 140" className="w-full h-full" fill="none" stroke="var(--ink)" strokeWidth="1">
+      <ellipse cx="60" cy="104" rx="38" ry="12" /><path d="M22 104 C24 124 96 124 98 104" />
+      <ellipse cx="60" cy="104" rx="26" ry="7" fill="var(--laca)" fillOpacity=".75" stroke="none" />
+      <path d="M60 20 C76 40 84 54 84 66 a24 24 0 0 1 -48 0 C36 54 44 40 60 20 Z" fill="var(--moss)" fillOpacity=".25" />
+      <path d="M60 34 V80 M60 52 l-10 -8 M60 62 l12 -9" />
+    </svg>
+  ),
+};
+function Materia() {
+  const [sel, setSel] = useState(0);
+  const items = [
+    { n: "01", t: "Algodón Peinado Densidad 200", jp: "綿", d: "Suavidad que respira y perdura tras cada lavado.", note: "Fibra larga de cosecha selecta; se peina para retirar fibras cortas antes de hilar. Resultado: menos pelusa y un tejido que no pierde forma.", plate: Plate.cotton, tag: "Fibra natural" },
+    { n: "02", t: "Patrón Tabi de Punta Dividida", jp: "足袋", d: "Liberación del pulgar para equilibrar la pisada corporal.", note: "El hallux se mueve con independencia, el peso se reparte mejor y el arco trabaja sin tensión. La costura de la punta se cierra a mano.", plate: Plate.tabi, tag: "Patrón anatómico" },
+    { n: "03", t: "Pigmentos Minerales & Tintes Washi", jp: "色", d: "Colores naturales que no dañan la piel.", note: "Tintes de té, tierra ocre y pigmento mineral fijados a baja temperatura. Cada lote varía apenas en tono: esa diferencia es parte de la pieza.", plate: Plate.pigment, tag: "Tinte de bajo impacto" },
+  ];
+  return (
+    <section id="materia" className="gutter bg-sand py-20 md:py-28">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-12 gap-6 mb-14">
+          <p className="lg:col-span-3 text-[11px] tracking-[.32em] uppercase text-matcha pt-3">Curaduría de la materia prima</p>
+          <h2 className="lg:col-span-8 serif font-light text-[clamp(32px,4.6vw,58px)] leading-[1.05]">Tres decisiones que <em className="italic">se sienten</em> antes de verse.</h2>
+        </div>
+        <div className="border-t border-ink/15">
+          {items.map((it, i) => {
+            const on = sel === i;
+            const P = it.plate;
+            return (
+              <button key={it.n} onClick={() => setSel(i)} aria-expanded={on}
+                className={`w-full text-left grid grid-cols-[auto_1fr] md:grid-cols-[5rem_8rem_1fr_auto] gap-x-6 gap-y-3 items-start py-8 border-b border-ink/15 transition-colors ${on ? "bg-linen/60" : "hover:bg-linen/30"}`}>
+                <span className="serif text-[26px] text-laca md:pl-3 leading-none pt-1">{it.n}.</span>
+                <div className={`${on ? "block" : "hidden md:block"} col-span-2 md:col-span-1 row-start-2 md:row-start-auto w-28 h-32 md:w-32 md:h-36 bg-[#FBF9F6] border border-ink/10 p-2 transition-opacity ${on ? "opacity-100" : "opacity-60"}`}><P /></div>
+                <div className="min-w-0 col-start-2 md:col-start-auto row-start-1 md:row-start-auto">
+                  <p className="serif text-[clamp(22px,2.6vw,30px)] leading-tight">{it.t}</p>
+                  <p className="text-[14px] text-inks mt-2">{it.d}</p>
+                  {on && <p className="fade text-[14px] leading-[1.8] text-ink/80 mt-4 max-w-[38rem]">{it.note}</p>}
+                  <span className="inline-block mt-4 text-[10.5px] tracking-[.2em] uppercase text-matcha border border-moss/60 px-2.5 py-1">{it.tag}</span>
+                </div>
+                <span className="hidden md:block jp text-[38px] text-ink/15 pr-3">{it.jp}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Atelier ---------- */
+function PieceCard({ p, onAcquire }) {
+  const [tone, setTone] = useState(p.tones[0]);
+  const [size, setSize] = useState("M");
+  const [done, setDone] = useState(false);
+  const left = p.stock[tone];
+  const few = left <= FEW;
+  const acquire = () => { onAcquire(p, tone, size); setDone(true); setTimeout(() => setDone(false), 1600); };
+  return (
+    <article className="flex flex-col">
+      <div className="relative bg-sand aspect-[4/5] border border-ink/10">
+        <div className="absolute inset-3 border border-ink/[.07]" />
+        <KnitTabi key={tone} tone={tone} className="absolute inset-0 m-auto h-[74%] fade" strokeW={1.8} />
+        <span className="absolute left-5 top-5 serif italic text-[14px] text-inks">n.º {String(p.id).padStart(2, "0")}</span>
+        <span className="absolute right-5 top-5 vertical jp text-[11px] tracking-[.45em] text-inks">{p.jp}</span>
+      </div>
+      <div className="pt-6 px-1 flex flex-col gap-4 flex-1">
+        <div className="flex items-baseline justify-between gap-4">
+          <h3 className="serif text-[25px] leading-tight">{p.name}</h3>
+          <p className="serif text-[18px] text-inks tnum shrink-0">{mxn(p.price)}</p>
+        </div>
+        <p className="text-[12.5px] text-inks -mt-2">{p.material}</p>
+        <div className="flex items-center gap-3" role="radiogroup" aria-label={`Tono de ${p.name}`}>
+          {p.tones.map(k => (
+            <button key={k} role="radio" aria-checked={tone === k} aria-label={TONES[k].name} title={TONES[k].name} onClick={() => setTone(k)}
+              className={`w-6 h-6 rounded-full swatch-tex transition ${tone === k ? "ring-1 ring-ink ring-offset-[3px] ring-offset-linen" : "ring-1 ring-ink/15 hover:ring-ink/40"}`}
+              style={{ backgroundColor: TONES[k].hex }} />
+          ))}
+          <span className="serif italic text-[15px] text-inks ml-1">{TONES[tone].name}</span>
+        </div>
+        <div className="flex items-center gap-5 text-[12px]" role="radiogroup" aria-label="Talla">
+          {SIZES.map(([s, cm]) => (
+            <button key={s} role="radio" aria-checked={size === s} onClick={() => setSize(s)}
+              className={`pb-1 border-b transition-colors ${size === s ? "border-ink text-ink" : "border-transparent text-inks/70 hover:text-ink"}`}>
+              <span className="tracking-[.14em]">{s}</span> <span className="text-inks/70 tnum">{cm}</span>
+            </button>
+          ))}
+        </div>
+        <p className={`text-[11px] tracking-[.18em] uppercase flex items-center gap-2 ${few ? "text-laca" : "text-matcha"}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${few ? "bg-laca" : "bg-moss"}`} />
+          {few ? `Pocos ejemplares en almacén · ${left}` : (p.edition || "Disponible en atelier")}
+        </p>
+        <button onClick={acquire}
+          className={`group relative overflow-hidden mt-auto self-start px-7 py-3 text-[11.5px] tracking-[.26em] uppercase border transition-all active:scale-[.98] ${done ? "border-matcha text-linen bg-matcha" : "border-ink/70"}`}>
+          {!done && <span className="absolute inset-0 bg-ink -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out" />}
+          <span className={`relative transition-colors duration-500 ${done ? "" : "group-hover:text-linen"}`}>{done ? "Pieza reservada ✓" : "Adquirir Pieza"}</span>
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function Atelier({ query, onAcquire }) {
+  const [filter, setFilter] = useState("Todas");
+  const filters = ["Todas", "Tinta Sumi", "Blanco Washi", "Rojo Laca", "Oliva Matcha"];
+  const keyOf = { "Tinta Sumi": "sumi", "Blanco Washi": "washi", "Rojo Laca": "laca", "Oliva Matcha": "matcha" };
+  const list = PIECES.filter(p => (filter === "Todas" || p.tones.includes(keyOf[filter])) &&
+    (!query.trim() || (p.name + " " + p.material).toLowerCase().includes(query.trim().toLowerCase())));
+  return (
+    <section id="atelier" className="gutter py-20 md:py-28">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-12 gap-6 items-end mb-14">
+          <div className="lg:col-span-7">
+            <p className="text-[11px] tracking-[.32em] uppercase text-matcha">El atelier de calcetas · <span className="jp tracking-[.3em]">工房</span></p>
+            <h2 className="serif font-light text-[clamp(34px,5vw,64px)] leading-[1.02] mt-4">Catálogo de autor</h2>
+          </div>
+          <div className="lg:col-span-5 flex flex-wrap gap-x-5 gap-y-2 lg:justify-end" role="tablist" aria-label="Filtrar por tono">
+            {filters.map(f => (
+              <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
+                className={`serif text-[17px] transition-colors ${filter === f ? "italic text-laca" : "text-inks hover:text-ink"}`}>{f}</button>
+            ))}
+          </div>
+        </div>
+        {query.trim() && <p className="serif italic text-[17px] text-inks mb-8">Piezas para “{query}”: {list.length}</p>}
+        {list.length ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-16">
+            {list.map(p => <PieceCard key={p.id} p={p} onAcquire={onAcquire} />)}
+          </div>
+        ) : (
+          <div className="text-center py-20 border-y border-ink/10">
+            <p className="jp text-[48px] text-ink/15">無</p>
+            <p className="serif text-[22px] mt-2">Aún no hay una pieza con ese nombre.</p>
+            <p className="text-[13px] text-inks mt-2">Pruebe con “Tabi”, “lino” o elija otro tono.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Filosofía ---------- */
+function Filosofia() {
+  return (
+    <section id="filosofia" className="gutter bg-ink text-linen">
+      <div className="max-w-7xl mx-auto py-20 md:py-28 grid lg:grid-cols-12 gap-10 items-center">
+        <span className="lg:col-span-2 jp text-[clamp(72px,10vw,128px)] leading-none text-lacadk">侘寂</span>
+        <div className="lg:col-span-7 lg:col-start-4">
+          <p className="serif font-light italic text-[clamp(26px,3.4vw,42px)] leading-[1.25]">
+            Preferimos una calceta que envejece con usted a cien que se desechan en una temporada.
+          </p>
+          <p className="mt-6 text-[13px] tracking-[.2em] uppercase text-linen/60">Wabi-sabi · la belleza de lo imperfecto y lo duradero</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Drawer: Atelier ---------- */
+function BrushProgress({ pct, reached }) {
+  const len = 600;
+  return (
+    <div className="relative">
+      <svg viewBox="0 0 620 40" className="w-full h-8" aria-hidden="true">
+        <path d="M10 22 C 120 14, 220 28, 320 20 S 520 16, 610 22" fill="none" stroke="var(--ink)" strokeOpacity=".12" strokeWidth="6" strokeLinecap="round" />
+        <path d="M10 22 C 120 14, 220 28, 320 20 S 520 16, 610 22" fill="none" stroke="var(--laca)" strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={len} strokeDashoffset={len - (pct / 100) * len} style={{ transition: "stroke-dashoffset .8s ease" }} />
+      </svg>
+      {reached && (
+        <span className="stamp absolute -right-1 -top-4 w-12 h-12 border-2 border-laca text-laca rounded-sm flex items-center justify-center jp text-[13px] leading-tight text-center bg-linen" style={{ transform: "rotate(-6deg)" }}>
+          無料<br/>配送
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Drawer({ open, onClose, items, setQty, remove }) {
+  const [furoshiki, setFuroshiki] = useState(true);
+  const [paid, setPaid] = useState(false);
+  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const missing = Math.max(0, FREE_SHIPPING - subtotal);
+  const shipping = subtotal === 0 ? 0 : missing > 0 ? SHIPPING : 0;
+  const total = subtotal + shipping;
+  const iva = total - total / (1 + IVA);
+  const pct = Math.min(100, (subtotal / FREE_SHIPPING) * 100);
+  const pieces = items.reduce((s, i) => s + i.qty, 0);
+  const closeRef = useRef(null);
+  useEffect(() => {
+    if (!open) return; closeRef.current?.focus();
+    const k = e => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
+  }, [open]);
+  return (
+    <div className={`fixed inset-0 z-50 ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+      <div onClick={onClose} className={`absolute inset-0 bg-ink/30 transition-opacity duration-500 ${open ? "opacity-100" : "opacity-0"}`} />
+      <aside role="dialog" aria-modal="true" aria-label="Bolsa del atelier"
+        className={`absolute right-0 top-0 h-full w-full max-w-[460px] bg-linen linen-tex flex flex-col transition-transform duration-500 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)", paddingRight: "env(safe-area-inset-right, 0px)" }}>
+        <div className="flex items-start justify-between px-7 pt-7 pb-5">
+          <div>
+            <p className="text-[10.5px] tracking-[.3em] uppercase text-matcha">Su selección</p>
+            <p className="serif text-[30px] leading-tight mt-1">Bolsa del atelier <span className="text-inks text-[20px] tnum">({pieces})</span></p>
+          </div>
+          <button ref={closeRef} onClick={onClose} aria-label="Cerrar" className="text-inks hover:text-ink mt-1"><Ic.close className="w-6 h-6" /></button>
+        </div>
+
+        <div className="px-7 pb-6 border-b border-ink/10">
+          <BrushProgress pct={pct} reached={subtotal >= FREE_SHIPPING} />
+          <p className="serif italic text-[16.5px] mt-2 text-ink/85">
+            {subtotal === 0 ? <>El envío es de cortesía a partir de {mxn(FREE_SHIPPING)}.</>
+              : missing > 0 ? <>Faltan <span className="not-italic text-laca tnum">{mxn(missing)}</span> para su envío de cortesía.</>
+              : <>Su envío a cualquier punto de México corre por nuestra cuenta.</>}
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-7">
+          {items.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center py-16">
+              <span className="jp text-[56px] text-ink/15">空</span>
+              <p className="serif text-[22px] mt-2">Su bolsa aún está vacía</p>
+              <p className="text-[13px] text-inks mt-1">Elija una pieza en el atelier.</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-ink/10">
+              {items.map(i => (
+                <li key={i.key} className="py-6 grid grid-cols-[84px_1fr] gap-5">
+                  <div className="w-[84px] h-[100px] bg-sand border border-ink/10 flex items-center justify-center">
+                    <KnitTabi tone={i.tone} className="h-[80%]" strokeW={2.4} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex justify-between gap-3">
+                      <p className="serif text-[20px] leading-tight">{i.name}</p>
+                      <p className="serif text-[17px] tnum shrink-0">{mxn(i.price * i.qty)}</p>
+                    </div>
+                    <p className="text-[12px] text-inks mt-1">{TONES[i.tone].name} · Talla {i.size}</p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-[14px]">
+                        <button aria-label="Una pieza menos" onClick={() => setQty(i.key, i.qty - 1)} className="w-6 h-6 rounded-full border border-ink/25 hover:border-ink leading-none">−</button>
+                        <span className="serif text-[18px] tnum w-4 text-center">{i.qty}</span>
+                        <button aria-label="Una pieza más" disabled={i.qty >= i.max} onClick={() => setQty(i.key, i.qty + 1)} className="w-6 h-6 rounded-full border border-ink/25 hover:border-ink leading-none disabled:opacity-30">+</button>
+                      </div>
+                      <button onClick={() => remove(i.key)} className="text-[11px] tracking-[.18em] uppercase text-inks hover:text-laca">Retirar</button>
+                    </div>
+                    {i.qty >= i.max && <p className="text-[11px] text-laca mt-2">Son todos los ejemplares disponibles.</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="px-7 py-6 border-t border-ink/10 bg-sand/70">
+          <label className="flex items-start gap-3 cursor-pointer mb-5">
+            <input id="furoshiki" type="checkbox" checked={furoshiki} onChange={e => setFuroshiki(e.target.checked)} className="mt-1 accent-matcha" />
+            <span className="text-[13px] leading-snug">
+              <span className="text-ink">Envolver en furoshiki de lino reutilizable</span><br/>
+              <span className="text-inks">Sin costo. Sin plásticos; el paño sirve después como pañuelo o bolsa.</span>
+            </span>
+          </label>
+          <dl className="text-[14px] space-y-2 tnum">
+            <div className="flex justify-between"><dt className="text-inks">Subtotal</dt><dd>{mxn2(subtotal)}</dd></div>
+            <div className="flex justify-between"><dt className="text-inks">Envío</dt><dd className={shipping === 0 && subtotal > 0 ? "text-matcha" : ""}>{subtotal === 0 ? "—" : shipping ? mxn2(shipping) : "Cortesía"}</dd></div>
+            <div className="flex justify-between text-[12.5px]"><dt className="text-inks">IVA incluido (16%)</dt><dd className="text-inks">{mxn2(iva)}</dd></div>
+            <div className="flex justify-between items-baseline pt-3 border-t border-ink/15"><dt className="serif text-[20px]">Total</dt><dd className="serif text-[26px]">{mxn2(total)} <span className="text-[13px] text-inks">MXN</span></dd></div>
+          </dl>
+          <button disabled={!items.length} onClick={() => { setPaid(true); setTimeout(() => setPaid(false), 2200); }}
+            className="mt-5 w-full bg-laca hover:bg-[#8F2424] disabled:bg-sand2 disabled:text-inks text-linen py-4 text-[12px] tracking-[.28em] uppercase transition-colors">
+            {paid ? "Conectando con pago seguro…" : "Proceder al Pago Seguro"}
+          </button>
+          <p className="text-[11px] text-inks text-center mt-3">Tarjeta o OXXO Pay · Mockup: el pago real se integra vía POST /api/orders</p>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/* ---------- Footer ---------- */
+function Footer() {
+  const cols = [
+    ["Atelier", ["Colección Tabi", "Tejidos Botánicos", "Ediciones limitadas", "Tarjeta de regalo"]],
+    ["Atención", ["Guía de tallas en cm", "Envíos y cortesías", "Cambios y cuidado", "Cita personalizada"]],
+  ];
+  return (
+    <footer className="gutter bg-sand border-t border-ink/10">
+      <div className="max-w-7xl mx-auto pt-20 pb-10">
+        <blockquote className="max-w-3xl">
+          <p className="serif font-light italic text-[clamp(24px,3vw,36px)] leading-[1.3]">
+            “Durante siglos, el tabi separó el dedo para que el pie recordara cómo apoyarse en la tierra. Nosotros sólo seguimos tejiendo esa memoria.”
+          </p>
+          <footer className="mt-4 text-[11px] tracking-[.3em] uppercase text-inks">— Manifiesto SOKKO</footer>
+        </blockquote>
+
+        <div className="mt-16 grid gap-10 md:grid-cols-[1.3fr_1fr_1fr_1.2fr]">
+          <div>
+            <Logo />
+            <p className="text-[13px] text-inks mt-5 leading-relaxed max-w-xs">Calcetería artesanal con ADN japonés. Diseñada en Sinaloa, para caminar todo México.</p>
+          </div>
+          {cols.map(([t, ls]) => (
+            <div key={t}>
+              <p className="text-[10.5px] tracking-[.3em] uppercase text-matcha mb-4">{t}</p>
+              <ul className="space-y-2.5">{ls.map(l => <li key={l}><a href="#origen" className="serif text-[17px] text-ink/80 hover:text-laca">{l}</a></li>)}</ul>
+            </div>
+          ))}
+          <div>
+            <p className="text-[10.5px] tracking-[.3em] uppercase text-matcha mb-4">Atención personalizada</p>
+            <p className="serif text-[18px]">hola@sokko.mx</p>
+            <p className="text-[12.5px] text-inks mt-1">Lunes a viernes, 9:00 a 18:00 (hora del Pacífico)</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {["Algodón trazable", "Tintes de bajo impacto", "Empaque sin plástico"].map(s => (
+                <span key={s} className="text-[10px] tracking-[.14em] uppercase text-matcha border border-moss/60 rounded-full px-3 py-1.5">{s}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-14 pt-6 border-t border-ink/10 flex flex-col md:flex-row md:items-center justify-between gap-4 text-[12px] text-inks">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="tracking-[.2em] uppercase text-[10.5px]">Pagos</span>
+            {["Visa", "Mastercard", "American Express", "OXXO Pay"].map(m => <span key={m} className="serif text-[15px] text-ink/80">{m}</span>)}
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-1">
+            <a href="#origen" className="hover:text-ink">Aviso de privacidad</a>
+            <a href="#origen" className="hover:text-ink">Términos</a>
+            <span>© 2026 SOKKO <span className="jp">ソッコ</span> · NEXUS CODE · UAdeO</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ---------- App ---------- */
+function App() {
+  const [cart, setCart] = useState([
+    { key: "7-sumi-M", id: 7, name: "Tabi Origami Noche", price: 420, tone: "sumi", size: "M", qty: 1, max: 3 },
+  ]);
+  const [open, setOpen] = useState(false);
+  const [bump, setBump] = useState(0);
+  const [query, setQuery] = useState("");
+  useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; }, [open]);
+  const count = cart.reduce((s, i) => s + i.qty, 0);
+  const acquire = (p, tone, size) => {
+    const key = `${p.id}-${tone}-${size}`;
+    setCart(c => {
+      const f = c.find(i => i.key === key);
+      if (f) return c.map(i => i.key === key ? { ...i, qty: Math.min(i.qty + 1, i.max) } : i);
+      return [...c, { key, id: p.id, name: p.name, price: p.price, tone, size, qty: 1, max: p.stock[tone] }];
+    });
+    setBump(b => b + 1);
+    setTimeout(() => setOpen(true), 500);
+  };
+  const setQty = (key, q) => setCart(c => q <= 0 ? c.filter(i => i.key !== key) : c.map(i => i.key === key ? { ...i, qty: Math.min(q, i.max) } : i));
+  const remove = (key) => setCart(c => c.filter(i => i.key !== key));
+  return (
+    <>
+      <TopBar />
+      <Nav count={count} bump={bump} onCart={() => setOpen(true)} query={query} setQuery={setQuery} />
+      <main>
+        <Hero />
+        <Materia />
+        <Atelier query={query} onAcquire={acquire} />
+        <Filosofia />
+      </main>
+      <Footer />
+      <Drawer open={open} onClose={() => setOpen(false)} items={cart} setQty={setQty} remove={remove} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+</html>
