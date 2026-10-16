@@ -83,7 +83,7 @@ export default function MateriaCuration() {
                   >
                     {it.note}
                   </span>
-                  <span className="mt-4 inline-block border border-moss/60 px-2.5 py-1 text-[10.5px] tracking-[.2em] text-matcha uppercase">
+                  <span className="mt-4 inline-block border border-moss/60 px-2.5 py-1 text-[11px] tracking-[.2em] text-matcha uppercase">
                     {it.tag}
                   </span>
                 </span>

@@ -337,9 +337,9 @@ export default {
 - **Criterio:** se abre desde el Navbar y tras "Adquirir Pieza" (500 ms después del clic); cierra con `Esc`, clic en fondo y botón ✕; el foco va al botón de cierre al abrir y regresa al disparador al cerrar.
 
 ### Fase 8 — Accesibilidad, responsive y pulido
-- [ ] Checklist de §8 completo.
-- [ ] Sin warnings en consola; `npm run build` limpio.
-- [ ] Lighthouse (móvil) en Accesibilidad ≥ 95.
+- [x] Checklist de §8 completo.
+- [x] Sin warnings en consola; `npm run build` limpio.
+- [x] Lighthouse (móvil) en Accesibilidad ≥ 95.
 
 ---
 
@@ -472,14 +472,14 @@ props: progress: number (0–100), reached: boolean
 
 ## 8. Accesibilidad y responsive (checklist de Fase 8)
 
-- [ ] Contraste: `ink-soft` sobre `linen` y `sand` ≥ 4.5:1; `matcha` solo en texto ≥ 11 px; `moss` nunca como texto.
-- [ ] Todos los kanji y katakana decorativos con `aria-hidden="true"`; los que son contenido (nombre japonés de la pieza) con `lang="ja"`.
-- [ ] Áreas táctiles ≥ 44 × 44 px en swatches, tallas, stepper, cerrar drawer y menú.
-- [ ] Navegación completa con teclado: menú, buscador, filtros, acordeón, tarjetas y drawer.
-- [ ] `prefers-reduced-motion`: sin animaciones de relleno, sello ni scroll suave.
-- [ ] Breakpoints verificados: 360, 390, 768, 1024, 1280, 1440 px. Sin scroll horizontal en ninguno.
-- [ ] Gutter lateral mínimo 16 px (`px-4`), 48 px desde `md` (`md:px-12`).
-- [ ] Imágenes futuras con `alt` descriptivo: "Calceta {nombre} en {tono}".
+- [x] Contraste: `ink-soft` sobre `linen` y `sand` ≥ 4.5:1; `matcha` solo en texto ≥ 11 px; `moss` nunca como texto.
+- [x] Todos los kanji y katakana decorativos con `aria-hidden="true"`; los que son contenido (nombre japonés de la pieza) con `lang="ja"`.
+- [x] Áreas táctiles ≥ 44 × 44 px en swatches, tallas, stepper, cerrar drawer y menú.
+- [x] Navegación completa con teclado: menú, buscador, filtros, acordeón, tarjetas y drawer.
+- [x] `prefers-reduced-motion`: sin animaciones de relleno, sello ni scroll suave.
+- [x] Breakpoints verificados: 360, 390, 768, 1024, 1280, 1440 px. Sin scroll horizontal en ninguno.
+- [x] Gutter lateral mínimo 16 px (`px-4`), 48 px desde `md` (`md:px-12`).
+- [x] Imágenes futuras con `alt` descriptivo: "Calceta {nombre} en {tono}".
 
 ---
 
@@ -521,11 +521,11 @@ Cuando la API exista, solo cambia `productService.js` (mapear `variants` a `stoc
 
 ## 10. Definición de terminado
 
-- [ ] Las 8 fases con casillas marcadas.
-- [ ] El Home en `npm run dev` es visualmente equivalente al mockup en escritorio y móvil.
-- [ ] Todas las interacciones del mockup funcionan: filtro por tono, búsqueda, acordeón de materia, swatches y tallas por tarjeta, "Adquirir Pieza", drawer, pincelada de progreso, sello, furoshiki, cantidades, retirar, desglose con IVA.
-- [ ] Reglas de §4.4 verificadas manualmente con estos casos:
+- [x] Las 8 fases con casillas marcadas.
+- [x] El Home en `npm run dev` es visualmente equivalente al mockup en escritorio y móvil.
+- [x] Todas las interacciones del mockup funcionan: filtro por tono, búsqueda, acordeón de materia, swatches y tallas por tarjeta, "Adquirir Pieza", drawer, pincelada de progreso, sello, furoshiki, cantidades, retirar, desglose con IVA.
+- [x] Reglas de §4.4 verificadas manualmente con estos casos:
   - 1 × $420 → falta $379, envío $99, total $519.00, IVA $71.59.
   - 2 × $420 → envío "Cortesía", total $840.00, IVA $115.86, sello visible.
-- [ ] `CONTEXTO_MAESTRO.md` actualizado (§1.3).
+- [x] `CONTEXTO_MAESTRO.md` actualizado (§1.3).
 - [ ] PR `feat/home-kyoto-artisan` → `main` con capturas en 1440 px y 390 px.

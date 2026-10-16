@@ -90,7 +90,7 @@ export default function CartDrawer() {
       >
         <div className="flex items-start justify-between px-7 pt-7 pb-5">
           <div>
-            <p className="text-[10.5px] tracking-[.3em] text-matcha uppercase">Su selección</p>
+            <p className="text-[11px] tracking-[.3em] text-matcha uppercase">Su selección</p>
             <h2 id={titleId} className="mt-1 font-serif text-[30px] leading-tight font-normal">
               Bolsa del atelier <span className="tnum text-[20px] text-ink-soft">({count})</span>
             </h2>

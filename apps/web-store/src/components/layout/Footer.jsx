@@ -33,7 +33,7 @@ export default function Footer() {
 
           {COLUMNS.map(({ title, links }) => (
             <nav key={title} aria-label={title}>
-              <h2 className="mb-4 text-[10.5px] font-normal tracking-[.3em] text-matcha uppercase">{title}</h2>
+              <h2 className="mb-4 text-[11px] font-normal tracking-[.3em] text-matcha uppercase">{title}</h2>
               <ul className="space-y-1">
                 {links.map((l) => (
                   <li key={l}>
@@ -47,14 +47,14 @@ export default function Footer() {
           ))}
 
           <div>
-            <h2 className="mb-4 text-[10.5px] font-normal tracking-[.3em] text-matcha uppercase">Atención personalizada</h2>
+            <h2 className="mb-4 text-[11px] font-normal tracking-[.3em] text-matcha uppercase">Atención personalizada</h2>
             <p className="font-serif text-[18px] select-all">hola@sokko.mx</p>
             <p className="mt-1 text-[12.5px] text-ink-soft">Lunes a viernes, 9:00 a 18:00 (hora del Pacífico)</p>
             <ul className="mt-5 flex flex-wrap gap-2" aria-label="Compromisos de sostenibilidad">
               {SUSTAINABILITY.map((s) => (
                 <li
                   key={s}
-                  className="rounded-full border border-moss/60 px-3 py-1.5 text-[10px] tracking-[.14em] text-matcha uppercase"
+                  className="rounded-full border border-moss/60 px-3 py-1.5 text-[11px] tracking-[.14em] text-matcha uppercase"
                 >
                   {s}
                 </li>

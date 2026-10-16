@@ -26,8 +26,9 @@ function LogoMark() {
 export default function Logo({ asLink = true }) {
   if (!asLink) return <LogoMark />
   return (
-    <a href="#origen" aria-label="SOKKO inicio" className="inline-flex">
+    <a href="#origen" className="inline-flex">
       <LogoMark />
+      <span className="sr-only"> inicio</span>
     </a>
   )
 }

@@ -3,6 +3,7 @@ export default function Filosofia() {
   return (
     <section id="filosofia" className="gutter scroll-mt-20 bg-ink text-linen">
       <div className="mx-auto grid max-w-7xl items-center gap-10 py-20 md:py-28 lg:grid-cols-12">
+        {/* TODO(design): 侘寂 en laca sobre ink tiene contraste 2.29:1; es decorativo (aria-hidden) pero Lighthouse lo marca. */}
         <span aria-hidden="true" className="font-jp text-[clamp(72px,10vw,128px)] leading-none text-laca lg:col-span-2">
           侘寂
         </span>

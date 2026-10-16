@@ -13,6 +13,8 @@
   --color-ink-soft: #6a645c;
   --color-laca: #a62b2b;
   --color-laca-hover: #8f2424;
+  /* TODO(design): matcha sobre sand da 4.43:1 (Lighthouse pide 4.5:1 para texto pequeño). Sobre linen da 4.88:1.
+     Valorar oscurecer el token (p. ej. #5A6654) o no usar texto matcha sobre fondos sand. */
   --color-matcha: #606c5a;
   --color-moss: #8f9779;
 
