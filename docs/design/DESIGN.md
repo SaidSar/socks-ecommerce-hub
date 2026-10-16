@@ -327,8 +327,8 @@ export default {
 - **Criterio:** el header es sticky, el menú móvil se abre/cierra con botón con `aria-expanded`, y los cuatro enlaces llevan a su sección sin que el header tape el título.
 
 ### Fase 6 — Secciones del Home
-- [ ] `HeroEditorial`, `MateriaCuration` + `BotanicalPlate`, `AtelierCatalog` + `PieceCard`, `Filosofia`.
-- [ ] `pages/Home.jsx` compone todo y maneja `loading / error / ready`.
+- [x] `HeroEditorial`, `MateriaCuration` + `BotanicalPlate`, `AtelierCatalog` + `PieceCard`, `Filosofia`.
+- [x] `pages/Home.jsx` compone todo y maneja `loading / error / ready`.
 - **Criterio:** visualmente equivalente al mockup en 1440 px, 1024 px y 390 px.
 
 ### Fase 7 — Drawer del carrito
