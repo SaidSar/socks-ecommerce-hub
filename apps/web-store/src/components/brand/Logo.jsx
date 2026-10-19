@@ -32,7 +32,7 @@ export default function Logo({ asLink = true, to }) {
   if (!asLink) return <LogoMark />
   if (to) {
     return (
-      <Link to={to} className="inline-flex">
+      <Link to={to} className="inline-flex min-h-11 items-center">
         <LogoMark />
         <span className="sr-only">, volver a la tienda</span>
       </Link>

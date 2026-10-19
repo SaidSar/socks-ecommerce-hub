@@ -109,7 +109,7 @@ export default function LoginForm({ onAuthStart, search = '' }) {
         ¿Primera visita al atelier?{' '}
         <Link
           to={{ pathname: '/cuenta/registro', search }}
-          className="text-ink underline decoration-laca underline-offset-4"
+          className="inline-flex min-h-11 items-center text-ink underline decoration-laca underline-offset-4"
         >
           Crear una cuenta
         </Link>

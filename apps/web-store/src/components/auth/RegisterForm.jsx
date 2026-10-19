@@ -180,7 +180,7 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
         </div>
       </fieldset>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col">
         <AuthCheckbox id="news" checked={f.news} onChange={set('news')}>
           Quiero enterarme de las ediciones limitadas antes de su lanzamiento.{' '}
           <span className="text-ink-soft">Un correo al mes, como máximo.</span>
@@ -205,7 +205,7 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
 
       <p className="text-center text-[13.5px] text-ink-soft">
         ¿Ya tiene cuenta?{' '}
-        <Link to={{ pathname: '/cuenta', search }} className="text-ink underline decoration-laca underline-offset-4">
+        <Link to={{ pathname: '/cuenta', search }} className="inline-flex min-h-11 items-center text-ink underline decoration-laca underline-offset-4">
           Iniciar sesión
         </Link>
       </p>

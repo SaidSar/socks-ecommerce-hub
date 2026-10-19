@@ -59,7 +59,7 @@ export default function AuthField({
 export function AuthCheckbox({ id, checked, onChange, error, children }) {
   return (
     <div>
-      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-[13.5px] leading-snug">
+      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-start gap-3 py-[11px] text-[13.5px] leading-snug">
         <input
           id={id}
           type="checkbox"

@@ -9,7 +9,7 @@ import AuthEditorialPanel from './AuthEditorialPanel'
  */
 export default function AuthLayout({ view, children }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <AuthEditorialPanel view={view} />
       <main className="linen-tex relative">
         <div className="gutter flex min-h-full flex-col py-8 lg:py-12 lg:pl-16">
@@ -22,12 +22,12 @@ export default function AuthLayout({ view, children }) {
 
           <div className="mx-auto my-auto w-full max-w-[460px] pt-10 pb-6 lg:mx-0">{children}</div>
 
-          <footer className="flex flex-wrap gap-x-5 gap-y-1 pt-8 text-[12px] text-ink-soft">
+          <footer className="flex flex-wrap items-center gap-x-5 pt-8 text-[12px] text-ink-soft">
             {/* TODO(design): enlazar a las rutas legales cuando existan. */}
-            <a href="#privacidad" className="hover:text-ink">
+            <a href="#privacidad" className="inline-flex min-h-11 items-center hover:text-ink">
               Aviso de privacidad
             </a>
-            <a href="#terminos" className="hover:text-ink">
+            <a href="#terminos" className="inline-flex min-h-11 items-center hover:text-ink">
               Términos
             </a>
             <span>

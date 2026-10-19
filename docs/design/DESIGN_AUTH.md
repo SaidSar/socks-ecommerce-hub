@@ -201,10 +201,10 @@ getSession() → user | null
 - **Criterio:** login demo → bienvenida "お帰" → "Volver al atelier" muestra iniciales "AM" en el Navbar y talla M preseleccionada; "Cerrar sesión" vuelve al ícono.
 
 ### Fase 5 — Accesibilidad, responsive y pulido
-- [ ] Áreas táctiles ≥ 44 px; `prefers-reduced-motion` sin shake, sello ni pincelada animada.
-- [ ] Breakpoints 360, 390, 768, 1024, 1280, 1440 sin scroll horizontal.
-- [ ] Lighthouse móvil Accesibilidad = 100 en `/cuenta` y `/cuenta/registro`.
-- [ ] Capturas en `docs/design/screenshots/`: `auth-login-1440.png`, `auth-registro-390.png`, `auth-bienvenida-1440.png`, `home-navbar-sesion-1440.png`.
+- [x] Áreas táctiles ≥ 44 px; `prefers-reduced-motion` sin shake, sello ni pincelada animada.
+- [x] Breakpoints 360, 390, 768, 1024, 1280, 1440 sin scroll horizontal.
+- [x] Lighthouse móvil Accesibilidad = 100 en `/cuenta` y `/cuenta/registro`.
+- [x] Capturas en `docs/design/screenshots/`: `auth-login-1440.png`, `auth-registro-390.png`, `auth-bienvenida-1440.png`, `home-navbar-sesion-1440.png`.
 
 ---
 
@@ -236,6 +236,6 @@ Clasificación SOA: hash/JWT = **servicio de utilidad**; `Users` = **servicio de
 ---
 
 ## 9. Definición de terminado
-- [ ] Fases 1–5 con casillas marcadas y los 7 casos de §7 verificados.
-- [ ] `npm run build` y `npm run lint` limpios en la rama.
+- [x] Fases 1–5 con casillas marcadas y los 7 casos de §7 verificados.
+- [x] `npm run build` y `npm run lint` limpios en la rama.
 - [ ] PR `said/frontend-login` → `main` abierto con capturas enlazadas desde `blob/said/frontend-login/...` (se corrigen a `blob/main/` después del merge).
