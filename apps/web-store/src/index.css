@@ -17,6 +17,7 @@
   --color-matcha: #5a6654;
   --color-moss: #8f9779;
   --color-ocre: #b07a3c; /* solo trazo del medidor de contraseña (puntaje 2) */
+  --color-sokko-red: #d91f25; /* solo logotipo; no usar en UI */
 
   --font-serif: 'Cormorant Garamond', 'Cormorant', 'Garamond', 'Times New Roman', serif;
   --font-sans: 'Work Sans', 'Helvetica Neue', system-ui, sans-serif;

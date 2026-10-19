@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import Logo from '../brand/Logo'
 import KnitTabi from '../product/KnitTabi'
 
@@ -67,7 +68,9 @@ export default function AuthEditorialPanel({ view }) {
 
       <div className="gutter relative flex h-full flex-col py-10 lg:py-16 lg:pr-12">
         <div className="self-start">
-          <Logo to="/" />
+          <Link to="/" aria-label="SOKKO, volver a la tienda" className="inline-flex min-h-11 items-center">
+            <Logo variant="horizontal" className="h-10 md:h-11" />
+          </Link>
         </div>
 
         <div className="mt-10 grid grid-cols-[1fr_auto] items-end gap-6 lg:mt-16 lg:grid-cols-1">

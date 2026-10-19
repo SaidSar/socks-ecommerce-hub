@@ -1,47 +1,38 @@
-import { Link } from 'react-router-dom'
+import isotipoUrl from '../../assets/brand/sokko-isotipo.svg'
+import isotipoDarkUrl from '../../assets/brand/sokko-isotipo-on-dark.svg'
+import horizontalUrl from '../../assets/brand/sokko-logo-horizontal.svg'
+import horizontalDarkUrl from '../../assets/brand/sokko-logo-horizontal-on-dark.svg'
+import verticalUrl from '../../assets/brand/sokko-logo.svg'
+import verticalDarkUrl from '../../assets/brand/sokko-logo-on-dark.svg'
 
-function LogoMark() {
-  return (
-    <span className="flex items-center gap-3 select-none">
-      <svg viewBox="0 0 48 48" className="h-9 w-9" aria-hidden="true">
-        <circle cx="19" cy="23" r="7" fill="var(--color-laca)" />
-        <path
-          d="M20 6 H32 V22 C32 28 34 31 37 34 C41 38 39 43 34 43 H14 C10 43 8 40 9 37 C10 35 12 34 14 34 L17 33 C20 31 20 27 20 24 Z"
-          fill="none"
-          stroke="var(--color-ink)"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <path d="M14 35 C16 37 16 41 14 43" fill="none" stroke="var(--color-ink)" strokeWidth="1.4" strokeLinecap="round" />
-      </svg>
-      <span className="leading-none">
-        <span className="block font-serif text-[22px] tracking-[.28em]">SOKKO</span>
-        <span className="mt-1 block font-jp text-[10px] tracking-[.6em] text-laca" aria-hidden="true">
-          足袋工房
-        </span>
-      </span>
-    </span>
-  )
+// Archivos oficiales del cliente, sin modificar (docs/brand/README.md). `dark` solo sobre fondo tinta.
+const SOURCES = {
+  horizontal: { light: horizontalUrl, dark: horizontalDarkUrl },
+  vertical: { light: verticalUrl, dark: verticalDarkUrl },
+  isotipo: { light: isotipoUrl, dark: isotipoDarkUrl },
+}
+
+// Tamaño mínimo del README §3 expresado en altura (el ancho siempre es automático):
+// horizontal ≥ 110 px de ancho → 36 px de alto; vertical ≥ 96 px de ancho → 84 px de alto.
+const MIN_HEIGHT = {
+  horizontal: 'min-h-9',
+  vertical: 'min-h-[84px]',
+  isotipo: '',
 }
 
 /**
- * Logotipo SOKKO. Por defecto es un enlace a #origen; `asLink={false}` lo deja como marca estática (footer)
- * y `to` lo convierte en enlace de ruta (pantalla de cuenta → tienda).
+ * Logotipo oficial SOKKO. La altura va en `className` (h-…); el ancho se ajusta solo para no deformarlo.
+ * Es solo la imagen: el enlace (si lo hay) lo pone quien lo usa.
  */
-export default function Logo({ asLink = true, to }) {
-  if (!asLink) return <LogoMark />
-  if (to) {
-    return (
-      <Link to={to} className="inline-flex min-h-11 items-center">
-        <LogoMark />
-        <span className="sr-only">, volver a la tienda</span>
-      </Link>
-    )
-  }
+export default function Logo({ variant = 'horizontal', tone = 'light', className = '' }) {
+  const src = (SOURCES[variant] ?? SOURCES.horizontal)[tone === 'dark' ? 'dark' : 'light']
   return (
-    <a href="#origen" className="inline-flex">
-      <LogoMark />
-      <span className="sr-only"> inicio</span>
-    </a>
+    <img
+      src={src}
+      alt="SOKKO"
+      draggable={false}
+      decoding="async"
+      className={`block w-auto max-w-none select-none ${MIN_HEIGHT[variant] ?? ''} ${className}`}
+    />
   )
 }

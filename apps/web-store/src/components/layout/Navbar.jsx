@@ -66,7 +66,9 @@ export default function Navbar({ query, onQueryChange }) {
           <MenuIcon className="h-6 w-6" />
         </button>
 
-        <Logo />
+        <a href="#origen" aria-label="SOKKO, inicio" className="inline-flex shrink-0 items-center">
+          <Logo variant="horizontal" className="h-9 md:h-11" />
+        </a>
 
         <nav className="ml-6 hidden items-center gap-9 text-[12.5px] tracking-[.12em] uppercase lg:flex" aria-label="Principal">
           {NAV_LINKS.map(({ label, id }) => (
