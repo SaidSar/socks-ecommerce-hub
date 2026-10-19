@@ -2,8 +2,6 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { passwordStrength } from '../../utils/authValidation'
 
 const BRUSH = 'M5 11 C 60 6, 110 15, 160 10 S 260 7, 305 11'
-// TODO(design): #B07A3C (ocre, puntaje 2) no es token del sistema; viene del mockup.
-const OCHRE = '#B07A3C'
 
 /** Medidor de pincelada (DESIGN_AUTH.md §5.2): el trazo crece con el puntaje 0–4. */
 export default function PasswordStrength({ password }) {
@@ -16,8 +14,8 @@ export default function PasswordStrength({ password }) {
   }, [])
 
   const pct = password ? score / 4 : 0
-  const color = score <= 1 ? 'var(--color-laca)' : score === 2 ? OCHRE : 'var(--color-matcha)'
-  // El ocre como texto sobre lino queda en ~3.2:1; la etiqueta usa ink-soft para pasar AA.
+  const color = score <= 1 ? 'var(--color-laca)' : score === 2 ? 'var(--color-ocre)' : 'var(--color-matcha)'
+  // El ocre (solo trazo) como texto sobre lino queda en ~3.2:1; la etiqueta usa ink-soft para pasar AA.
   const labelColor = score === 2 ? 'var(--color-ink-soft)' : color
 
   return (

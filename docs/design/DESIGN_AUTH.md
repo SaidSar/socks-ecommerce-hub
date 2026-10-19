@@ -80,7 +80,7 @@ Archivo: `src/components/layout/Navbar.jsx`. Orden a la derecha: **buscar · cue
 - En el menú móvil del Navbar agrega una fila al final: "Iniciar sesión" o "Hola, {nombre} · Cerrar sesión".
 
 **Integración con el catálogo**
-- `PieceCard` y la pieza del hero preseleccionan `user.preferredSize` si existe; si no, `'M'` (regla actual).
+- `PieceCard` preselecciona `user.preferredSize` si existe; si no, `'M'`. El hero no tiene selector de talla, así que no aplica.
 
 ---
 
@@ -101,6 +101,7 @@ Beneficios: 01 Su talla guardada — Cada pieza aparece ya en S, M o L según su
 - Campos: Correo electrónico (`type=email`, `autoComplete=email`, placeholder `nombre@dominio.com`) · Contraseña (`autoComplete=current-password`, botón mostrar/ocultar con `aria-pressed`).
 - "Mantener la sesión" (checkbox, marcado por defecto) y enlace en itálica "¿Olvidó su contraseña?" → `/cuenta/recuperar`.
 - Botón: "Iniciar sesión" · cargando: "Verificando…" (spinner).
+- Mientras carga no se deshabilita (conserva el foco): usa `aria-busy="true"` e ignora clics repetidos.
 - Pie: "¿Primera visita al atelier? Crear una cuenta".
 - Bloque demo (solo `import.meta.env.DEV`): "Demo · correo hola@sokko.mx · contraseña Kyoto2026".
 
@@ -152,7 +153,7 @@ Beneficios: 01 Su talla guardada — Cada pieza aparece ya en S, M o L según su
 - Campos con `aria-invalid` y `aria-describedby` hacia su error/hint; alertas generales con `role="alert"`.
 
 ### 5.2 Fuerza de contraseña
-Reglas: ≥ 8 caracteres · mayúsculas y minúsculas · al menos un número · un símbolo (opcional). Válida = primeras tres. Puntaje 0–4 → etiqueta Débil (0–1), Aceptable (2), Buena (3), Excelente (4). Color del trazo: `laca` (≤1), `#B07A3C` (2), `matcha` (≥3). Longitud del trazo con `getTotalLength()`.
+Reglas: ≥ 8 caracteres · mayúsculas y minúsculas · al menos un número · un símbolo (opcional). Válida = primeras tres. Puntaje 0–4 → etiqueta Débil (0–1), Aceptable (2), Buena (3), Excelente (4). Color del trazo: `laca` (≤1), token `ocre` `#B07A3C` (2, solo para el trazo; la etiqueta va en `ink-soft`), `matcha` (≥3). Longitud del trazo con `getTotalLength()`.
 
 ### 5.3 `src/services/authService.js` (simulado)
 API pública (todas `async`, latencia simulada 900–1300 ms):
@@ -238,4 +239,4 @@ Clasificación SOA: hash/JWT = **servicio de utilidad**; `Users` = **servicio de
 ## 9. Definición de terminado
 - [x] Fases 1–5 con casillas marcadas y los 7 casos de §7 verificados.
 - [x] `npm run build` y `npm run lint` limpios en la rama.
-- [ ] PR `said/frontend-login` → `main` abierto con capturas enlazadas desde `blob/said/frontend-login/...` (se corrigen a `blob/main/` después del merge).
+- [x] PR `said/frontend-login` → `main` abierto con capturas enlazadas desde `blob/said/frontend-login/...` (se corrigen a `blob/main/` después del merge).

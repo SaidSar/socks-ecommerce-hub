@@ -16,6 +16,7 @@
   --color-laca-dark-bg: #c8473f; /* solo sobre fondo ink, texto grande */
   --color-matcha: #5a6654;
   --color-moss: #8f9779;
+  --color-ocre: #b07a3c; /* solo trazo del medidor de contraseña (puntaje 2) */
 
   --font-serif: 'Cormorant Garamond', 'Cormorant', 'Garamond', 'Times New Roman', serif;
   --font-sans: 'Work Sans', 'Helvetica Neue', system-ui, sans-serif;

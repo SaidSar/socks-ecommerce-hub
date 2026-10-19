@@ -88,7 +88,7 @@ export function AuthSubmit({ loading, loadingText, children }) {
   return (
     <button
       type="submit"
-      aria-busy={loading}
+      aria-busy={loading ? 'true' : undefined}
       className="flex h-[52px] w-full items-center justify-center gap-3 bg-laca text-[12px] tracking-[.28em] text-linen uppercase transition-colors hover:bg-laca-hover"
     >
       {loading && (

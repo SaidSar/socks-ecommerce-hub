@@ -9,8 +9,6 @@ const pieceNumber = (id) => String(id).padStart(2, '0')
 /** Hero editorial (DESIGN.md §6.5). `piece` es null mientras carga el catálogo. */
 export default function HeroEditorial({ piece }) {
   // Estado local, solo visual: no cambia la pieza del carrito.
-  // TODO(design): DESIGN_AUTH.md §3 pide preseleccionar user.preferredSize en la pieza del hero, pero el hero
-  // no tiene selector de talla (solo tonos). Cuando se agregue, iniciarlo con useAuth().user?.preferredSize ?? 'M'.
   const [tone, setTone] = useState('washi')
 
   return (
