@@ -186,8 +186,8 @@ getSession() → user | null
 - **Criterio:** en consola del navegador (dev), login demo devuelve el usuario sin contraseña; registrar `hola@sokko.mx` lanza `EMAIL_TAKEN`.
 
 ### Fase 2 — Rutas y layout
-- [ ] Rutas de §1 en `App.jsx` con `pages/Account.jsx` (o `pages/auth/*`) y guardas de redirección.
-- [ ] `components/auth/AuthLayout.jsx`, `AuthEditorialPanel.jsx`, `AuthTabs.jsx` (`role=tablist`, subrayado `laca` animado de 64 px).
+- [x] Rutas de §1 en `App.jsx` con `pages/Account.jsx` (o `pages/auth/*`) y guardas de redirección.
+- [x] `components/auth/AuthLayout.jsx`, `AuthEditorialPanel.jsx`, `AuthTabs.jsx` (`role=tablist`, subrayado `laca` animado de 64 px).
 - **Criterio:** las 4 rutas renderizan el biombo con el panel correcto; `/cuenta/bienvenida` sin sesión redirige a `/cuenta`.
 
 ### Fase 3 — Formularios

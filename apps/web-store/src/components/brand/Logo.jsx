@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function LogoMark() {
   return (
     <span className="flex items-center gap-3 select-none">
@@ -22,9 +24,20 @@ function LogoMark() {
   )
 }
 
-/** Logotipo SOKKO. Por defecto es un enlace a #origen; `asLink={false}` lo deja como marca estática (footer). */
-export default function Logo({ asLink = true }) {
+/**
+ * Logotipo SOKKO. Por defecto es un enlace a #origen; `asLink={false}` lo deja como marca estática (footer)
+ * y `to` lo convierte en enlace de ruta (pantalla de cuenta → tienda).
+ */
+export default function Logo({ asLink = true, to }) {
   if (!asLink) return <LogoMark />
+  if (to) {
+    return (
+      <Link to={to} className="inline-flex">
+        <LogoMark />
+        <span className="sr-only">, volver a la tienda</span>
+      </Link>
+    )
+  }
   return (
     <a href="#origen" className="inline-flex">
       <LogoMark />
