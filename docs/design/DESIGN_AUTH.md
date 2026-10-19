@@ -195,9 +195,9 @@ getSession() → user | null
 - **Criterio:** todos los mensajes de §5.1 aparecen en su caso; el foco va al primer error.
 
 ### Fase 4 — Bienvenida y Navbar
-- [ ] `components/auth/Welcome.jsx` (§4.5) con pares en bolsa reales.
-- [ ] Navbar: ícono de cuenta, estado con iniciales y menú (§3); fila en menú móvil.
-- [ ] Preselección de talla desde `user.preferredSize` en `PieceCard` y hero.
+- [x] `components/auth/Welcome.jsx` (§4.5) con pares en bolsa reales.
+- [x] Navbar: ícono de cuenta, estado con iniciales y menú (§3); fila en menú móvil.
+- [x] Preselección de talla desde `user.preferredSize` en `PieceCard` y hero.
 - **Criterio:** login demo → bienvenida "お帰" → "Volver al atelier" muestra iniciales "AM" en el Navbar y talla M preseleccionada; "Cerrar sesión" vuelve al ícono.
 
 ### Fase 5 — Accesibilidad, responsive y pulido

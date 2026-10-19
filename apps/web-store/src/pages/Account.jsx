@@ -5,6 +5,7 @@ import AuthTabs from '../components/auth/AuthTabs'
 import ForgotForm from '../components/auth/ForgotForm'
 import LoginForm from '../components/auth/LoginForm'
 import RegisterForm from '../components/auth/RegisterForm'
+import Welcome from '../components/auth/Welcome'
 import { useAuth } from '../hooks/useAuth'
 
 const TITLES = {
@@ -84,8 +85,7 @@ export default function Account({ view }) {
         {view === 'login' && <LoginForm onAuthStart={setAuthMode} search={location.search} />}
         {view === 'register' && <RegisterForm onAuthStart={setAuthMode} search={location.search} />}
         {view === 'forgot' && <ForgotForm />}
-        {/* Bienvenida: Fase 4. */}
-        {view === 'welcome' && <p className="text-ink-soft">{TITLES[view]}</p>}
+        {view === 'welcome' && <Welcome mode={location.state?.mode} />}
       </div>
 
       {isTabView && (
