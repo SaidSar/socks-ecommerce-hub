@@ -191,7 +191,7 @@ getSession() → user | null
 - **Criterio:** las 4 rutas renderizan el biombo con el panel correcto; `/cuenta/bienvenida` sin sesión redirige a `/cuenta`.
 
 ### Fase 3 — Formularios
-- [ ] `components/auth/AuthField.jsx`, `PasswordField.jsx`, `PasswordStrength.jsx`, `LoginForm.jsx`, `RegisterForm.jsx`, `ForgotForm.jsx` con validaciones y copy de §4–5.
+- [x] `components/auth/AuthField.jsx`, `PasswordField.jsx`, `PasswordStrength.jsx`, `LoginForm.jsx`, `RegisterForm.jsx`, `ForgotForm.jsx` con validaciones y copy de §4–5.
 - **Criterio:** todos los mensajes de §5.1 aparecen en su caso; el foco va al primer error.
 
 ### Fase 4 — Bienvenida y Navbar

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout'
 import AuthTabs from '../components/auth/AuthTabs'
+import ForgotForm from '../components/auth/ForgotForm'
+import LoginForm from '../components/auth/LoginForm'
+import RegisterForm from '../components/auth/RegisterForm'
 import { useAuth } from '../hooks/useAuth'
 
 const TITLES = {
@@ -30,7 +33,7 @@ export default function Account({ view }) {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   // Modo de la última autenticación hecha aquí: decide el sello de la bienvenida (歓迎 u お帰).
-  const [authMode] = useState('login')
+  const [authMode, setAuthMode] = useState('login')
   const redirect = safeRedirect(searchParams.get('redirect'))
   const isTabView = view === 'login' || view === 'register'
 
@@ -78,9 +81,25 @@ export default function Account({ view }) {
         role={isTabView ? 'tabpanel' : undefined}
         aria-labelledby={isTabView ? `tab-${view}` : undefined}
       >
-        {/* Formularios: Fase 3. Bienvenida: Fase 4. */}
-        <p className="text-ink-soft">{TITLES[view]}</p>
+        {view === 'login' && <LoginForm onAuthStart={setAuthMode} search={location.search} />}
+        {view === 'register' && <RegisterForm onAuthStart={setAuthMode} search={location.search} />}
+        {view === 'forgot' && <ForgotForm />}
+        {/* Bienvenida: Fase 4. */}
+        {view === 'welcome' && <p className="text-ink-soft">{TITLES[view]}</p>}
       </div>
+
+      {isTabView && (
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-x-4 border-t border-ink/10 pt-6">
+          <p className="text-[13px] text-ink-soft">¿Prefiere no crear cuenta ahora?</p>
+          {/* TODO(design): llevar al checkout como invitado cuando exista; hoy vuelve a la tienda. */}
+          <Link
+            to="/"
+            className="inline-flex min-h-11 shrink-0 items-center font-serif text-[16px] italic underline decoration-ink/25 underline-offset-4"
+          >
+            Comprar como invitado
+          </Link>
+        </div>
+      )}
     </AuthLayout>
   )
 }

@@ -23,6 +23,7 @@
 
   --animate-fade: fade 0.6s ease;
   --animate-stamp: stamp 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  --animate-shake: shake 0.4s ease;
 
   @keyframes fade {
     from {
@@ -41,6 +42,19 @@
     to {
       transform: scale(1) rotate(-6deg);
       opacity: 1;
+    }
+  }
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-5px);
+    }
+    75% {
+      transform: translateX(5px);
     }
   }
 }

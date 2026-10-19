@@ -34,6 +34,34 @@ export function CloseIcon(props) {
   )
 }
 
+export function UserIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="8.5" r="3.8" />
+      <path d="M4.5 20c.9-3.9 3.9-6 7.5-6s6.6 2.1 7.5 6" />
+    </svg>
+  )
+}
+
+export function EyeIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 12C3.5 10 7 6 12 6s8.5 4 9.5 6c-1 2-4.5 6-9.5 6s-8.5-4-9.5-6z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+export function EyeOffIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 6.1A9.9 9.9 0 0112 6c5 0 8.5 4 9.5 6-.5 1-1.6 2.6-3.2 3.9M6.4 7.6C4.6 8.9 3.2 10.7 2.5 12c1 2 4.5 6 9.5 6 1.5 0 2.9-.4 4.1-1" />
+      <path d="M9.9 9.9a3 3 0 004.2 4.2" />
+    </svg>
+  )
+}
+
 export function MenuIcon(props) {
   return (
     <svg {...base} {...props}>
