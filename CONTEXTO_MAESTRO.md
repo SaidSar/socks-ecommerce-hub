@@ -38,6 +38,8 @@ ser coherente con este documento.
 Tipografía: **Cormorant Garamond** (`font-serif`, titulares y precios), **Work Sans**
 (`font-sans`, cuerpo y botones) y **Shippori Mincho** (`font-jp`, kanji decorativos).
 
+Logotipo oficial del cliente en `docs/brand/` (ver `README.md`). Rojo de logo `#D91F25` exclusivo de marca; la UI usa laca `#A62B2B`.
+
 ### 1.2 Principios visuales
 
 - **Ma (間)** — espacio negativo generoso; menos elementos, más aire.

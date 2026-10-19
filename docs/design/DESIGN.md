@@ -358,8 +358,8 @@ props: tone: keyof TONES = 'washi', className?: string, strokeWidth?: number = 2
 - **Es un placeholder.** Cuando existan fotos, `PieceCard` y el hero renderizan `<img>` y `KnitTabi` queda como fallback si `imageUrl` es nulo.
 
 ### 6.2 `Logo`
-- Círculo `laca` r=7 + silueta Tabi a trazo `ink` 1.6 + wordmark "SOKKO" (`font-serif text-[22px] tracking-[.28em]`) + 足袋工房 (`font-jp text-[10px] tracking-[.6em] text-laca`).
-- Envuelto en `<a href="#origen" aria-label="SOKKO inicio">`.
+- Usa los SVG oficiales de `src/assets/brand` vía `<Logo variant tone />`; ver `docs/brand/README.md`.
+- En el Navbar va envuelto en `<a href="#origen" aria-label="SOKKO, inicio">`.
 
 ### 6.3 `ToneSwatches`
 ```txt

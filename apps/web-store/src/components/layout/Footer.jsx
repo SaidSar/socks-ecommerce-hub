@@ -25,7 +25,7 @@ export default function Footer() {
 
         <div className="mt-16 grid gap-10 md:grid-cols-[1.3fr_1fr_1fr_1.2fr]">
           <div>
-            <Logo asLink={false} />
+            <Logo variant="vertical" className="h-28" />
             <p className="mt-5 max-w-xs text-[13px] leading-relaxed text-ink-soft">
               Calcetería artesanal con ADN japonés. Diseñada en Sinaloa, para caminar todo México.
             </p>

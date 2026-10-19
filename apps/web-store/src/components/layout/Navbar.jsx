@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 import { useCart } from '../../hooks/useCart'
 import { scrollToId } from '../../utils/scroll'
 import Logo from '../brand/Logo'
 import { BagIcon, MenuIcon, SearchIcon } from '../brand/Icons'
+import AccountMenu from './AccountMenu'
 
 const NAV_LINKS = [
   { label: 'El Origen', id: 'origen' },
@@ -15,6 +18,7 @@ const SEARCH_PLACEHOLDER = '¿Qué pieza busca su paso?'
 
 export default function Navbar({ query, onQueryChange }) {
   const { count, open: openCart } = useCart()
+  const { user, logout } = useAuth()
   const [searching, setSearching] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const inputRef = useRef(null)
@@ -49,11 +53,11 @@ export default function Navbar({ query, onQueryChange }) {
 
   return (
     <header className="gutter sticky top-[env(safe-area-inset-top,0px)] z-40">
-      <div className="mx-auto mt-3 flex h-[68px] max-w-7xl items-center gap-4 border border-ink/10 bg-linen/85 px-3 backdrop-blur md:gap-6 md:px-8">
+      <div className="mx-auto mt-3 flex h-[68px] max-w-7xl items-center gap-1.5 border border-ink/10 bg-linen/85 px-2 backdrop-blur sm:gap-4 sm:px-3 md:gap-6 md:px-8">
         <button
           ref={menuButtonRef}
           type="button"
-          className="flex h-11 w-11 items-center justify-center lg:hidden"
+          className="flex h-11 w-11 shrink-0 items-center justify-center lg:hidden"
           aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={menuOpen}
           aria-controls="menu-movil"
@@ -62,7 +66,9 @@ export default function Navbar({ query, onQueryChange }) {
           <MenuIcon className="h-6 w-6" />
         </button>
 
-        <Logo />
+        <a href="#origen" aria-label="SOKKO, inicio" className="inline-flex shrink-0 items-center">
+          <Logo variant="horizontal" className="h-9 md:h-11" />
+        </a>
 
         <nav className="ml-6 hidden items-center gap-9 text-[12.5px] tracking-[.12em] uppercase lg:flex" aria-label="Principal">
           {NAV_LINKS.map(({ label, id }) => (
@@ -84,7 +90,7 @@ export default function Navbar({ query, onQueryChange }) {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:gap-4">
+        <div className="ml-auto flex shrink-0 items-center sm:gap-2 md:gap-4">
           <div className="hidden items-center gap-1 md:flex">
             <button
               type="button"
@@ -110,6 +116,8 @@ export default function Navbar({ query, onQueryChange }) {
               }`}
             />
           </div>
+
+          <AccountMenu />
 
           <button
             type="button"
@@ -156,6 +164,27 @@ export default function Navbar({ query, onQueryChange }) {
               </a>
             ))}
           </nav>
+          <div className="mt-2 border-t border-ink/10 pt-2">
+            {user ? (
+              <p className="flex min-h-11 flex-wrap items-center gap-x-2 font-serif text-[20px]">
+                Hola, {user.firstName} ·
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    logout()
+                  }}
+                  className="min-h-11 italic underline decoration-ink/25 underline-offset-4"
+                >
+                  Cerrar sesión
+                </button>
+              </p>
+            ) : (
+              <Link to="/cuenta" className="flex min-h-11 items-center font-serif text-[20px]">
+                Iniciar sesión
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </header>
