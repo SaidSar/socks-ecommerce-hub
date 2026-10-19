@@ -182,7 +182,7 @@ getSession() → user | null
 ## 6. Plan por fases
 
 ### Fase 1 — Servicio y contexto
-- [ ] `services/authService.js`, `context/AuthContext.jsx`, `hooks/useAuth.js` (§5.3–5.4) y provider en `App.jsx`.
+- [x] `services/authService.js`, `context/AuthContext.jsx`, `hooks/useAuth.js` (§5.3–5.4) y provider en `App.jsx`.
 - **Criterio:** en consola del navegador (dev), login demo devuelve el usuario sin contraseña; registrar `hola@sokko.mx` lanza `EMAIL_TAKEN`.
 
 ### Fase 2 — Rutas y layout
