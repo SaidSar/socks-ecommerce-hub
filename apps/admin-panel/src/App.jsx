@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import AppShell from './components/layout/AppShell'
+import { ProtectedLayout, RequirePermission } from './components/layout/Guards'
 import { NAV } from './config/navigation'
-import { AdminDataProvider } from './context/AdminDataContext'
+import { AdminAuthProvider } from './context/AdminAuthContext'
 import ComingSoon from './pages/ComingSoon'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
@@ -10,24 +10,23 @@ import NotFound from './pages/NotFound'
 import Orders from './pages/Orders'
 import Settings from './pages/Settings'
 
-// TODO(api): el usuario llega de la sesión (Fase 3).
-const PLACEHOLDER_USER = { name: 'Aiko Morales', email: 'hola@sokko.mx', role: 'dueno' }
+const guard = (section, element) => <RequirePermission section={section}>{element}</RequirePermission>
 
 const soonRoutes = NAV.filter((n) => !n.ready).map((n) => ({
   path: n.to.slice(1),
-  element: <ComingSoon section={n.key} />,
+  element: guard(n.key, <ComingSoon section={n.key} />),
 }))
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   {
-    element: <AppShell />,
+    element: <ProtectedLayout />,
     children: [
       { index: true, element: <Dashboard /> },
-      { path: 'pedidos', element: <Orders /> },
-      { path: 'pedidos/:folio', element: <Orders /> },
-      { path: 'inventario', element: <Inventory /> },
-      { path: 'configuracion', element: <Settings /> },
+      { path: 'pedidos', element: guard('pedidos', <Orders />) },
+      { path: 'pedidos/:folio', element: guard('pedidos', <Orders />) },
+      { path: 'inventario', element: guard('inventario', <Inventory />) },
+      { path: 'configuracion', element: guard('configuracion', <Settings />) },
       ...soonRoutes,
       { path: '*', element: <NotFound /> },
     ],
@@ -36,8 +35,8 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <AdminDataProvider user={PLACEHOLDER_USER}>
+    <AdminAuthProvider>
       <RouterProvider router={router} />
-    </AdminDataProvider>
+    </AdminAuthProvider>
   )
 }

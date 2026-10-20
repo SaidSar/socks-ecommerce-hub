@@ -252,7 +252,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - **Criterio:** `npm test` en verde con todos los casos de §5.6.
 
 ### Fase 3 — Acceso y roles
-- [ ] `/login`, `AdminAuthContext`, guardas, `config/roles.js`, `Forbidden`, menú de usuario y `resetDemoData` en DEV.
+- [x] `/login`, `AdminAuthContext`, guardas, `config/roles.js`, `Forbidden`, menú de usuario y `resetDemoData` en DEV.
 - **Criterio:** Daniel no ve Configuración ni cifras en pesos; entrar a `/configuracion` como Daniel muestra `Forbidden`.
 
 ### Fase 4 — Dashboard
