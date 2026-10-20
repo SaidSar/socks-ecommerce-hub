@@ -20,13 +20,14 @@ construido con una **Arquitectura Orientada a Servicios (SOA)**.
 ```
 socks-ecommerce-hub/
 ├── apps/
-│   ├── web-store/          # Frontend · React + Vite + Tailwind CSS
+│   ├── web-store/          # Tienda · React + Vite + Tailwind CSS
 │   │   └── src/
 │   │       ├── components/
 │   │       ├── pages/
 │   │       ├── services/   # Clientes HTTP hacia api-service
 │   │       ├── context/
 │   │       └── assets/
+│   ├── admin-panel/        # Panel administrativo · React + Vite + Tailwind CSS
 │   └── api-service/        # Backend SOA · ASP.NET Core Web API (Sokko.Api)
 │       ├── Controllers/
 │       ├── Models/
@@ -39,8 +40,10 @@ socks-ecommerce-hub/
 ```
 
 ```
- web-store (React)  ──HTTP/JSON──▶  api-service (.NET)  ──▶  SQL Server (próximamente)
- localhost:5173                     localhost:5080
+ web-store (React)    ──HTTP/JSON──▶  api-service (.NET)  ──▶  SQL Server (próximamente)
+ localhost:5173                       localhost:5080
+ admin-panel (React)  ──HTTP/JSON──▶  /api/admin/*
+ localhost:5174
 ```
 
 ## Paleta — Kyoto Artisan
@@ -80,11 +83,24 @@ npm run dev
 - Tienda: `http://localhost:5173`
 - La URL de la API se configura con `VITE_API_URL` (ver `apps/web-store/.env.example`).
 
+### 3. Panel administrativo — `admin-panel`
+
+```bash
+npm --prefix apps/admin-panel install
+npm --prefix apps/admin-panel run dev
+```
+
+- Panel: `http://localhost:5174` (cuentas demo y detalles en [`apps/admin-panel/README.md`](apps/admin-panel/README.md)).
+- Pruebas: `npm --prefix apps/admin-panel test`.
+
 ### Compilación
 
 ```bash
 # Frontend
 cd apps/web-store && npm run build
+
+# Panel administrativo
+cd apps/admin-panel && npm run build
 
 # Backend
 cd apps/api-service && dotnet build

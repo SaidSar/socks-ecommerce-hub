@@ -52,14 +52,15 @@ Logotipo oficial del cliente en `docs/brand/` (ver `README.md`). Rojo de logo `#
 
 ## 2. Arquitectura general
 
-Monorepo con dos aplicaciones independientes que se comunican vía HTTP/JSON
+Monorepo con un proveedor y dos consumidores independientes que se comunican vía HTTP/JSON
 (arquitectura orientada a servicios).
 
 ```
 socks-ecommerce-hub/
 ├── apps/
-│   ├── web-store/      → Frontend (consumidor del servicio)
-│   └── api-service/    → Backend SOA (proveedor del servicio)
+│   ├── web-store/      → Tienda pública (consumidor externo: compradores)
+│   ├── admin-panel/    → Panel administrativo (consumidor interno: Dueño y Operaciones)
+│   └── api-service/    → Backend SOA (proveedor único del servicio)
 ├── docs/               → Documentación del proyecto
 ├── CONTEXTO_MAESTRO.md
 └── README.md
@@ -70,8 +71,16 @@ socks-ecommerce-hub/
 │  web-store           │ ─────────────────────▶ │  api-service             │ ─────▶ │  SQL Server  │
 │  React + Vite        │ ◀───────────────────── │  ASP.NET Core Web API    │        │  (futuro)    │
 │  localhost:5173      │      CORS AllowWebStore│  Swagger / OpenAPI       │        └──────────────┘
-└──────────────────────┘                        └──────────────────────────┘
+└──────────────────────┘                        │  grupos public y admin   │
+┌──────────────────────┐   HTTP / JSON (REST)   │                          │
+│  admin-panel         │ ─────────────────────▶ │  /api/admin/*            │
+│  React + Vite        │ ◀───────────────────── │  Bearer + roles          │
+│  localhost:5174      │                        └──────────────────────────┘
+└──────────────────────┘
 ```
+
+Un proveedor, dos consumidores ligados al mismo contrato OpenAPI. El código del panel nunca
+se incluye en el bundle de la tienda.
 
 ### 2.1 Frontend — `apps/web-store`
 
@@ -85,6 +94,15 @@ socks-ecommerce-hub/
   - `context/` — estado global (React Context: carrito, sesión, etc.).
   - `assets/` — imágenes, fuentes y recursos estáticos.
 - **Configuración:** la URL de la API se lee de `VITE_API_URL`.
+
+### 2.1b Panel administrativo — `apps/admin-panel`
+
+- **Stack:** React + Vite + Tailwind CSS (mismas versiones que `web-store`), `react-router-dom`; pruebas con `vitest`.
+- **Puerto de desarrollo:** `http://localhost:5174` (`npm --prefix apps/admin-panel run dev`).
+- **Usuarios:** Dueño (todo, con cifras en pesos) y Operaciones (pedidos, envíos e inventario, sin pesos ni configuración).
+- **Estructura de `src/`:** `config/` (roles y permisos), `domain/` (reglas puras con pruebas), `services/`
+  (`adminApi.js`, única capa que conocerá `/api/admin/*`; hoy simulada), `context/`, `hooks/`, `components/`, `pages/`.
+- **Especificación:** `docs/design/DESIGN_ADMIN.md` y `docs/design/DECISIONES_ADMIN.md`.
 
 ### 2.2 Backend — `apps/api-service`
 
@@ -112,7 +130,8 @@ socks-ecommerce-hub/
 1. **Contrato de servicio explícito** — DTOs + OpenAPI definen el contrato.
 2. **Bajo acoplamiento** — el frontend solo conoce el contrato HTTP, nunca el modelo interno.
 3. **Abstracción** — la lógica vive en `Services/`, los controladores solo orquestan.
-4. **Reutilización** — los servicios pueden ser consumidos por otros clientes (móvil, admin).
+4. **Reutilización** — los mismos servicios los consumen la tienda (`web-store`, consumidor público) y el panel
+   (`admin-panel`, consumidor interno); a futuro, otros clientes (móvil).
 5. **Autonomía** — cada app se compila, ejecuta y despliega de forma independiente.
 
 ---
