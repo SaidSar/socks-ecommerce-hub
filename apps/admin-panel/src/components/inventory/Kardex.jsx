@@ -7,7 +7,7 @@ export default function Kardex({ movements, highlight = false }) {
       <h3 id="kardex-title" className="text-[12px] uppercase tracking-[.12em] text-ink-soft mb-2">
         Kárdex
       </h3>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-[12.5px] min-w-[340px]">
           <caption className="sr-only">Movimientos del SKU, del más reciente al más antiguo</caption>
           <thead className="text-ink-soft text-left">

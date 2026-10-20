@@ -22,14 +22,16 @@ export default function WorkQueue({ queue }) {
               <Link
                 to={`/pedidos?f=${it.filter}`}
                 className="group block text-left px-5 py-4 hover:bg-linen transition-colors h-full"
-                aria-label={`${it.label}: ${n} ${n === 1 ? 'pedido' : 'pedidos'}. Ver en Pedidos`}
               >
                 <span className="flex items-center gap-2 text-[12.5px] text-ink-soft">
                   <span className={`w-2 h-2 rounded-full ${it.dot}`} aria-hidden="true" />
                   {it.label}
                 </span>
                 <span className="flex items-end justify-between mt-1">
-                  <span className={`text-[30px] font-semibold tnum leading-none ${it.key === 'late' && n ? 'text-laca' : ''}`}>{n}</span>
+                  <span className={`text-[30px] font-semibold tnum leading-none ${it.key === 'late' && n ? 'text-laca' : ''}`}>
+                    {n}
+                    <span className="sr-only"> {n === 1 ? 'pedido' : 'pedidos'}, ver en Pedidos</span>
+                  </span>
                   <span className="text-[12.5px] text-ai opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity" aria-hidden="true">
                     Ver →
                   </span>

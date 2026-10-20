@@ -58,7 +58,7 @@ export default function Orders() {
       <PageHeader title="Pedidos" sub="Surta, envíe y dé seguimiento: paquetería y entrega local" />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="overflow-x-auto -mx-1 px-1 py-1 flex-1 min-w-0">
+        <div className="relative overflow-x-auto -mx-1 px-1 py-1 flex-1 min-w-0">
           <Tabs options={tabs} value={filter} onChange={(k) => update({ f: k === 'todos' ? '' : k })} label="Filtrar pedidos" />
         </div>
         <SearchField

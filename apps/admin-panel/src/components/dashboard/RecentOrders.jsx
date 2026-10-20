@@ -19,7 +19,7 @@ export default function RecentOrders({ orders, showMoney, now }) {
           </Link>
         }
       />
-      <div className="overflow-x-auto border-t border-line">
+      <div className="relative overflow-x-auto border-t border-line">
         <table className="w-full text-[13px] min-w-[620px]">
           <caption className="sr-only">Últimos 5 pedidos</caption>
           <thead className="sr-only">

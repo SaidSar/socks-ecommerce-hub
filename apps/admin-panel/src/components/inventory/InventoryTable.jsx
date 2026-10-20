@@ -6,7 +6,7 @@ import StockChip from '../ui/StockChip'
 export default function InventoryTable({ rows, selected, canAdjust, few, onSelect }) {
   return (
     <Card className="min-w-0 overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-[13px] min-w-[820px]">
           <caption className="sr-only">Inventario por SKU</caption>
           <thead className="bg-linen text-ink-soft text-[12px]">

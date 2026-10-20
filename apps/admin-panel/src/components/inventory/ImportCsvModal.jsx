@@ -106,7 +106,7 @@ export default function ImportCsvModal({ onClose }) {
             <p className="text-[13px]">
               <b className="font-semibold">1.</b> El archivo necesita estas columnas, en este orden. En Excel use “Guardar como → CSV UTF-8”.
             </p>
-            <div className="mt-2 overflow-x-auto rounded-md border border-line">
+            <div className="relative mt-2 overflow-x-auto rounded-md border border-line">
               <table className="w-full text-[12.5px] min-w-[460px]">
                 <caption className="sr-only">Formato del archivo</caption>
                 <thead className="bg-linen text-ink-soft">
@@ -181,7 +181,7 @@ export default function ImportCsvModal({ onClose }) {
                     <b className="font-semibold">3.</b> Revise antes de aplicar: <span className="text-matcha font-medium">{preview.valid.length} filas válidas</span> ·{' '}
                     <span className="text-laca font-medium">{preview.invalid.length} con error</span>
                   </p>
-                  <div className="mt-2 overflow-x-auto rounded-md border border-line max-h-56 overflow-y-auto" tabIndex={0} aria-label="Vista previa del archivo">
+                  <div className="relative mt-2 overflow-x-auto rounded-md border border-line max-h-56 overflow-y-auto" tabIndex={0} aria-label="Vista previa del archivo">
                     <table className="w-full text-[12.5px] min-w-[560px]">
                       <caption className="sr-only">Vista previa: primero las filas con error</caption>
                       <thead className="bg-linen text-ink-soft sticky top-0">

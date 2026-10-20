@@ -91,6 +91,19 @@
   }
 }
 
+/*
+ * Foco visible en campos: varias utilidades usan outline-none + borde Ai. Esta regla va fuera de capas
+ * para ganarle a las utilidades y sumar un halo Ai (los buscadores lo llevan en su contenedor).
+ */
+:where(input:not([type='search']):not([type='checkbox']):not([type='file']):not([data-in-wrap]), select, textarea):focus-visible {
+  box-shadow: 0 0 0 2px rgb(47 94 158 / 0.35);
+}
+
+label:has(> input[type='search']:focus-visible),
+[data-field-wrap]:has(> input:focus-visible) {
+  box-shadow: 0 0 0 2px rgb(47 94 158 / 0.35);
+}
+
 @utility tnum {
   font-variant-numeric: tabular-nums;
 }

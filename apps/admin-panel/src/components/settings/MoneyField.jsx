@@ -9,7 +9,7 @@ export default function MoneyField({ label, value, onChange, suffix, error }) {
       <label htmlFor={id} className="text-[12.5px] text-ink-soft">
         {label}
       </label>
-      <div className={`mt-1 flex items-center h-10 max-lg:h-11 rounded-md border bg-paper focus-within:border-ai ${error ? 'border-laca' : 'border-line'}`}>
+      <div data-field-wrap className={`mt-1 flex items-center h-10 max-lg:h-11 rounded-md border bg-paper focus-within:border-ai ${error ? 'border-laca' : 'border-line'}`}>
         {!suffix && (
           <span className="pl-3 text-ink-soft text-[13px]" aria-hidden="true">
             $
@@ -17,6 +17,7 @@ export default function MoneyField({ label, value, onChange, suffix, error }) {
         )}
         <input
           id={id}
+          data-in-wrap
           inputMode="numeric"
           autoComplete="off"
           value={value}

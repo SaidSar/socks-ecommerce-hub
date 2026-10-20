@@ -52,16 +52,17 @@ export default function UserMenu({ user, roleLabel, onLogout, onResetDemo }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={`${user.name}, ${roleLabel}. Menú de usuario`}
         className="h-10 max-lg:h-11 pl-1.5 pr-2.5 rounded-md hover:bg-sand flex items-center gap-2.5"
       >
         <span className="w-8 h-8 rounded-full bg-ink text-linen text-[12px] font-semibold flex items-center justify-center" aria-hidden="true">
           {initials}
         </span>
-        <span className="hidden sm:block text-left leading-tight" aria-hidden="true">
+        {/* El nombre siempre forma parte del nombre accesible; se ve desde sm. */}
+        <span className="sr-only sm:not-sr-only sm:block text-left leading-tight">
           <span className="block text-[13px] font-medium">{user.name}</span>
           <span className="block text-[11.5px] text-ink-soft">{roleLabel}</span>
         </span>
+        <span className="sr-only">, menú de usuario</span>
         <Icon name="down" className="w-4 h-4 text-ink-soft" />
       </button>
       {open && (

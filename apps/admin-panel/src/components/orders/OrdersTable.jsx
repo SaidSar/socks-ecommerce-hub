@@ -10,7 +10,7 @@ const cityShort = (city) => city.split(',')[0]
 export default function OrdersTable({ orders, total, openId, showMoney, now, hrefFor, onOpen }) {
   return (
     <Card className="min-w-0 overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className={`w-full text-[13px] ${showMoney ? 'min-w-[860px]' : 'min-w-[780px]'}`}>
           <caption className="sr-only">Pedidos</caption>
           <thead className="bg-linen text-ink-soft text-[12px]">

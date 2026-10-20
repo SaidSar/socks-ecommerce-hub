@@ -38,7 +38,7 @@ export default function SalesChart({ data }) {
   const hd = hover != null ? data[hover] : null
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={ref} className="relative w-full min-w-0 max-w-full">
       <svg
         width={w}
         height={h}

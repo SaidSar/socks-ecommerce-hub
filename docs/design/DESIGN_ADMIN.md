@@ -268,10 +268,10 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - **Criterio:** importar un CSV con 2 filas erróneas aplica solo las válidas; cambiar la tarifa local a 59 se refleja en `computeShipping`.
 
 ### Fase 7 — Accesibilidad, responsive y cierre
-- [ ] Áreas táctiles ≥ 44 px en móvil, foco visible, `prefers-reduced-motion`, sin scroll horizontal en 360–1440 px (las tablas se desplazan dentro de su contenedor).
-- [ ] Lighthouse móvil Accesibilidad ≥ 95 en `/`, `/pedidos` e `/inventario` (meta 100).
-- [ ] `apps/admin-panel/README.md`, actualización de `CONTEXTO_MAESTRO.md` y README raíz.
-- [ ] Capturas en `docs/design/screenshots/`: `admin-dashboard-1440.png`, `admin-pedido-local-1440.png`, `admin-inventario-kardex-1440.png`, `admin-dashboard-390.png`, `admin-login-1440.png`.
+- [x] Áreas táctiles ≥ 44 px en móvil, foco visible, `prefers-reduced-motion`, sin scroll horizontal en 360–1440 px (las tablas se desplazan dentro de su contenedor).
+- [x] Lighthouse móvil Accesibilidad ≥ 95 en `/`, `/pedidos` e `/inventario` (meta 100).
+- [x] `apps/admin-panel/README.md`, actualización de `CONTEXTO_MAESTRO.md` y README raíz.
+- [x] Capturas en `docs/design/screenshots/`: `admin-dashboard-1440.png`, `admin-pedido-local-1440.png`, `admin-inventario-kardex-1440.png`, `admin-dashboard-390.png`, `admin-login-1440.png`.
 
 ---
 
@@ -309,7 +309,7 @@ Clasificación SOA: Pedidos, Inventario, Configuración = **servicios de entidad
 ---
 
 ## 11. Definición de terminado
-- [ ] Fases 1–7 con casillas marcadas; build, lint y pruebas limpios.
-- [ ] Los 5 criterios de las fases 3–6 verificados en el navegador.
-- [ ] `apps/web-store` y `apps/api-service` sin cambios.
+- [x] Fases 1–7 con casillas marcadas; build, lint y pruebas limpios.
+- [x] Los 5 criterios de las fases 3–6 verificados en el navegador.
+- [x] `apps/web-store` y `apps/api-service` sin cambios.
 - [ ] PR `said/frontend-admin` → `main` abierto (sin merge) con capturas enlazadas desde `blob/said/frontend-admin/...` (se corrigen a `blob/main/` tras el merge).

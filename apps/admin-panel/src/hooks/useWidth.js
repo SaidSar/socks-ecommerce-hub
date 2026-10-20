@@ -7,9 +7,11 @@ export function useWidth(initial = 600) {
   useLayoutEffect(() => {
     const node = ref.current
     if (!node) return
+    // Medida inicial síncrona: sin esperar al primer aviso del observer (evita desbordes al montar).
+    setWidth(Math.round(node.getBoundingClientRect().width) || initial)
     const ro = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)))
     ro.observe(node)
     return () => ro.disconnect()
-  }, [])
+  }, [initial])
   return [ref, width]
 }
