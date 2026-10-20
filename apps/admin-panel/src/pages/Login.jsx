@@ -18,7 +18,6 @@ function validate(email, password) {
   const e = email.trim()
   if (!e) errors.email = 'Escriba su correo.'
   else if (!EMAIL_RE.test(e)) errors.email = 'Revise el formato del correo.'
-  // TODO(design): el mockup no define el texto para contraseña vacía.
   if (!password) errors.password = 'Escriba su contraseña.'
   return errors
 }

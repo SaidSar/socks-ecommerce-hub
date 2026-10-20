@@ -14,7 +14,7 @@
 2. Rama `said/frontend-admin` desde `main` actualizado. Un commit por fase (§8): `feat(admin-panel): fase N — <resumen>`.
 3. Al terminar cada fase, desde `apps/admin-panel`: `npm run build`, `npm run lint` y `npm test` sin errores ni warnings. Marca las casillas de la fase.
 4. **No toques `apps/web-store` ni `apps/api-service`** salvo lo indicado en §1.3 (scripts raíz y documentación).
-5. Usa las **mismas versiones** de React, Vite, Tailwind y ESLint que `apps/web-store` (revisa su `package.json`). Sin librerías de UI, de gráficas ni de formularios. Solo se permite `react-router-dom` y `vitest` (devDependency).
+5. Usa las **mismas versiones** de React, Vite, Tailwind y el linter (oxlint, `.oxlintrc.json`) que `apps/web-store` (revisa su `package.json`). Sin librerías de UI, de gráficas ni de formularios. Solo se permite `react-router-dom` y `vitest` (devDependency).
 6. El mockup usa Tailwind por CDN, Babel en el navegador, `Math.random` sembrado y un selector de rol de demostración: nada de eso pasa al código (§10).
 7. Ante una duda de diseño, replica el mockup y deja `// TODO(design):`. Todo punto de integración con la API lleva `// TODO(api):`.
 
@@ -40,7 +40,7 @@ apps/admin-panel/
 ├── index.html                    <title>SOKKO · Panel</title>, favicon, theme-color #F4F0EB, <meta name="robots" content="noindex">
 ├── package.json                  name "@sokko/admin-panel"; scripts dev (puerto 5174), build, preview, lint, test
 ├── vite.config.js                server.port 5174
-├── eslint.config.js              misma configuración que web-store
+├── .oxlintrc.json                misma configuración que web-store
 ├── public/favicon.svg            copia byte a byte de apps/web-store/public/favicon.svg
 ├── README.md                     cómo correrlo y cuentas demo
 └── src/
@@ -116,7 +116,7 @@ Misma marca que la tienda, otro ritmo: denso, sans primero, sin flourishes edito
 
 - Ruta `/login`. Sin registro público, sin recuperación automática ("¿Olvidó su contraseña? Pídale al Dueño que la restablezca").
 - Diseño: tarjeta centrada `max-w-sm` sobre `linen`, logo horizontal arriba, título serif "Panel SOKKO", campos Correo y Contraseña (mostrar/ocultar), botón laca "Entrar".
-- Mensajes: correo vacío "Escriba su correo." · formato "Revise el formato del correo." · credenciales "El correo o la contraseña no coinciden." (sin revelar cuál).
+- Mensajes: correo vacío "Escriba su correo." · formato "Revise el formato del correo." · contraseña vacía "Escriba su contraseña." · credenciales "El correo o la contraseña no coinciden." (sin revelar cuál).
 - Cuentas demo (solo visibles en `import.meta.env.DEV`):
 
 | Rol | Nombre | Correo | Contraseña |
@@ -312,4 +312,4 @@ Clasificación SOA: Pedidos, Inventario, Configuración = **servicios de entidad
 - [x] Fases 1–7 con casillas marcadas; build, lint y pruebas limpios.
 - [x] Los 5 criterios de las fases 3–6 verificados en el navegador.
 - [x] `apps/web-store` y `apps/api-service` sin cambios.
-- [ ] PR `said/frontend-admin` → `main` abierto (sin merge) con capturas enlazadas desde `blob/said/frontend-admin/...` (se corrigen a `blob/main/` tras el merge).
+- [x] PR `said/frontend-admin` → `main` abierto (sin merge) con capturas enlazadas desde `blob/said/frontend-admin/...` (se corrigen a `blob/main/` tras el merge).
