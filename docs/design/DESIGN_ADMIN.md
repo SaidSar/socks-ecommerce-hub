@@ -256,7 +256,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - **Criterio:** Daniel no ve Configuración ni cifras en pesos; entrar a `/configuracion` como Daniel muestra `Forbidden`.
 
 ### Fase 4 — Dashboard
-- [ ] Componentes de §5.5 y `SalesChart`/`HBars`.
+- [x] Componentes de §5.5 y `SalesChart`/`HBars`.
 - **Criterio:** "Hoy" por defecto; cambiar a 7d/30d recalcula; cada número de la cola abre Pedidos con su filtro.
 
 ### Fase 5 — Pedidos

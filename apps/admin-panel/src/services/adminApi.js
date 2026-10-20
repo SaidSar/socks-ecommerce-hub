@@ -58,11 +58,15 @@ const stamp = () => {
 
 const by = (user) => shortName(user?.name ?? 'Sistema')
 
+// El servidor manda el nombre y color del tono junto con cada SKU.
+const withTone = (x) => ({ ...x, toneName: TONES[x.tone]?.name ?? x.tone, toneHex: TONES[x.tone]?.hex ?? '#ccc' })
+
 // Sin `money.view` el servidor no manda importes (Operaciones).
 function redactOrder(order, role) {
-  if (can(role, 'money.view')) return order
+  const items = order.items.map(withTone)
+  if (can(role, 'money.view')) return { ...order, items }
   const { subtotal: _s, total: _t, ...rest } = order
-  return { ...rest, items: order.items.map(({ price: _p, ...it }) => it) }
+  return { ...rest, items: items.map(({ price: _p, ...it }) => it) }
 }
 
 const findOrder = (id) => {
@@ -95,7 +99,9 @@ export async function getDashboard(range = 'hoy', role) {
   const { daily, orders, inventory, pieces, settings } = db()
   const data = buildDashboard({ daily, orders, inventory, pieces, sizes: SIZES, few: settings.fewThreshold, range, now: refNow() })
   data.recent = data.recent.map((o) => redactOrder(o, role))
+  data.alerts = data.alerts.map(withTone)
   data.now = refNow().toISOString()
+  data.freeShippingThreshold = settings.freeShippingThreshold
   if (!can(role, 'money.view')) {
     data.kpis.sales = null
     data.kpis.ticket = null
@@ -168,7 +174,7 @@ export async function saveOrderNote(id, note, user) {
 
 const decorate = (r, few, pieces) => {
   const avail = available(r)
-  return { ...r, available: avail, state: stockState(avail, few), edition: pieces.find((p) => p.id === r.pieceId)?.edition ?? null }
+  return withTone({ ...r, available: avail, state: stockState(avail, few), edition: pieces.find((p) => p.id === r.pieceId)?.edition ?? null })
 }
 
 /** TODO(api): GET /api/admin/inventory?state=&q= */
