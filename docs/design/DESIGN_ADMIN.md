@@ -242,9 +242,9 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 ## 8. Plan por fases
 
 ### Fase 1 — Andamiaje y shell
-- [ ] Crear `apps/admin-panel` con Vite + React + Tailwind (mismas versiones que web-store), ESLint, puerto 5174, `vitest`.
-- [ ] `index.css` con tokens (§2), fuentes, favicon y logos copiados byte a byte.
-- [ ] Router con todas las rutas de §7 + `/login`, `NotFound`; `AppShell` con barra lateral, barra superior y `PageHeader`; páginas vacías.
+- [x] Crear `apps/admin-panel` con Vite + React + Tailwind (mismas versiones que web-store), ESLint, puerto 5174, `vitest`.
+- [x] `index.css` con tokens (§2), fuentes, favicon y logos copiados byte a byte.
+- [x] Router con todas las rutas de §7 + `/login`, `NotFound`; `AppShell` con barra lateral, barra superior y `PageHeader`; páginas vacías.
 - **Criterio:** `npm run dev` abre en `localhost:5174` con la barra lateral del mockup y navegación entre secciones.
 
 ### Fase 2 — Dominio, datos y servicio
