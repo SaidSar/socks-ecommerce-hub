@@ -46,10 +46,8 @@ export function useFocusTrap(ref, { active = true, onEscape, returnFocus, initia
     return () => {
       document.removeEventListener('keydown', onKey)
       const target = returnFocusRef.current?.() || opener
-      if (target && typeof target.focus === 'function' && document.contains(target)) {
-        // Después del render que desmonta el panel.
-        requestAnimationFrame(() => target.focus())
-      }
+      // Síncrono: si el panel se vuelve a activar (StrictMode), su propio efecto recupera el foco después.
+      if (target && typeof target.focus === 'function' && document.contains(target)) target.focus()
     }
   }, [active, ref, initialFocus])
 }

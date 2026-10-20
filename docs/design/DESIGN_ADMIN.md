@@ -260,7 +260,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - **Criterio:** "Hoy" por defecto; cambiar a 7d/30d recalcula; cada número de la cola abre Pedidos con su filtro.
 
 ### Fase 5 — Pedidos
-- [ ] Tabla, pestañas, búsqueda, detalle, transiciones (§5.1), cancelación, nota, historial, URL.
+- [x] Tabla, pestañas, búsqueda, detalle, transiciones (§5.1), cancelación, nota, historial, URL.
 - **Criterio:** un pedido local recorre Por preparar → Preparando → En ruta local → Entregado; uno de paquetería exige guía válida; al enviarlo baja el stock y aparece "Venta" en el kárdex.
 
 ### Fase 6 — Inventario y Configuración
