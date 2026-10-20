@@ -2,12 +2,13 @@ import { useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { NAV } from '../../config/navigation'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
+import { useAdminData } from '../../hooks/useAdminData'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
 // TODO(api): el usuario llega de la sesión (Fase 3).
-const PLACEHOLDER_USER = { name: 'Aiko Morales', email: 'hola@sokko.mx' }
+const PLACEHOLDER_USER = { name: 'Aiko Morales', email: 'hola@sokko.mx', role: 'dueno' }
 
 function MobileNav({ onClose, children }) {
   const panelRef = useRef(null)
@@ -30,6 +31,7 @@ function MobileNav({ onClose, children }) {
 /** Estructura del panel: barra lateral fija (lg+) o panel (móvil), barra superior y área de trabajo. */
 export default function AppShell() {
   const [menu, setMenu] = useState(false)
+  const { summary } = useAdminData()
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
   if (lastPath !== pathname) {
@@ -37,7 +39,7 @@ export default function AppShell() {
     setMenu(false)
   }
 
-  const sidebar = <Sidebar items={NAV} onNavigate={() => setMenu(false)} />
+  const sidebar = <Sidebar items={NAV} toPrepare={summary.toPrepare} onNavigate={() => setMenu(false)} />
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
@@ -47,7 +49,7 @@ export default function AppShell() {
       {menu && <MobileNav onClose={() => setMenu(false)}>{sidebar}</MobileNav>}
 
       <div className="min-w-0">
-        <Topbar onOpenMenu={() => setMenu(true)} menuOpen={menu} user={PLACEHOLDER_USER} roleLabel="Dueño" onLogout={() => {}} />
+        <Topbar onOpenMenu={() => setMenu(true)} menuOpen={menu} lateCount={summary.late} user={PLACEHOLDER_USER} roleLabel="Dueño" onLogout={() => {}} />
         <main id="main" className="gutter py-6 lg:py-8 max-w-[1600px]">
           <Outlet />
         </main>

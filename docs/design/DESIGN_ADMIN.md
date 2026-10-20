@@ -248,7 +248,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - **Criterio:** `npm run dev` abre en `localhost:5174` con la barra lateral del mockup y navegación entre secciones.
 
 ### Fase 2 — Dominio, datos y servicio
-- [ ] `domain/*` con sus pruebas (§5), `utils/format.js`, `data/seed.js`, `services/adminApi.js`, `AdminDataContext`.
+- [x] `domain/*` con sus pruebas (§5), `utils/format.js`, `data/seed.js`, `services/adminApi.js`, `AdminDataContext`.
 - **Criterio:** `npm test` en verde con todos los casos de §5.6.
 
 ### Fase 3 — Acceso y roles
