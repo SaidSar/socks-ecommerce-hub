@@ -264,7 +264,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - **Criterio:** un pedido local recorre Por preparar → Preparando → En ruta local → Entregado; uno de paquetería exige guía válida; al enviarlo baja el stock y aparece "Venta" en el kárdex.
 
 ### Fase 6 — Inventario y Configuración
-- [ ] Tabla, filtros, `StockPanel`, kárdex, importación CSV y plantilla; página de Configuración.
+- [x] Tabla, filtros, `StockPanel`, kárdex, importación CSV y plantilla; página de Configuración.
 - **Criterio:** importar un CSV con 2 filas erróneas aplica solo las válidas; cambiar la tarifa local a 59 se refleja en `computeShipping`.
 
 ### Fase 7 — Accesibilidad, responsive y cierre
