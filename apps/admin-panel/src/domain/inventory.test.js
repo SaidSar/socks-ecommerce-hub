@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyInitial, applyMovement, applySale, available, MSG, release, reserve, sortMovements, stockState, validateMovement } from './inventory'
+import { applyInitial, applyMovement, applySale, available, checkMovement, MSG, needsFolio, release, reserve, sortMovements, stockState, validateMovement } from './inventory'
 
 const row = (over = {}) => ({ sku: 'SKK-007-SUM-M', stock: 10, reserved: 2, ...over })
 const AT = '2026-10-18T15:00:00.000Z'
@@ -39,11 +39,27 @@ describe('movimientos manuales', () => {
     expect(res.row.stock).toBe(10)
   })
 
-  it('Devolución suma y exige motivo', () => {
-    expect(validateMovement(row(), { type: 'Devolución', qty: '1', note: ' ' })).toBe(MSG.note)
-    const { row: r, movement } = applyMovement(row(), { type: 'Devolución', qty: '1', note: 'Cambio de talla' }, 'Aiko M.', AT)
+  it('Devolución suma, exige motivo y queda ligada a su pedido', () => {
+    expect(validateMovement(row(), { type: 'Devolución', qty: '1', note: ' ', folio: 'SKK-1042' })).toBe(MSG.note)
+    const { row: r, movement } = applyMovement(row(), { type: 'Devolución', qty: '1', note: 'Cambio de talla', folio: ' skk-1042 ' }, 'Aiko M.', AT)
     expect(r.stock).toBe(11)
-    expect(movement.qty).toBe(1)
+    expect(movement).toMatchObject({ qty: 1, order: 'SKK-1042' })
+  })
+
+  it('Devolución sin folio, con formato inválido o de un pedido que no existe se rechaza en el campo folio', () => {
+    const base = { type: 'Devolución', qty: '1', note: 'Cambio de talla' }
+    expect(checkMovement(row(), base)).toMatchObject({ message: MSG.folio, field: 'folio', status: 422 })
+    expect(checkMovement(row(), { ...base, folio: 'SKK-12' })).toMatchObject({ message: MSG.folio, field: 'folio' })
+    const orderExists = (f) => f === 'SKK-1042'
+    expect(checkMovement(row(), { ...base, folio: 'SKK-9999' }, { orderExists })).toMatchObject({ message: MSG.folioUnknown('SKK-9999'), field: 'folio' })
+    expect(checkMovement(row(), { ...base, folio: 'SKK-1042' }, { orderExists }).message).toBe('')
+  })
+
+  it('los demás movimientos manuales no piden folio', () => {
+    expect(needsFolio('Entrada')).toBe(false)
+    expect(needsFolio('Venta')).toBe(true)
+    const { movement } = applyMovement(row(), { type: 'Entrada', qty: '1', folio: 'SKK-1042' }, 'Aiko M.', AT)
+    expect(movement.order).toBeNull()
   })
 
   it('Conteo físico fija el stock y registra la diferencia negativa', () => {

@@ -114,6 +114,24 @@ describe('efecto de los pedidos en inventario', () => {
   })
 })
 
+describe('movimientos con folio', () => {
+  it('una devolución exige un pedido existente y queda ligada a él', async () => {
+    const { rows } = await api.getInventory()
+    const { sku } = rows[0]
+    const mv = { type: 'Devolución', qty: '1', note: 'Cambio de talla' }
+    await expect(api.adjustStock(sku, { ...mv, folio: 'SKK-9999' }, OWNER)).rejects.toMatchObject({ status: 422, field: 'folio' })
+    const { orders } = await api.getOrders({}, 'dueno')
+    const { movement } = await api.adjustStock(sku, { ...mv, folio: orders[0].id }, OWNER)
+    expect(movement).toMatchObject({ type: 'Devolución', order: orders[0].id })
+  })
+
+  it('una merma que toca pares apartados responde 409', async () => {
+    const { rows } = await api.getInventory()
+    const r = rows.find((x) => x.reserved > 0)
+    await expect(api.adjustStock(r.sku, { type: 'Merma', qty: String(r.available + 1), note: 'Mancha' }, OPS)).rejects.toMatchObject({ status: 409 })
+  })
+})
+
 describe('importación y configuración', () => {
   it('un CSV con 2 filas erróneas aplica solo las válidas', async () => {
     const { rows } = await api.getInventory()

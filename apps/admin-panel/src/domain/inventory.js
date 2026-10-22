@@ -5,6 +5,9 @@ export const MANUAL_MOVEMENTS = ['Entrada', 'Merma', 'Devolución', 'Conteo fís
 // Movimientos automáticos.
 export const SALE = 'Venta'
 export const INITIAL = 'Inventario inicial'
+// Movimientos que siempre apuntan a un pedido (CK_InventoryMovements_OrderRequired, DESIGN_DB.md §3.7).
+export const FOLIO_MOVEMENTS = [SALE, 'Devolución']
+export const FOLIO_RE = /^SKK-\d{4,}$/
 
 const pairs = (n) => (n === 1 ? '1 par' : `${n} pares`)
 const reservedPairs = (n) => (n === 1 ? 'el par apartado' : `los ${n} pares apartados`)
@@ -16,13 +19,18 @@ export const MSG = {
   tooManyReserved: (n, reserved) => `No puede sacar más de ${pairs(n)}; ${reserved === 1 ? '1 está apartado' : `${reserved} están apartados`} para pedidos.`,
   belowReserved: (n, reserved) => `El conteo (${n}) es menor que ${reservedPairs(reserved)}. Cancele o surta esos pedidos antes de ajustar.`,
   note: 'Escriba el motivo para la bitácora.',
+  folio: 'Escriba el folio del pedido, por ejemplo SKK-1042.',
+  folioUnknown: (folio) => `No encontramos el pedido ${folio}. Revise el folio.`,
 }
 
 export const available = (row) => row.stock - row.reserved
 
-/** Error de un movimiento: `status` 409 si choca con pares apartados (R-27), 422 si el dato es inválido. */
-const fail = (message, status = 422) => ({ message, status })
-const OK = { message: '', status: 0 }
+/**
+ * Error de un movimiento: `status` 409 si choca con pares apartados (R-27), 422 si el dato es inválido;
+ * `field` dice qué campo del formulario lo causó.
+ */
+const fail = (message, status = 422, field = 'qty') => ({ message, status, field })
+const OK = { message: '', status: 0, field: '' }
 
 /** agotado (≤ 0) · pocos (≤ umbral) · ok */
 export function stockState(avail, fewThreshold) {
@@ -32,12 +40,15 @@ export function stockState(avail, fewThreshold) {
 }
 
 export const needsNote = (type) => type === 'Merma' || type === 'Devolución'
+export const needsFolio = (type) => FOLIO_MOVEMENTS.includes(type)
+export const normalizeFolio = (folio) => String(folio ?? '').trim().toUpperCase()
 
 /**
- * Valida un movimiento manual y devuelve `{ message, status }` (`message` vacío si es válido).
+ * Valida un movimiento manual y devuelve `{ message, status, field }` (`message` vacío si es válido).
  * R-27: la Merma no puede tocar pares apartados y el Conteo físico no puede quedar por debajo de ellos.
+ * La Devolución exige el folio de su pedido; `orderExists(folio)` (lo da el servidor) comprueba que exista.
  */
-export function checkMovement(row, { type, qty, note }) {
+export function checkMovement(row, { type, qty, note, folio }, { orderExists } = {}) {
   if (!MANUAL_MOVEMENTS.includes(type)) return fail('Tipo de movimiento no válido.')
   const raw = String(qty ?? '').trim()
   const n = /^\d+$/.test(raw) ? Number(raw) : NaN
@@ -50,12 +61,17 @@ export function checkMovement(row, { type, qty, note }) {
   if (type === 'Merma' && n > available(row)) {
     return row.reserved > 0 ? fail(MSG.tooManyReserved(available(row), row.reserved), 409) : fail(MSG.tooMany(row.stock))
   }
-  if (needsNote(type) && !String(note ?? '').trim()) return fail(MSG.note)
+  if (needsNote(type) && !String(note ?? '').trim()) return fail(MSG.note, 422, 'note')
+  if (needsFolio(type)) {
+    const code = normalizeFolio(folio)
+    if (!FOLIO_RE.test(code)) return fail(MSG.folio, 422, 'folio')
+    if (orderExists && !orderExists(code)) return fail(MSG.folioUnknown(code), 422, 'folio')
+  }
   return OK
 }
 
 /** Valida un movimiento manual. `qty` llega como texto o número. Devuelve '' o el mensaje. */
-export const validateMovement = (row, movement) => checkMovement(row, movement).message
+export const validateMovement = (row, movement, opts) => checkMovement(row, movement, opts).message
 
 /** Cambio firmado que produce el movimiento sobre el stock actual. */
 export function movementDelta(row, type, n) {
@@ -73,12 +89,12 @@ export function movementDelta(row, type, n) {
 }
 
 /**
- * Aplica un movimiento manual. Devuelve `{ row, movement, error, status }`.
- * movement: { sku, type, qty (delta firmado), balance, date, user, note }
+ * Aplica un movimiento manual. Devuelve `{ row, movement, error, status, field }`.
+ * movement: { sku, type, qty (delta firmado), balance, date, user, note, order (folio o null) }
  */
-export function applyMovement(row, { type, qty, note }, user, date) {
-  const check = checkMovement(row, { type, qty, note })
-  if (check.message) return { row, movement: null, error: check.message, status: check.status }
+export function applyMovement(row, { type, qty, note, folio }, user, date, opts) {
+  const check = checkMovement(row, { type, qty, note, folio }, opts)
+  if (check.message) return { row, movement: null, error: check.message, status: check.status, field: check.field }
   const n = Number(String(qty).trim())
   const delta = movementDelta(row, type, n)
   const stock = Math.max(0, row.stock + delta)
@@ -93,6 +109,7 @@ export function applyMovement(row, { type, qty, note }, user, date) {
       date,
       user,
       note: cleanNote || (type === 'Conteo físico' ? 'Ajuste tras conteo' : '—'),
+      order: needsFolio(type) ? normalizeFolio(folio) : null,
     },
     error: '',
   }
@@ -103,7 +120,7 @@ export function applySale(row, qty, folio, user, date) {
   const stock = Math.max(0, row.stock - qty)
   return {
     row: { ...row, stock, reserved: Math.max(0, row.reserved - qty) },
-    movement: { sku: row.sku, type: SALE, qty: stock - row.stock, balance: stock, date, user, note: `Pedido ${folio}` },
+    movement: { sku: row.sku, type: SALE, qty: stock - row.stock, balance: stock, date, user, note: `Pedido ${folio}`, order: folio },
   }
 }
 
@@ -117,7 +134,7 @@ export const release = (row, qty) => ({ ...row, reserved: Math.max(0, row.reserv
 export function applyInitial(row, stock, user, date, note = 'Importado desde CSV') {
   return {
     row: { ...row, stock },
-    movement: { sku: row.sku, type: INITIAL, qty: stock - row.stock, balance: stock, date, user, note },
+    movement: { sku: row.sku, type: INITIAL, qty: stock - row.stock, balance: stock, date, user, note, order: null },
   }
 }
 

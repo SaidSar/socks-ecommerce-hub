@@ -35,7 +35,8 @@ export default function Kardex({ movements, highlight = false }) {
                 <td className="py-2 pr-2">
                   <span className="block">{m.type}</span>
                   <span className="block text-[11.5px] text-ink-soft">
-                    {m.note} · {m.user}
+                    {m.note}
+                    {m.order && m.type !== 'Venta' ? ` · Pedido ${m.order}` : ''} · {m.user}
                   </span>
                 </td>
                 <td className={`py-2 text-right tnum font-medium align-top ${m.qty > 0 ? 'text-matcha' : m.qty < 0 ? 'text-laca' : 'text-ink-soft'}`}>

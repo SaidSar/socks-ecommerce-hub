@@ -210,11 +210,16 @@ export async function getMovements(sku) {
 }
 
 /** TODO(api): POST /api/admin/inventory/{sku}/movements */
-export async function adjustStock(sku, { type, qty, note }, user) {
+export async function adjustStock(sku, { type, qty, note, folio }, user) {
   await latency()
-  const res = applyMovement(findRow(sku), { type, qty, note }, by(user), stamp())
+  const orderExists = (code) => db().orders.some((o) => o.id === code)
+  const res = applyMovement(findRow(sku), { type, qty, note, folio }, by(user), stamp(), { orderExists })
   // 409 si choca con pares apartados (R-27), 422 si el dato es inválido; nunca 500.
-  if (res.error) throw new ApiError(res.error, res.status)
+  if (res.error) {
+    const err = new ApiError(res.error, res.status)
+    err.field = res.field
+    throw err
+  }
   replaceRow(res.row)
   db().movements.push(res.movement)
   save()

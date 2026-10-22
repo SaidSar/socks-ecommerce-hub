@@ -1,31 +1,42 @@
 import { useId, useRef, useState } from 'react'
-import { MANUAL_MOVEMENTS, needsNote, validateMovement } from '../../domain/inventory'
+import { checkMovement, MANUAL_MOVEMENTS, needsFolio, needsNote } from '../../domain/inventory'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 
 const PLACEHOLDER = {
   Entrada: 'Lote maquila noviembre',
   Merma: 'Hilo jalado, mancha…',
-  Devolución: 'Cambio de talla, pedido SKK-…',
+  Devolución: 'Cambio de talla',
   'Conteo físico': 'Conteo de fin de mes',
 }
 
-/** Registrar movimiento (DESIGN_ADMIN.md §5.3). `onSubmit` llama a la API y devuelve el movimiento creado. */
+/**
+ * Registrar movimiento (DESIGN_ADMIN.md §5.3). `onSubmit` llama a la API y devuelve el movimiento creado.
+ * La Devolución exige el folio de su pedido (DESIGN_DB.md §3.7); que exista lo comprueba la API.
+ */
 export default function MovementForm({ row, onSubmit, onDone }) {
   const [type, setType] = useState('Entrada')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
-  const [error, setError] = useState('')
+  const [folio, setFolio] = useState('')
+  // `field` dice junto a qué campo va el error: 'folio' se muestra en línea; el resto, al pie.
+  const [error, setError] = useState({ message: '', field: '' })
   const [done, setDone] = useState('')
   const [busy, setBusy] = useState(false)
   const qtyRef = useRef(null)
+  const noteRef = useRef(null)
+  const folioRef = useRef(null)
   const typeRefs = useRef([])
-  const ids = { qty: useId(), note: useId(), err: useId() }
+  const ids = { qty: useId(), note: useId(), folio: useId(), folioHint: useId(), folioErr: useId(), err: useId() }
   const isCount = type === 'Conteo físico'
+  const withFolio = needsFolio(type)
+  const folioError = error.field === 'folio' ? error.message : ''
+  const formError = error.field === 'folio' ? '' : error.message
+  const clearError = () => setError({ message: '', field: '' })
 
   const pickType = (t) => {
     setType(t)
-    setError('')
+    clearError()
   }
 
   const onTypeKey = (e) => {
@@ -39,24 +50,28 @@ export default function MovementForm({ row, onSubmit, onDone }) {
     typeRefs.current[next]?.focus()
   }
 
+  const focusField = (field) => ({ folio: folioRef, note: noteRef }[field] ?? qtyRef).current?.focus()
+
   const submit = async (e) => {
     e.preventDefault()
-    const err = validateMovement(row, { type, qty, note })
-    if (err) {
-      setError(err)
-      qtyRef.current?.focus()
+    const check = checkMovement(row, { type, qty, note, folio })
+    if (check.message) {
+      setError(check)
+      focusField(check.field)
       return
     }
     setBusy(true)
     try {
-      await onSubmit({ type, qty, note })
+      await onSubmit({ type, qty, note, folio: withFolio ? folio : undefined })
       setDone(`${type} registrada`)
       setQty('')
       setNote('')
-      setError('')
+      setFolio('')
+      clearError()
       onDone?.()
     } catch (ex) {
-      setError(ex.message)
+      setError({ message: ex.message, field: ex.field ?? '' })
+      if (ex.field) focusField(ex.field)
     } finally {
       setBusy(false)
     }
@@ -65,7 +80,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
   const diff = isCount && qty !== '' ? Number(qty) - row.stock : null
 
   return (
-    <form onSubmit={submit} noValidate className="rounded-lg bg-linen border border-line p-4 space-y-3" aria-describedby={error ? ids.err : undefined}>
+    <form onSubmit={submit} noValidate className="rounded-lg bg-linen border border-line p-4 space-y-3" aria-describedby={formError ? ids.err : undefined}>
       <h3 className="text-[13.5px] font-medium">Registrar movimiento</h3>
       <div className="grid grid-cols-2 gap-1" role="radiogroup" aria-label="Tipo de movimiento" onKeyDown={onTypeKey}>
         {MANUAL_MOVEMENTS.map((t, i) => (
@@ -95,11 +110,11 @@ export default function MovementForm({ row, onSubmit, onDone }) {
           value={qty}
           onChange={(e) => {
             setQty(e.target.value.replace(/\D/g, ''))
-            setError('')
+            clearError()
             setDone('')
           }}
-          aria-invalid={Boolean(error)}
-          className={`mt-1 h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[14px] tnum outline-none focus:border-ai ${error ? 'border-laca' : 'border-line'}`}
+          aria-invalid={error.field === 'qty'}
+          className={`mt-1 h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[14px] tnum outline-none focus:border-ai ${error.field === 'qty' ? 'border-laca' : 'border-line'}`}
         />
         {diff !== null && (
           <p className="text-[12px] text-ink-soft mt-1 tnum">
@@ -108,24 +123,58 @@ export default function MovementForm({ row, onSubmit, onDone }) {
           </p>
         )}
       </div>
+      {withFolio && (
+        <div>
+          <label htmlFor={ids.folio} className="text-[12px] text-ink-soft">
+            Folio del pedido
+          </label>
+          <input
+            ref={folioRef}
+            id={ids.folio}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            value={folio}
+            onChange={(e) => {
+              setFolio(e.target.value.toUpperCase())
+              clearError()
+              setDone('')
+            }}
+            placeholder="SKK-1042"
+            aria-invalid={Boolean(folioError)}
+            aria-describedby={folioError ? `${ids.folioErr} ${ids.folioHint}` : ids.folioHint}
+            className={`mt-1 h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[14px] tnum outline-none focus:border-ai placeholder:text-ink-soft ${folioError ? 'border-laca' : 'border-line'}`}
+          />
+          <p id={ids.folioHint} className="text-[12px] text-ink-soft mt-1">
+            Pedido del que regresan los pares.
+          </p>
+          {folioError && (
+            <p id={ids.folioErr} className="text-[12.5px] text-laca mt-1" role="alert">
+              {folioError}
+            </p>
+          )}
+        </div>
+      )}
       <div>
         <label htmlFor={ids.note} className="text-[12px] text-ink-soft">
           Motivo {needsNote(type) ? '' : '(opcional)'}
         </label>
         <input
+          ref={noteRef}
           id={ids.note}
           value={note}
           onChange={(e) => {
             setNote(e.target.value)
-            setError('')
+            clearError()
           }}
           placeholder={PLACEHOLDER[type]}
-          className="mt-1 h-10 max-lg:h-11 w-full rounded-md border border-line bg-paper px-3 text-[13px] outline-none focus:border-ai placeholder:text-ink-soft"
+          aria-invalid={error.field === 'note'}
+          className={`mt-1 h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[13px] outline-none focus:border-ai placeholder:text-ink-soft ${error.field === 'note' ? 'border-laca' : 'border-line'}`}
         />
       </div>
-      {error && (
+      {formError && (
         <p id={ids.err} className="text-[12.5px] text-laca" role="alert">
-          {error}
+          {formError}
         </p>
       )}
       <div className="flex items-center gap-3">
