@@ -8,7 +8,7 @@ import { applyInitial, applyMovement, applySale, available, matchesStockFilter, 
 import { advance, cancel, countByFilter, isLate, matchesFilter, matchesQuery } from '../domain/orders'
 import { computeShipping, formatZone, validateZone } from '../domain/shipping'
 import { normalize } from '../utils/format'
-import { COURIERS, createSeed, DEMO_NOW, SIZES, TONES } from '../data/seed'
+import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES, TONES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
 
 export const STORAGE_KEY = 'sokko.admin.data.v1'
@@ -28,7 +28,7 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed?.version === 1) return parsed
+      if (parsed?.version === SEED_VERSION) return parsed
     }
   } catch {
     /* almacenamiento bloqueado o JSON dañado: se vuelve a la semilla */

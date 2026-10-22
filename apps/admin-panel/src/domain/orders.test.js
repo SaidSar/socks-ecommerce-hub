@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advance, canCancel, cancel, isLate, matchesFilter, matchesQuery, nextLabel, nextStatus, TRACKING_ERROR, validateTracking } from './orders'
+import { advance, canCancel, cancel, isLate, matchesFilter, matchesQuery, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, TRACKING_ERROR, validateAdvance, validateTracking } from './orders'
 
 const NOW = new Date(2026, 9, 18, 9, 30)
 const hoursAgo = (h) => new Date(NOW.getTime() - h * 3600e3).toISOString()
@@ -10,6 +10,7 @@ const order = (over = {}) => ({
   status: 'por_preparar',
   delivery: 'paqueteria',
   pay: 'Tarjeta',
+  paymentStatus: 'pagado',
   customer: { name: 'Mariana López', email: 'mariana.lopez@correo.mx' },
   items: [{ sku: 'SKK-007-SUM-M', qty: 1 }],
   history: [{ status: 'pagado', at: hoursAgo(3), by: 'Tienda en línea' }],
@@ -106,7 +107,8 @@ describe('cancelación', () => {
 describe('filtros y búsqueda', () => {
   it('filtra atrasados y OXXO pendiente', () => {
     expect(matchesFilter(order({ created: hoursAgo(60) }), 'late', NOW)).toBe(true)
-    expect(matchesFilter(order({ pay: 'OXXO Pay' }), 'oxxo', NOW)).toBe(true)
+    expect(matchesFilter(order({ pay: 'OXXO Pay', paymentStatus: 'pendiente' }), 'oxxo', NOW)).toBe(true)
+    expect(matchesFilter(order({ pay: 'OXXO Pay', paymentStatus: 'pagado' }), 'oxxo', NOW)).toBe(false)
     expect(matchesFilter(order({ pay: 'OXXO Pay', status: 'preparando' }), 'oxxo', NOW)).toBe(false)
   })
   it('busca sin distinguir acentos, por folio, correo o SKU', () => {
@@ -114,5 +116,17 @@ describe('filtros y búsqueda', () => {
     expect(matchesQuery(order(), '1050')).toBe(true)
     expect(matchesQuery(order(), 'skk-007-sum')).toBe(true)
     expect(matchesQuery(order(), 'ramírez')).toBe(false)
+  })
+})
+
+describe('pago antes de surtir (CK_Orders_PaymentBeforeFulfillment)', () => {
+  it('un OXXO sin pagar no avanza, pero sí se puede cancelar', () => {
+    const unpaid = order({ pay: 'OXXO Pay', paymentStatus: 'pendiente' })
+    expect(validateAdvance(unpaid)).toBe(PAYMENT_PENDING_ERROR)
+    expect(advance(unpaid, {}, 'Aiko M.', NOW.toISOString())).toMatchObject({ error: PAYMENT_PENDING_ERROR, order: unpaid })
+    expect(cancel(unpaid, 'Aiko M.', NOW.toISOString()).order.status).toBe('cancelado')
+  })
+  it('pagado avanza normal', () => {
+    expect(validateAdvance(order({ pay: 'OXXO Pay', paymentStatus: 'pagado' }))).toBe('')
   })
 })

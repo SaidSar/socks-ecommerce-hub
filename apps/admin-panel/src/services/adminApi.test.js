@@ -58,6 +58,50 @@ describe('seed determinista y coherente', () => {
     })
   })
 
+  it('OXXO sin pagar solo por preparar o cancelado; el resto pagado (CK_Orders_PaymentBeforeFulfillment)', () => {
+    const unpaid = seed.orders.filter((o) => o.paymentStatus === 'pendiente')
+    expect(unpaid.length).toBeGreaterThan(0)
+    unpaid.forEach((o) => {
+      expect(o.pay).toBe('OXXO Pay')
+      expect(['por_preparar', 'cancelado']).toContain(o.status)
+      expect(o.paidAt).toBeNull()
+      expect(o.history.some((h) => h.status === 'pagado')).toBe(false)
+    })
+    seed.orders.filter((o) => o.paymentStatus === 'reembolsado').forEach((o) => expect(o.status).toBe('cancelado'))
+    expect(seed.orders.some((o) => o.pay === 'OXXO Pay' && o.paymentStatus === 'pagado' && o.status !== 'por_preparar')).toBe(true)
+  })
+
+  it('el hito "Pagado" lleva la fecha de pago y va antes de los pasos de bodega', () => {
+    seed.orders.filter((o) => o.paidAt).forEach((o) => {
+      const paid = o.history.find((h) => h.status === 'pagado')
+      expect(paid.at).toBe(o.paidAt)
+      o.history.filter((h) => h.status !== 'pagado' && h.status !== 'por_preparar').forEach((h) => expect(new Date(h.at) >= new Date(o.paidAt)).toBe(true))
+      if (o.pay === 'Tarjeta') expect(o.paidAt).toBe(o.created)
+      else expect(new Date(o.paidAt) > new Date(o.created)).toBe(true)
+    })
+  })
+
+  it('ventas y devoluciones del kárdex apuntan a un pedido existente que lleva ese SKU', () => {
+    const linked = seed.movements.filter((m) => m.type === 'Venta' || m.type === 'Devolución')
+    expect(linked.some((m) => m.type === 'Devolución')).toBe(true)
+    linked.forEach((m) => {
+      const o = seed.orders.find((x) => x.id === m.order)
+      expect(o).toBeDefined()
+      expect(o.items.some((it) => it.sku === m.sku)).toBe(true)
+    })
+  })
+
+  it('enums con los códigos de la API (DESIGN_DB.md §1.6)', () => {
+    seed.orders.forEach((o) => {
+      expect(['local', 'paqueteria']).toContain(o.delivery)
+      expect(['Tarjeta', 'OXXO Pay']).toContain(o.pay)
+      expect(['pendiente', 'pagado', 'reembolsado']).toContain(o.paymentStatus)
+      if (o.carrier) expect(['Estafeta', 'DHL Express']).toContain(o.carrier)
+    })
+    const types = new Set(seed.movements.map((m) => m.type))
+    types.forEach((t) => expect(['Entrada', 'Merma', 'Devolución', 'Conteo físico', 'Venta', 'Inventario inicial']).toContain(t))
+  })
+
   it('30 días de ventas con periodo anterior', () => {
     expect(seed.daily).toHaveLength(30)
     expect(seed.daily.every((d) => d.v > 0 && d.prev > 0 && d.orders > 0)).toBe(true)
@@ -67,7 +111,7 @@ describe('seed determinista y coherente', () => {
 describe('efecto de los pedidos en inventario', () => {
   it('pedido de paquetería: exige guía válida; al enviarlo baja el stock y aparece "Venta" en el kárdex', async () => {
     const { orders } = await api.getOrders({ filter: 'todos' }, 'dueno')
-    const o = orders.find((x) => x.delivery === 'paqueteria' && x.status === 'por_preparar')
+    const o = orders.find((x) => x.delivery === 'paqueteria' && x.status === 'por_preparar' && x.paymentStatus === 'pagado')
     const it = o.items[0]
     const before = (await api.getInventory({ q: it.sku })).rows[0]
 
@@ -86,7 +130,7 @@ describe('efecto de los pedidos en inventario', () => {
 
   it('pedido local: por preparar → preparando → en ruta local → entregado', async () => {
     const { orders } = await api.getOrders({ filter: 'por_preparar' }, 'operaciones')
-    const o = orders.find((x) => x.delivery === 'local')
+    const o = orders.find((x) => x.delivery === 'local' && x.pay === 'Tarjeta')
     expect((await api.advanceOrder(o.id, {}, OPS)).status).toBe('preparando')
     expect((await api.advanceOrder(o.id, { courier: 'Kevin Armenta' }, OPS)).status).toBe('en_ruta')
     const done = await api.advanceOrder(o.id, {}, OPS)

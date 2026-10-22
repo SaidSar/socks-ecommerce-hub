@@ -13,6 +13,9 @@ export const STATUS = {
 
 export const CARRIERS = ['Estafeta', 'DHL Express']
 export const PAYMENT_METHODS = ['Tarjeta', 'OXXO Pay']
+// Estado del pago (columna API de DESIGN_DB.md §1.6). Tarjeta nace pagado; OXXO Pay, pendiente.
+export const PAYMENT_STATUSES = ['pendiente', 'pagado', 'reembolsado']
+export const PAYMENT_PENDING_ERROR = 'El pago en OXXO sigue pendiente. El pedido se prepara cuando llegue la confirmación.'
 export const LATE_HOURS = 48
 export const TRACKING_RE = /^\d{10,}$/
 export const TRACKING_ERROR = 'Escriba el número de guía (solo dígitos, mínimo 10).'
@@ -71,7 +74,10 @@ export function isLate(order, now) {
   return (new Date(now) - new Date(order.created)) / 3600e3 > LATE_HOURS
 }
 
-export const isOxxoPending = (order) => order.pay === 'OXXO Pay' && order.status === 'por_preparar'
+export const isPaymentPending = (order) => order.paymentStatus === 'pendiente'
+
+/** Pestaña "OXXO pendiente": PaymentMethod = OxxoPay AND PaymentStatus = Pendiente (DESIGN_DB.md §3.8). */
+export const isOxxoPending = (order) => order.pay === 'OXXO Pay' && isPaymentPending(order) && order.status === 'por_preparar'
 
 export const pairCount = (order) => order.items.reduce((a, it) => a + it.qty, 0)
 
@@ -82,6 +88,8 @@ export function validateTracking(tracking) {
 /** Valida lo que pide el paso siguiente. Devuelve '' si se puede avanzar o el mensaje de error. */
 export function validateAdvance(order, payload = {}) {
   if (!nextStatus(order)) return 'Este pedido ya no tiene un siguiente paso.'
+  // CK_Orders_PaymentBeforeFulfillment: sin pago solo se puede estar por preparar o cancelado.
+  if (isPaymentPending(order)) return PAYMENT_PENDING_ERROR
   if (order.status === 'preparando') {
     if (isLocal(order)) return payload.courier ? '' : COURIER_ERROR
     if (!CARRIERS.includes(payload.carrier)) return 'Elija la paquetería.'

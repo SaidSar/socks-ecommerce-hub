@@ -1,6 +1,9 @@
 // Datos de ejemplo deterministas del panel (DESIGN_ADMIN.md §6.1). Solo los usa services/adminApi.js.
 import { computeShipping } from '../domain/shipping'
 
+// Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
+export const SEED_VERSION = 2
+
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
 
@@ -139,6 +142,21 @@ export function createSeed() {
     if (delivery === 'local' && status === 'enviado') status = 'en_ruta'
     if (delivery === 'paqueteria' && status === 'en_ruta') status = 'enviado'
     const pay = ov.pay ?? (rnd() < 0.78 ? 'Tarjeta' : 'OXXO Pay')
+    // Pago (DESIGN_DB.md §3.8): Tarjeta nace pagada. OXXO Pay sin pagar solo puede estar por preparar o
+    // cancelado (CK_Orders_PaymentBeforeFulfillment); si ya avanzó, se pagó unas horas después de crearse.
+    // Se decide con `i` y no con rnd() para no mover el resto de la semilla.
+    let paymentStatus = 'pagado'
+    let paidAt = created
+    if (pay === 'OXXO Pay') {
+      if (status === 'cancelado' || (status === 'por_preparar' && (i === 1 || i % 3 !== 0))) {
+        paymentStatus = 'pendiente'
+        paidAt = null
+      } else {
+        const wait = Math.min((2 + (i % 5) * 3) * 3600e3, (DEMO_NOW.getTime() - created.getTime()) * 0.5)
+        paidAt = new Date(created.getTime() + wait)
+      }
+    }
+    if (status === 'cancelado' && paymentStatus === 'pagado') paymentStatus = 'reembolsado'
     const name = pick(NAMES)
     const shipped = status === 'enviado' || status === 'en_ruta' || status === 'entregado'
     let tracking = ''
@@ -153,6 +171,8 @@ export function createSeed() {
       shipping: cost,
       total: subtotal + cost,
       pay,
+      paymentStatus,
+      paidAt: paidAt ? iso(paidAt) : null,
       customer: {
         name,
         email:
@@ -171,7 +191,11 @@ export function createSeed() {
       tracking,
       courier: delivery === 'local' && (status === 'en_ruta' || status === 'entregado') ? pick(COURIERS) : '',
       note: i === 4 ? 'Cliente pidió envolver por separado: es regalo.' : '',
-      history: [{ status: 'pagado', at: iso(created), by: 'Tienda en línea' }],
+      // OXXO nace "por preparar" y el hito "Pagado" llega con la fecha de pago; con Tarjeta coinciden.
+      history: [
+        ...(pay === 'OXXO Pay' ? [{ status: 'por_preparar', at: iso(created), by: 'Tienda en línea' }] : []),
+        ...(paidAt ? [{ status: 'pagado', at: iso(paidAt), by: pay === 'OXXO Pay' ? 'OXXO Pay' : 'Tienda en línea' }] : []),
+      ],
     }
 
     // Historial coherente: pasos en orden, sin pasar de DEMO_NOW.
@@ -180,7 +204,8 @@ export function createSeed() {
     } else {
       const steps = ['por_preparar', 'preparando', delivery === 'local' ? 'en_ruta' : 'enviado', 'entregado']
       const idx = steps.indexOf(status)
-      let t = created.getTime()
+      // Los pasos de bodega empiezan cuando hay pago.
+      let t = (paidAt ?? created).getTime()
       const room = DEMO_NOW.getTime() - t
       for (let k = 1; k <= idx; k++) {
         t += Math.min((6 + rnd() * 30) * 3600e3, room * (0.12 + rnd() * 0.12))
@@ -217,10 +242,21 @@ export function createSeed() {
     orders.forEach((o) => {
       const shipStep = o.history.find((h) => h.status === 'enviado' || h.status === 'en_ruta')
       if (!shipStep) return
-      o.items.filter((it) => it.sku === r.sku).forEach((it) => events.push({ type: 'Venta', delta: -it.qty, date: new Date(shipStep.at), user: shipStep.by, note: `Pedido ${o.id}` }))
+      o.items.filter((it) => it.sku === r.sku).forEach((it) => events.push({ type: 'Venta', delta: -it.qty, date: new Date(shipStep.at), user: shipStep.by, note: `Pedido ${o.id}`, order: o.id }))
     })
     if (rnd() < 0.3) events.push({ type: 'Merma', delta: -1, date: at(int(6, 20), int(10, 17)), user: 'Daniel R.', note: 'Hilo jalado en control de calidad' })
-    if (rnd() < 0.2) events.push({ type: 'Devolución', delta: 1, date: at(int(6, 20), int(10, 17)), user: 'Aiko M.', note: 'Cambio de talla' })
+    if (rnd() < 0.2) {
+      // La devolución sale de un pedido entregado que llevaba este SKU (CK_InventoryMovements_OrderRequired).
+      // Se siguen consumiendo los mismos números aleatorios para no mover el resto de la semilla.
+      // (día, hora y minuto que antes daban la fecha).
+      int(6, 20)
+      int(10, 17)
+      int(0, 59)
+      const src = orders.find((o) => o.status === 'entregado' && o.items.some((it) => it.sku === r.sku))
+      const deliveredAt = src ? new Date(src.history.at(-1).at).getTime() : 0
+      const date = new Date(Math.min(deliveredAt + 24 * 3600e3, DEMO_NOW.getTime() - 2 * 3600e3))
+      if (src && date.getTime() > deliveredAt) events.push({ type: 'Devolución', delta: 1, date, user: 'Aiko M.', note: 'Cambio de talla', order: src.id })
+    }
     events.sort((a, b) => a.date - b.date)
 
     const net = events.reduce((a, e) => a + e.delta, 0)
@@ -239,12 +275,12 @@ export function createSeed() {
     let bal = 0
     list.forEach((e) => {
       bal += e.delta
-      movements.push({ sku: r.sku, type: e.type, qty: e.delta, balance: bal, date: iso(e.date), user: e.user, note: e.note })
+      movements.push({ sku: r.sku, type: e.type, qty: e.delta, balance: bal, date: iso(e.date), user: e.user, note: e.note, order: e.order ?? null })
     })
     if (bal !== r.stock) {
       const last = list[list.length - 1].date
       const date = new Date(Math.min(DEMO_NOW.getTime() - 3600e3, last.getTime() + 20 * 3600e3))
-      movements.push({ sku: r.sku, type: 'Conteo físico', qty: r.stock - bal, balance: r.stock, date: iso(date), user: 'Aiko M.', note: 'Ajuste tras conteo' })
+      movements.push({ sku: r.sku, type: 'Conteo físico', qty: r.stock - bal, balance: r.stock, date: iso(date), user: 'Aiko M.', note: 'Ajuste tras conteo', order: null })
     }
   })
 
@@ -269,5 +305,5 @@ export function createSeed() {
     })
   }
 
-  return { version: 1, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES) }
+  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES) }
 }
