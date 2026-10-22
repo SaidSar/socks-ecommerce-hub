@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { CARRIER_LABELS, label } from '../../domain/enums'
 import { CARRIERS, isPaymentPending, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, validateAdvance } from '../../domain/orders'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
@@ -75,7 +76,9 @@ export default function NextStepBox({ order, couriers, onAdvance }) {
             className="h-10 max-lg:h-11 rounded-md border border-line bg-paper px-2 text-[13px]"
           >
             {CARRIERS.map((c) => (
-              <option key={c}>{c}</option>
+              <option key={c} value={c}>
+                {label(CARRIER_LABELS, c)}
+              </option>
             ))}
           </select>
           <div>

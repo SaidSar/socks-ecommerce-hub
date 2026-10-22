@@ -1,5 +1,7 @@
 import { useId, useRef, useState } from 'react'
+import { label, MOVEMENT_LABELS } from '../../domain/enums'
 import { COLUMNS } from '../../domain/importCsv'
+import { INITIAL } from '../../domain/inventory'
 import { useAdminData } from '../../hooks/useAdminData'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
@@ -93,7 +95,7 @@ export default function ImportCsvModal({ onClose }) {
             {result.applied} SKU actualizados
           </p>
           <p className="text-[13px] mt-1">
-            Cada uno quedó en el kárdex como “Inventario inicial · Importado desde CSV”. {result.skipped}{' '}
+            Cada uno quedó en el kárdex como “{label(MOVEMENT_LABELS, INITIAL)} · Importado desde CSV”. {result.skipped}{' '}
             {result.skipped === 1 ? 'fila se omitió' : 'filas se omitieron'} por errores.
           </p>
           <Button variant="dark" className="mt-4" onClick={onClose}>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { label, PAYMENT_METHOD_LABELS } from '../../domain/enums'
 import { canCancel, pairCount } from '../../domain/orders'
 import { formatMXN } from '../../utils/format'
 import Button from '../ui/Button'
@@ -36,7 +37,7 @@ export default function CancelOrder({ order, showMoney, onCancel }) {
           <p className="text-[13px] font-medium text-laca">¿Cancelar {order.id}?</p>
           <p className="text-[12.5px] mt-1">
             Se liberan {pairs} {pairs === 1 ? 'par' : 'pares'} al inventario y se inicia el reembolso
-            {showMoney && order.total != null ? ` de ${formatMXN(order.total)}` : ''} por {order.pay}.
+            {showMoney && order.total != null ? ` de ${formatMXN(order.total)}` : ''} por {label(PAYMENT_METHOD_LABELS, order.pay)}.
           </p>
           {error && <p className="text-[12px] text-laca mt-2">{error}</p>}
           <div className="flex flex-wrap gap-2 mt-3">

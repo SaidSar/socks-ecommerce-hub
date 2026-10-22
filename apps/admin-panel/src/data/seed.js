@@ -1,8 +1,9 @@
 // Datos de ejemplo deterministas del panel (DESIGN_ADMIN.md §6.1). Solo los usa services/adminApi.js.
+import { PAYMENT_METHOD_LABELS } from '../domain/enums'
 import { computeShipping } from '../domain/shipping'
 
 // Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
-export const SEED_VERSION = 3
+export const SEED_VERSION = 4
 
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
@@ -82,9 +83,9 @@ const cityBy = (name) => CITIES.find((c) => c.city.startsWith(name))
 
 // Casos fijos para que la demo siempre tenga cada situación de la cola de trabajo.
 const OVERRIDES = {
-  0: { status: 'por_preparar', city: 'Los Mochis', pay: 'Tarjeta' },
-  1: { status: 'por_preparar', city: 'CDMX', pay: 'OXXO Pay' },
-  2: { status: 'por_preparar', city: 'Guadalajara', pay: 'Tarjeta' },
+  0: { status: 'por_preparar', city: 'Los Mochis', pay: 'tarjeta' },
+  1: { status: 'por_preparar', city: 'CDMX', pay: 'oxxo_pay' },
+  2: { status: 'por_preparar', city: 'Guadalajara', pay: 'tarjeta' },
   3: { status: 'preparando', city: 'Los Mochis' },
   5: { status: 'preparando', city: 'Monterrey', hour: 8 },
   6: { status: 'enviado', city: 'Ahome' },
@@ -143,13 +144,13 @@ export function createSeed() {
     const delivery = method
     if (delivery === 'local' && status === 'enviado') status = 'en_ruta'
     if (delivery === 'paqueteria' && status === 'en_ruta') status = 'enviado'
-    const pay = ov.pay ?? (rnd() < 0.78 ? 'Tarjeta' : 'OXXO Pay')
+    const pay = ov.pay ?? (rnd() < 0.78 ? 'tarjeta' : 'oxxo_pay')
     // Pago (DESIGN_DB.md §3.8): Tarjeta nace pagada. OXXO Pay sin pagar solo puede estar por preparar o
     // cancelado (CK_Orders_PaymentBeforeFulfillment); si ya avanzó, se pagó unas horas después de crearse.
     // Se decide con `i` y no con rnd() para no mover el resto de la semilla.
     let paymentStatus = 'pagado'
     let paidAt = created
-    if (pay === 'OXXO Pay') {
+    if (pay === 'oxxo_pay') {
       if (status === 'cancelado' || (status === 'por_preparar' && (i === 1 || i % 3 !== 0))) {
         paymentStatus = 'pendiente'
         paidAt = null
@@ -189,14 +190,14 @@ export function createSeed() {
       },
       delivery,
       giftWrap: rnd() < 0.55,
-      carrier: delivery === 'paqueteria' && shipped ? pick(['Estafeta', 'DHL Express']) : null,
+      carrier: delivery === 'paqueteria' && shipped ? pick(['estafeta', 'dhl_express']) : null,
       tracking,
       courier: delivery === 'local' && (status === 'en_ruta' || status === 'entregado') ? pick(COURIERS) : '',
       note: i === 4 ? 'Cliente pidió envolver por separado: es regalo.' : '',
       // OXXO nace "por preparar" y el hito "Pagado" llega con la fecha de pago; con Tarjeta coinciden.
       history: [
-        ...(pay === 'OXXO Pay' ? [{ status: 'por_preparar', at: iso(created), by: 'Tienda en línea' }] : []),
-        ...(paidAt ? [{ status: 'pagado', at: iso(paidAt), by: pay === 'OXXO Pay' ? 'OXXO Pay' : 'Tienda en línea' }] : []),
+        ...(pay === 'oxxo_pay' ? [{ status: 'por_preparar', at: iso(created), by: 'Tienda en línea' }] : []),
+        ...(paidAt ? [{ status: 'pagado', at: iso(paidAt), by: pay === 'oxxo_pay' ? PAYMENT_METHOD_LABELS.oxxo_pay : 'Tienda en línea' }] : []),
       ],
     }
 
@@ -244,9 +245,9 @@ export function createSeed() {
     orders.forEach((o) => {
       const shipStep = o.history.find((h) => h.status === 'enviado' || h.status === 'en_ruta')
       if (!shipStep) return
-      o.items.filter((it) => it.sku === r.sku).forEach((it) => events.push({ type: 'Venta', delta: -it.qty, date: new Date(shipStep.at), user: shipStep.by, note: `Pedido ${o.id}`, order: o.id }))
+      o.items.filter((it) => it.sku === r.sku).forEach((it) => events.push({ type: 'venta', delta: -it.qty, date: new Date(shipStep.at), user: shipStep.by, note: `Pedido ${o.id}`, order: o.id }))
     })
-    if (rnd() < 0.3) events.push({ type: 'Merma', delta: -1, date: at(int(6, 20), int(10, 17)), user: 'Daniel R.', note: 'Hilo jalado en control de calidad' })
+    if (rnd() < 0.3) events.push({ type: 'merma', delta: -1, date: at(int(6, 20), int(10, 17)), user: 'Daniel R.', note: 'Hilo jalado en control de calidad' })
     if (rnd() < 0.2) {
       // La devolución sale de un pedido entregado que llevaba este SKU (CK_InventoryMovements_OrderRequired).
       // Se siguen consumiendo los mismos números aleatorios para no mover el resto de la semilla.
@@ -257,7 +258,7 @@ export function createSeed() {
       const src = orders.find((o) => o.status === 'entregado' && o.items.some((it) => it.sku === r.sku))
       const deliveredAt = src ? new Date(src.history.at(-1).at).getTime() : 0
       const date = new Date(Math.min(deliveredAt + 24 * 3600e3, DEMO_NOW.getTime() - 2 * 3600e3))
-      if (src && date.getTime() > deliveredAt) events.push({ type: 'Devolución', delta: 1, date, user: 'Aiko M.', note: 'Cambio de talla', order: src.id })
+      if (src && date.getTime() > deliveredAt) events.push({ type: 'devolucion', delta: 1, date, user: 'Aiko M.', note: 'Cambio de talla', order: src.id })
     }
     events.sort((a, b) => a.date - b.date)
 
@@ -273,7 +274,7 @@ export function createSeed() {
     })
     if (low < 0) entry -= low
 
-    const list = [{ type: 'Entrada', delta: entry, date: at(int(25, 28), int(9, 12)), user: 'Daniel R.', note: 'Lote maquila septiembre' }, ...events]
+    const list = [{ type: 'entrada', delta: entry, date: at(int(25, 28), int(9, 12)), user: 'Daniel R.', note: 'Lote maquila septiembre' }, ...events]
     let bal = 0
     list.forEach((e) => {
       bal += e.delta
@@ -282,7 +283,7 @@ export function createSeed() {
     if (bal !== r.stock) {
       const last = list[list.length - 1].date
       const date = new Date(Math.min(DEMO_NOW.getTime() - 3600e3, last.getTime() + 20 * 3600e3))
-      movements.push({ sku: r.sku, type: 'Conteo físico', qty: r.stock - bal, balance: r.stock, date: iso(date), user: 'Aiko M.', note: 'Ajuste tras conteo', order: null })
+      movements.push({ sku: r.sku, type: 'conteo_fisico', qty: r.stock - bal, balance: r.stock, date: iso(date), user: 'Aiko M.', note: 'Ajuste tras conteo', order: null })
     }
   })
 

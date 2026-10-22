@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { CARRIER_LABELS, label, PAYMENT_METHOD_LABELS } from '../../domain/enums'
 import { isLate, pairCount } from '../../domain/orders'
 import { formatDate, formatMXN, formatTime } from '../../utils/format'
 import Card from '../ui/Card'
@@ -71,10 +72,10 @@ export default function OrdersTable({ orders, total, openId, showMoney, now, hre
                   {o.delivery === 'local' ? (
                     <span className="inline-flex items-center gap-1 rounded bg-sand px-1.5 py-0.5 text-[12px]">Local · {cityShort(o.customer.city)}</span>
                   ) : (
-                    o.carrier || 'Paquetería'
+                    label(CARRIER_LABELS, o.carrier) || 'Paquetería'
                   )}
                 </td>
-                <td className="py-3 whitespace-nowrap">{o.pay}</td>
+                <td className="py-3 whitespace-nowrap">{label(PAYMENT_METHOD_LABELS, o.pay)}</td>
                 <td className="py-3">
                   <StatusChip status={o.status} late={isLate(o, now)} />
                 </td>

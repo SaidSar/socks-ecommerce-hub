@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { CARRIER_LABELS, label, PAYMENT_METHOD_LABELS } from '../../domain/enums'
 import { isLate } from '../../domain/orders'
 import { useAdminData, useAdminQuery } from '../../hooks/useAdminData'
 import { formatDate, formatMXN, formatTime } from '../../utils/format'
@@ -106,7 +107,7 @@ function OrderBody({ order, showMoney, now, couriers }) {
               <dd className="text-ink-soft">{formatMXN(order.total - order.total / 1.16, 2)}</dd>
             </div>
             <div className="flex justify-between pt-1.5 border-t border-line font-semibold text-[14px]">
-              <dt>Total · {order.pay}</dt>
+              <dt>Total · {label(PAYMENT_METHOD_LABELS, order.pay)}</dt>
               <dd>{formatMXN(order.total, 2)}</dd>
             </div>
           </dl>
@@ -131,11 +132,11 @@ function OrderBody({ order, showMoney, now, couriers }) {
         <p className="text-[13px] mt-2">{isLocal ? `Entrega local · ${shippingText}` : `Paquetería · ${shippingText}`}</p>
         {order.tracking && (
           <p className="text-[13px] mt-1 tnum">
-            {order.carrier} · guía <span className="select-all">{order.tracking}</span>
+            {label(CARRIER_LABELS, order.carrier)} · guía <span className="select-all">{order.tracking}</span>
           </p>
         )}
         {order.courier && <p className="text-[13px] mt-1">Repartidor: {order.courier}</p>}
-        {!showMoney && order.pay && <p className="text-[13px] mt-1 text-ink-soft">Pago: {order.pay}</p>}
+        {!showMoney && order.pay && <p className="text-[13px] mt-1 text-ink-soft">Pago: {label(PAYMENT_METHOD_LABELS, order.pay)}</p>}
       </section>
 
       <NoteField key={order.id} order={order} onSave={(note) => api.saveOrderNote(order.id, note)} />

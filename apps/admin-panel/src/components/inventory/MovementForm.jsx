@@ -1,13 +1,14 @@
 import { useId, useRef, useState } from 'react'
+import { label, MOVEMENT_LABELS } from '../../domain/enums'
 import { checkMovement, MANUAL_MOVEMENTS, needsFolio, needsNote } from '../../domain/inventory'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 
 const PLACEHOLDER = {
-  Entrada: 'Lote maquila noviembre',
-  Merma: 'Hilo jalado, mancha…',
-  Devolución: 'Cambio de talla',
-  'Conteo físico': 'Conteo de fin de mes',
+  entrada: 'Lote maquila noviembre',
+  merma: 'Hilo jalado, mancha…',
+  devolucion: 'Cambio de talla',
+  conteo_fisico: 'Conteo de fin de mes',
 }
 
 /**
@@ -15,7 +16,7 @@ const PLACEHOLDER = {
  * La Devolución exige el folio de su pedido (DESIGN_DB.md §3.7); que exista lo comprueba la API.
  */
 export default function MovementForm({ row, onSubmit, onDone }) {
-  const [type, setType] = useState('Entrada')
+  const [type, setType] = useState('entrada')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
   const [folio, setFolio] = useState('')
@@ -28,7 +29,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
   const folioRef = useRef(null)
   const typeRefs = useRef([])
   const ids = { qty: useId(), note: useId(), folio: useId(), folioHint: useId(), folioErr: useId(), err: useId() }
-  const isCount = type === 'Conteo físico'
+  const isCount = type === 'conteo_fisico'
   const withFolio = needsFolio(type)
   const folioError = error.field === 'folio' ? error.message : ''
   const formError = error.field === 'folio' ? '' : error.message
@@ -63,7 +64,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
     setBusy(true)
     try {
       await onSubmit({ type, qty, note, folio: withFolio ? folio : undefined })
-      setDone(`${type} registrada`)
+      setDone(`${label(MOVEMENT_LABELS, type)} registrada`)
       setQty('')
       setNote('')
       setFolio('')
@@ -94,7 +95,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
             onClick={() => pickType(t)}
             className={`h-9 max-lg:h-11 rounded-md text-[12.5px] border ${type === t ? 'bg-ink text-linen border-ink' : 'bg-paper border-line hover:bg-sand'}`}
           >
-            {t}
+            {label(MOVEMENT_LABELS, t)}
           </button>
         ))}
       </div>

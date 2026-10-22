@@ -1,12 +1,13 @@
 // Reglas de inventario y kárdex (DESIGN_ADMIN.md §5.3, R-27 de DESIGN_DB.md §3.6). Funciones puras.
 
+// Códigos de API de los movimientos (DESIGN_DB.md §1.6); las etiquetas viven en enums.js.
 // Movimientos que el usuario registra a mano desde el panel de stock.
-export const MANUAL_MOVEMENTS = ['Entrada', 'Merma', 'Devolución', 'Conteo físico']
+export const MANUAL_MOVEMENTS = ['entrada', 'merma', 'devolucion', 'conteo_fisico']
 // Movimientos automáticos.
-export const SALE = 'Venta'
-export const INITIAL = 'Inventario inicial'
+export const SALE = 'venta'
+export const INITIAL = 'inventario_inicial'
 // Movimientos que siempre apuntan a un pedido (CK_InventoryMovements_OrderRequired, DESIGN_DB.md §3.7).
-export const FOLIO_MOVEMENTS = [SALE, 'Devolución']
+export const FOLIO_MOVEMENTS = [SALE, 'devolucion']
 export const FOLIO_RE = /^SKK-\d{4,}$/
 
 const pairs = (n) => (n === 1 ? '1 par' : `${n} pares`)
@@ -39,7 +40,7 @@ export function stockState(avail, fewThreshold) {
   return 'ok'
 }
 
-export const needsNote = (type) => type === 'Merma' || type === 'Devolución'
+export const needsNote = (type) => type === 'merma' || type === 'devolucion'
 export const needsFolio = (type) => FOLIO_MOVEMENTS.includes(type)
 export const normalizeFolio = (folio) => String(folio ?? '').trim().toUpperCase()
 
@@ -52,13 +53,13 @@ export function checkMovement(row, { type, qty, note, folio }, { orderExists } =
   if (!MANUAL_MOVEMENTS.includes(type)) return fail('Tipo de movimiento no válido.')
   const raw = String(qty ?? '').trim()
   const n = /^\d+$/.test(raw) ? Number(raw) : NaN
-  if (type === 'Conteo físico') {
+  if (type === 'conteo_fisico') {
     if (!Number.isInteger(n) || n < 0) return fail(MSG.count)
     if (n < row.reserved) return fail(MSG.belowReserved(n, row.reserved), 409)
   } else if (!Number.isInteger(n) || n <= 0) {
     return fail(MSG.qty)
   }
-  if (type === 'Merma' && n > available(row)) {
+  if (type === 'merma' && n > available(row)) {
     return row.reserved > 0 ? fail(MSG.tooManyReserved(available(row), row.reserved), 409) : fail(MSG.tooMany(row.stock))
   }
   if (needsNote(type) && !String(note ?? '').trim()) return fail(MSG.note, 422, 'note')
@@ -76,12 +77,12 @@ export const validateMovement = (row, movement, opts) => checkMovement(row, move
 /** Cambio firmado que produce el movimiento sobre el stock actual. */
 export function movementDelta(row, type, n) {
   switch (type) {
-    case 'Entrada':
-    case 'Devolución':
+    case 'entrada':
+    case 'devolucion':
       return n
-    case 'Merma':
+    case 'merma':
       return -n
-    case 'Conteo físico':
+    case 'conteo_fisico':
       return n - row.stock
     default:
       return 0
@@ -108,7 +109,7 @@ export function applyMovement(row, { type, qty, note, folio }, user, date, opts)
       balance: stock,
       date,
       user,
-      note: cleanNote || (type === 'Conteo físico' ? 'Ajuste tras conteo' : '—'),
+      note: cleanNote || (type === 'conteo_fisico' ? 'Ajuste tras conteo' : '—'),
       order: needsFolio(type) ? normalizeFolio(folio) : null,
     },
     error: '',

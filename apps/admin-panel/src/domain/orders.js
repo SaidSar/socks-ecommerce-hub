@@ -1,5 +1,6 @@
 // Reglas de pedidos (DESIGN_ADMIN.md §5.1). Funciones puras: no tocan inventario ni almacenamiento.
 import { normalize } from '../utils/format'
+import { CARRIER_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from './enums'
 
 export const STATUS = {
   pagado: { label: 'Pagado', dot: '#23211E' },
@@ -11,10 +12,11 @@ export const STATUS = {
   cancelado: { label: 'Cancelado', dot: '#B9B1A6' },
 }
 
-export const CARRIERS = ['Estafeta', 'DHL Express']
-export const PAYMENT_METHODS = ['Tarjeta', 'OXXO Pay']
-// Estado del pago (columna API de DESIGN_DB.md §1.6). Tarjeta nace pagado; OXXO Pay, pendiente.
-export const PAYMENT_STATUSES = ['pendiente', 'pagado', 'reembolsado']
+// Códigos de API (DESIGN_DB.md §1.6); las etiquetas viven en enums.js.
+export const CARRIERS = Object.keys(CARRIER_LABELS)
+export const PAYMENT_METHODS = Object.keys(PAYMENT_METHOD_LABELS)
+// Estado del pago. Tarjeta nace pagado; OXXO Pay, pendiente.
+export const PAYMENT_STATUSES = Object.keys(PAYMENT_STATUS_LABELS)
 export const PAYMENT_PENDING_ERROR = 'El pago en OXXO sigue pendiente. El pedido se prepara cuando llegue la confirmación.'
 export const LATE_HOURS = 48
 export const TRACKING_RE = /^\d{10,}$/
@@ -77,7 +79,7 @@ export function isLate(order, now) {
 export const isPaymentPending = (order) => order.paymentStatus === 'pendiente'
 
 /** Pestaña "OXXO pendiente": PaymentMethod = OxxoPay AND PaymentStatus = Pendiente (DESIGN_DB.md §3.8). */
-export const isOxxoPending = (order) => order.pay === 'OXXO Pay' && isPaymentPending(order) && order.status === 'por_preparar'
+export const isOxxoPending = (order) => order.pay === 'oxxo_pay' && isPaymentPending(order) && order.status === 'por_preparar'
 
 export const pairCount = (order) => order.items.reduce((a, it) => a + it.qty, 0)
 
