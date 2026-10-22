@@ -192,6 +192,14 @@ describe('importación y configuración', () => {
     expect(mv).toMatchObject({ type: 'Inventario inicial', note: 'Importado desde CSV', balance: 30 })
   })
 
+  it('la configuración tiene la forma de GET /api/config (DESIGN_DB.md §3.12) más las zonas', async () => {
+    const { localZones, ...config } = await api.getSettings()
+    expect(config).toEqual({ freeShippingThreshold: 799, parcelShippingCost: 99, localShippingCost: 49, localFreeShipping: true, fewUnitsThreshold: 4, ivaRate: 0.16 })
+    expect(localZones).toHaveLength(2)
+    const saved = await api.saveSettings({ ...(await api.getSettings()), ivaRate: 0.5 })
+    expect(saved.ivaRate).toBe(0.16)
+  })
+
   it('cambiar la tarifa local a 59 se refleja en computeShipping', async () => {
     const s = await api.getSettings()
     await api.saveSettings({ ...s, localShippingCost: 59 })
@@ -201,8 +209,8 @@ describe('importación y configuración', () => {
   it('valida montos, umbral y zona', async () => {
     const s = await api.getSettings()
     await expect(api.saveSettings({ ...s, localZones: [] })).rejects.toMatchObject({ errors: { localZones: expect.any(String) } })
-    await expect(api.saveSettings({ ...s, freeShippingThreshold: 0, fewThreshold: 0 })).rejects.toMatchObject({
-      errors: { freeShippingThreshold: expect.any(String), fewThreshold: expect.any(String) },
+    await expect(api.saveSettings({ ...s, freeShippingThreshold: 0, fewUnitsThreshold: 0 })).rejects.toMatchObject({
+      errors: { freeShippingThreshold: expect.any(String), fewUnitsThreshold: expect.any(String) },
     })
   })
 })

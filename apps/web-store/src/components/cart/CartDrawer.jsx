@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FREE_SHIPPING } from '../../config/commerce'
 import { useCart } from '../../hooks/useCart'
+import { useConfig } from '../../hooks/useConfig'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { formatMXN } from '../../utils/currency'
 import { CloseIcon } from '../brand/Icons'
@@ -15,6 +15,7 @@ const FOCUSABLE =
 /** Bolsa del atelier (DESIGN.md §6.9). */
 export default function CartDrawer() {
   const cart = useCart()
+  const { freeShippingThreshold } = useConfig()
   const { isOpen, close, items, count, subtotal, shipping, total, ivaIncluded, progress, missing, isFree, giftWrap } =
     cart
   const [paying, setPaying] = useState(false)
@@ -107,10 +108,10 @@ export default function CartDrawer() {
         </div>
 
         <div className="border-b border-ink/10 px-7 pb-6">
-          <BrushProgress progress={progress} reached={isFree} value={subtotal} max={FREE_SHIPPING} missing={missing} />
+          <BrushProgress progress={progress} reached={isFree} value={subtotal} max={freeShippingThreshold} missing={missing} />
           <p className="mt-2 font-serif text-[16.5px] text-ink/85 italic">
             {subtotal === 0 ? (
-              <>El envío es de cortesía a partir de {formatMXN(FREE_SHIPPING)}.</>
+              <>El envío es de cortesía a partir de {formatMXN(freeShippingThreshold)}.</>
             ) : !isFree ? (
               <>
                 Faltan <span className="tnum text-laca not-italic">{formatMXN(missing)}</span> para su envío de cortesía.

@@ -97,7 +97,7 @@ export async function getSummary() {
 export async function getDashboard(range = 'hoy', role) {
   await latency()
   const { daily, orders, inventory, pieces, settings } = db()
-  const data = buildDashboard({ daily, orders, inventory, pieces, sizes: SIZES, few: settings.fewThreshold, range, now: refNow() })
+  const data = buildDashboard({ daily, orders, inventory, pieces, sizes: SIZES, few: settings.fewUnitsThreshold, range, now: refNow() })
   data.recent = data.recent.map((o) => redactOrder(o, role))
   data.alerts = data.alerts.map(withTone)
   data.now = refNow().toISOString()
@@ -181,7 +181,7 @@ const decorate = (r, few, pieces) => {
 export async function getInventory({ filter = 'todos', q = '' } = {}) {
   await latency()
   const { inventory, settings, pieces } = db()
-  const few = settings.fewThreshold
+  const few = settings.fewUnitsThreshold
   const rows = inventory.map((r) => decorate(r, few, pieces))
   const term = normalize(q)
   const list = rows.filter((r) => matchesStockFilter(r, filter, few) && (!term || normalize(`${r.sku} ${r.piece} ${TONES[r.tone].name}`).includes(term)))
@@ -199,7 +199,7 @@ export async function getInventory({ filter = 'todos', q = '' } = {}) {
 export async function getStockRow(sku) {
   await latency()
   const { settings, pieces } = db()
-  return copy(decorate(findRow(sku), settings.fewThreshold, pieces))
+  return copy(decorate(findRow(sku), settings.fewUnitsThreshold, pieces))
 }
 
 /** Kárdex del más reciente al más antiguo. TODO(api): GET /api/admin/inventory/{sku}/movements */
@@ -273,7 +273,7 @@ export function validateSettings(s) {
     if (!Number.isInteger(s[k]) || s[k] < 0) errors[k] = 'Escriba un monto entero de 0 o más.'
   })
   if (!errors.freeShippingThreshold && s.freeShippingThreshold === 0) errors.freeShippingThreshold = 'El umbral debe ser mayor a 0.'
-  if (!Number.isInteger(s.fewThreshold) || s.fewThreshold <= 0) errors.fewThreshold = 'El umbral debe ser mayor a 0.'
+  if (!Number.isInteger(s.fewUnitsThreshold) || s.fewUnitsThreshold <= 0) errors.fewUnitsThreshold = 'El umbral debe ser mayor a 0.'
   if (!s.localZones?.length) errors.localZones = 'Agregue al menos un código postal a la zona local.'
   else if (s.localZones.some((z) => validateZone(z.value))) errors.localZones = 'Hay códigos postales con formato inválido.'
   return errors
@@ -292,7 +292,9 @@ export async function saveSettings(settings) {
     parcelShippingCost: settings.parcelShippingCost,
     localShippingCost: settings.localShippingCost,
     localFreeShipping: Boolean(settings.localFreeShipping),
-    fewThreshold: settings.fewThreshold,
+    fewUnitsThreshold: settings.fewUnitsThreshold,
+    // El IVA no se edita en el panel; se conserva el vigente.
+    ivaRate: db().settings.ivaRate,
     localZones: settings.localZones.map((z) => ({ value: formatZone(z.value), label: String(z.label ?? '').trim() })),
   }
   save()

@@ -2,7 +2,7 @@
 import { computeShipping } from '../domain/shipping'
 
 // Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
-export const SEED_VERSION = 2
+export const SEED_VERSION = 3
 
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
@@ -48,12 +48,14 @@ export const skuOf = (pieceId, tone, size) => `SKK-${String(pieceId).padStart(3,
 // Repartidores de entrega local (usuarios de Operaciones).
 export const COURIERS = ['Kevin Armenta', 'Daniel Ruiz']
 
+// Misma forma que Settings / GET /api/config (DESIGN_DB.md §3.12) más las zonas locales, que solo ve el panel.
 export const INITIAL_SETTINGS = {
   freeShippingThreshold: 799,
   parcelShippingCost: 99,
   localShippingCost: 49,
   localFreeShipping: true,
-  fewThreshold: 4,
+  fewUnitsThreshold: 4,
+  ivaRate: 0.16,
   localZones: [
     { value: '81200–81299', label: 'Los Mochis' },
     { value: '81300–81399', label: 'Ejidos de Ahome · por confirmar' },
