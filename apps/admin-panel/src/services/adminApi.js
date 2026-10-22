@@ -213,7 +213,8 @@ export async function getMovements(sku) {
 export async function adjustStock(sku, { type, qty, note }, user) {
   await latency()
   const res = applyMovement(findRow(sku), { type, qty, note }, by(user), stamp())
-  if (res.error) throw new ApiError(res.error)
+  // 409 si choca con pares apartados (R-27), 422 si el dato es inválido; nunca 500.
+  if (res.error) throw new ApiError(res.error, res.status)
   replaceRow(res.row)
   db().movements.push(res.movement)
   save()
