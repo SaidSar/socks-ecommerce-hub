@@ -16,7 +16,7 @@ const toDraft = (s) => ({
   parcelShippingCost: String(s.parcelShippingCost),
   localShippingCost: String(s.localShippingCost),
   localFreeShipping: s.localFreeShipping,
-  fewThreshold: String(s.fewThreshold),
+  fewUnitsThreshold: String(s.fewUnitsThreshold),
   localZones: s.localZones,
 })
 
@@ -25,7 +25,7 @@ const toSettings = (d) => ({
   parcelShippingCost: d.parcelShippingCost === '' ? NaN : Number(d.parcelShippingCost),
   localShippingCost: d.localShippingCost === '' ? NaN : Number(d.localShippingCost),
   localFreeShipping: d.localFreeShipping,
-  fewThreshold: d.fewThreshold === '' ? NaN : Number(d.fewThreshold),
+  fewUnitsThreshold: d.fewUnitsThreshold === '' ? NaN : Number(d.fewUnitsThreshold),
   localZones: d.localZones,
 })
 
@@ -83,7 +83,7 @@ function SettingsForm({ initial, users }) {
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 animate-fade">
       <ShippingSettings draft={draft} set={set} errors={errors} />
       <LocalZoneSettings zones={draft.localZones} onChange={set('localZones')} error={errors.localZones} />
-      <InventorySettings value={draft.fewThreshold} onChange={set('fewThreshold')} error={errors.fewThreshold} />
+      <InventorySettings value={draft.fewUnitsThreshold} onChange={set('fewUnitsThreshold')} error={errors.fewUnitsThreshold} />
       <InternalUsers users={users} />
       <div className="xl:col-span-2 flex flex-wrap items-center gap-3">
         <Button onClick={save} disabled={busy}>

@@ -9,6 +9,7 @@ export const ERR = {
   negative: 'El stock no puede ser negativo',
   notInteger: 'El stock debe ser un número entero',
   duplicate: 'SKU repetido en el archivo; se usa la primera fila',
+  belowReserved: (stock, reserved) => `El stock (${stock}) es menor que ${reserved === 1 ? 'el par apartado' : `los ${reserved} pares apartados`} para pedidos`,
   empty: 'El archivo está vacío.',
   headers: 'El archivo necesita las columnas SKU, Pieza, Tono, Talla y Stock, en ese orden.',
 }
@@ -62,7 +63,7 @@ export function parseCsv(text, sep) {
 const headerKey = (h) => normalize(h)
 
 /**
- * Valida el CSV contra el inventario actual (lista de { sku, piece, tone, size, stock }).
+ * Valida el CSV contra el inventario actual (lista de { sku, piece, tone, size, stock, reserved }).
  * Devuelve { error, rows, valid, invalid }; cada fila: { line, sku, piece, tone, size, stock, error }.
  */
 export function previewCsv(text, inventory) {
@@ -88,7 +89,11 @@ export function previewCsv(text, inventory) {
     const num = stockRaw.replace(/\s/g, '')
     if (/^-\d+(\.\d+)?$/.test(num)) return { ...base, error: ERR.negative }
     if (!/^\d+$/.test(num)) return { ...base, error: ERR.notInteger }
-    return { ...base, stock: Number(num), error: '' }
+    const stock = Number(num)
+    // R-27 (DESIGN_DB.md §3.6): la importación no puede dejar el stock por debajo de lo apartado.
+    const reserved = bySku.get(code).reserved ?? 0
+    if (stock < reserved) return { ...base, stock, error: ERR.belowReserved(stock, reserved) }
+    return { ...base, stock, error: '' }
   })
   return { error: '', rows, valid: rows.filter((r) => !r.error), invalid: rows.filter((r) => r.error) }
 }

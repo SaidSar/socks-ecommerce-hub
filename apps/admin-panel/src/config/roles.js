@@ -12,6 +12,7 @@ export const PERMISSIONS = [
   'finance.view',
   'promotions.manage',
   'shipping.view',
+  'payments.confirm',
 ]
 
 export const ROLES = {

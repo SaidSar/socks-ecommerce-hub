@@ -52,6 +52,15 @@ describe('previewCsv', () => {
     expect(res.invalid).toHaveLength(2)
   })
 
+  it('R-27: el stock importado no puede quedar por debajo de lo apartado', () => {
+    const withReserved = inventory.map((r) => (r.sku === 'SKK-012-MAT-S' ? { ...r, reserved: 3 } : r))
+    const csv = 'SKU,Pieza,Tono,Talla,Stock\nSKK-012-MAT-S,a,b,S,3\nSKK-007-SUM-M,a,b,M,0'
+    expect(previewCsv(csv, withReserved).valid.map((r) => r.sku)).toEqual(['SKK-012-MAT-S', 'SKK-007-SUM-M'])
+    const res = previewCsv('SKU,Pieza,Tono,Talla,Stock\nSKK-012-MAT-S,a,b,S,2', withReserved)
+    expect(res.invalid[0]).toMatchObject({ line: 2, error: ERR.belowReserved(2, 3) })
+    expect(res.invalid[0].error).toContain('3 pares apartados')
+  })
+
   it('rechaza columnas en otro orden y archivos vacíos', () => {
     expect(previewCsv('Pieza,SKU,Tono,Talla,Stock\n', inventory).error).toBe(ERR.headers)
     expect(previewCsv('', inventory).error).toBe(ERR.empty)

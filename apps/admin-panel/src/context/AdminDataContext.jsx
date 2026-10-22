@@ -34,6 +34,7 @@ export function AdminDataProvider({ user, children }) {
       getOrder: (id) => adminApi.getOrder(id, role),
       advanceOrder: mutate((id, payload) => adminApi.advanceOrder(id, payload, user)),
       cancelOrder: mutate((id) => adminApi.cancelOrder(id, user)),
+      markOrderPaid: mutate((id) => adminApi.markOrderPaid(id, user)),
       saveOrderNote: mutate((id, note) => adminApi.saveOrderNote(id, note, user)),
       getInventory: (params) => adminApi.getInventory(params),
       getStockRow: (sku) => adminApi.getStockRow(sku),

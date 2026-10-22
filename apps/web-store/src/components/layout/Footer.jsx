@@ -1,3 +1,4 @@
+import { label, PAYMENT_METHOD_LABELS } from '../../config/enums'
 import Logo from '../brand/Logo'
 
 // TODO(design): los enlaces del footer apuntan a #origen como en el mockup; definir rutas reales.
@@ -7,7 +8,9 @@ const COLUMNS = [
 ]
 
 const SUSTAINABILITY = ['Algodón trazable', 'Tintes de bajo impacto', 'Empaque sin plástico']
-const PAYMENTS = ['Visa', 'Mastercard', 'American Express', 'OXXO Pay']
+// Redes que acepta el método `tarjeta` (no son valores de enum) más OXXO Pay desde el mapa único de §1.6.
+const CARD_BRANDS = ['Visa', 'Mastercard', 'American Express']
+const PAYMENTS = [...CARD_BRANDS, label(PAYMENT_METHOD_LABELS, 'oxxo_pay')]
 
 export default function Footer() {
   return (

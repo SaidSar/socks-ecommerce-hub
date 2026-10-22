@@ -5,10 +5,10 @@ import { can } from '../config/roles'
 import { buildDashboard } from '../domain/dashboard'
 import { buildTemplate, previewCsv } from '../domain/importCsv'
 import { applyInitial, applyMovement, applySale, available, matchesStockFilter, release, sortMovements, stockState, STOCK_FILTERS } from '../domain/inventory'
-import { advance, cancel, countByFilter, isLate, matchesFilter, matchesQuery } from '../domain/orders'
+import { advance, cancel, countByFilter, isLate, markPaid, matchesFilter, matchesQuery } from '../domain/orders'
 import { computeShipping, formatZone, validateZone } from '../domain/shipping'
 import { normalize } from '../utils/format'
-import { COURIERS, createSeed, DEMO_NOW, SIZES, TONES } from '../data/seed'
+import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES, TONES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
 
 export const STORAGE_KEY = 'sokko.admin.data.v1'
@@ -28,7 +28,7 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed?.version === 1) return parsed
+      if (parsed?.version === SEED_VERSION) return parsed
     }
   } catch {
     /* almacenamiento bloqueado o JSON dañado: se vuelve a la semilla */
@@ -97,7 +97,7 @@ export async function getSummary() {
 export async function getDashboard(range = 'hoy', role) {
   await latency()
   const { daily, orders, inventory, pieces, settings } = db()
-  const data = buildDashboard({ daily, orders, inventory, pieces, sizes: SIZES, few: settings.fewThreshold, range, now: refNow() })
+  const data = buildDashboard({ daily, orders, inventory, pieces, sizes: SIZES, few: settings.fewUnitsThreshold, range, now: refNow() })
   data.recent = data.recent.map((o) => redactOrder(o, role))
   data.alerts = data.alerts.map(withTone)
   data.now = refNow().toISOString()
@@ -150,6 +150,21 @@ export async function advanceOrder(id, payload, user) {
   return copy(redactOrder(order, user?.role))
 }
 
+/**
+ * Marca como pagado un pedido con pago pendiente (OXXO Pay). Solo el Dueño.
+ * TODO(api): POST /api/admin/orders/{folio}/payment. En producción el pago lo confirma el webhook de la pasarela
+ * (OXXO Pay avisa al servidor cuando el cliente paga), no una persona; este botón queda solo como respaldo manual.
+ */
+export async function markOrderPaid(id, user) {
+  await latency()
+  if (!can(user?.role, 'payments.confirm')) throw new ApiError('Solo el Dueño puede confirmar pagos.', 403)
+  const { order, error } = markPaid(findOrder(id), by(user), stamp())
+  if (error) throw new ApiError(error, 409)
+  replaceOrder(order)
+  save()
+  return copy(redactOrder(order, user?.role))
+}
+
 /** Cancela y libera los pares apartados. TODO(api): POST /api/admin/orders/{folio}/cancel */
 export async function cancelOrder(id, user) {
   await latency()
@@ -181,7 +196,7 @@ const decorate = (r, few, pieces) => {
 export async function getInventory({ filter = 'todos', q = '' } = {}) {
   await latency()
   const { inventory, settings, pieces } = db()
-  const few = settings.fewThreshold
+  const few = settings.fewUnitsThreshold
   const rows = inventory.map((r) => decorate(r, few, pieces))
   const term = normalize(q)
   const list = rows.filter((r) => matchesStockFilter(r, filter, few) && (!term || normalize(`${r.sku} ${r.piece} ${TONES[r.tone].name}`).includes(term)))
@@ -199,7 +214,7 @@ export async function getInventory({ filter = 'todos', q = '' } = {}) {
 export async function getStockRow(sku) {
   await latency()
   const { settings, pieces } = db()
-  return copy(decorate(findRow(sku), settings.fewThreshold, pieces))
+  return copy(decorate(findRow(sku), settings.fewUnitsThreshold, pieces))
 }
 
 /** Kárdex del más reciente al más antiguo. TODO(api): GET /api/admin/inventory/{sku}/movements */
@@ -210,10 +225,16 @@ export async function getMovements(sku) {
 }
 
 /** TODO(api): POST /api/admin/inventory/{sku}/movements */
-export async function adjustStock(sku, { type, qty, note }, user) {
+export async function adjustStock(sku, { type, qty, note, folio }, user) {
   await latency()
-  const res = applyMovement(findRow(sku), { type, qty, note }, by(user), stamp())
-  if (res.error) throw new ApiError(res.error)
+  const orderExists = (code) => db().orders.some((o) => o.id === code)
+  const res = applyMovement(findRow(sku), { type, qty, note, folio }, by(user), stamp(), { orderExists })
+  // 409 si choca con pares apartados (R-27), 422 si el dato es inválido; nunca 500.
+  if (res.error) {
+    const err = new ApiError(res.error, res.status)
+    err.field = res.field
+    throw err
+  }
   replaceRow(res.row)
   db().movements.push(res.movement)
   save()
@@ -267,7 +288,7 @@ export function validateSettings(s) {
     if (!Number.isInteger(s[k]) || s[k] < 0) errors[k] = 'Escriba un monto entero de 0 o más.'
   })
   if (!errors.freeShippingThreshold && s.freeShippingThreshold === 0) errors.freeShippingThreshold = 'El umbral debe ser mayor a 0.'
-  if (!Number.isInteger(s.fewThreshold) || s.fewThreshold <= 0) errors.fewThreshold = 'El umbral debe ser mayor a 0.'
+  if (!Number.isInteger(s.fewUnitsThreshold) || s.fewUnitsThreshold <= 0) errors.fewUnitsThreshold = 'El umbral debe ser mayor a 0.'
   if (!s.localZones?.length) errors.localZones = 'Agregue al menos un código postal a la zona local.'
   else if (s.localZones.some((z) => validateZone(z.value))) errors.localZones = 'Hay códigos postales con formato inválido.'
   return errors
@@ -286,7 +307,9 @@ export async function saveSettings(settings) {
     parcelShippingCost: settings.parcelShippingCost,
     localShippingCost: settings.localShippingCost,
     localFreeShipping: Boolean(settings.localFreeShipping),
-    fewThreshold: settings.fewThreshold,
+    fewUnitsThreshold: settings.fewUnitsThreshold,
+    // El IVA no se edita en el panel; se conserva el vigente.
+    ivaRate: db().settings.ivaRate,
     localZones: settings.localZones.map((z) => ({ value: formatZone(z.value), label: String(z.label ?? '').trim() })),
   }
   save()

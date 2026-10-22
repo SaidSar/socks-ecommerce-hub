@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react'
-import { FREE_SHIPPING, IVA_RATE, SHIPPING_COST } from '../config/commerce'
 import { FEATURED_PIECE_ID, PIECES } from '../data/catalog.mock'
+import { useConfig } from '../hooks/useConfig'
 import { CartContext } from './cart-context'
 
 const STORAGE_KEY = 'sokko.cart.v1'
@@ -90,6 +90,7 @@ function reducer(state, action) {
 export function CartProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, init)
   const { items, giftWrap, isOpen } = state
+  const { freeShippingThreshold, parcelShippingCost, ivaRate } = useConfig()
 
   // Persistencia (sin isOpen). Si localStorage falla, el carrito sigue en memoria.
   useEffect(() => {
@@ -121,12 +122,13 @@ export function CartProvider({ children }) {
   const value = useMemo(() => {
     const count = items.reduce((s, i) => s + i.qty, 0)
     const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-    const isFree = subtotal >= FREE_SHIPPING
-    const shipping = subtotal === 0 || isFree ? 0 : SHIPPING_COST
+    const isFree = subtotal >= freeShippingThreshold
+    // Sin CP todavía, la bolsa cotiza paquetería; la tarifa local la da POST /api/shipping/quote en el checkout.
+    const shipping = subtotal === 0 || isFree ? 0 : parcelShippingCost
     const total = subtotal + shipping
-    const ivaIncluded = Math.round((total - total / (1 + IVA_RATE)) * 100) / 100
-    const progress = Math.min(100, (subtotal / FREE_SHIPPING) * 100)
-    const missing = Math.max(0, FREE_SHIPPING - subtotal)
+    const ivaIncluded = Math.round((total - total / (1 + ivaRate)) * 100) / 100
+    const progress = Math.min(100, (subtotal / freeShippingThreshold) * 100)
+    const missing = Math.max(0, freeShippingThreshold - subtotal)
     return {
       items,
       count,
@@ -146,7 +148,7 @@ export function CartProvider({ children }) {
       open,
       close,
     }
-  }, [items, giftWrap, isOpen, add, setQty, remove, toggleGift, open, close])
+  }, [items, giftWrap, isOpen, add, setQty, remove, toggleGift, open, close, freeShippingThreshold, parcelShippingCost, ivaRate])
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }

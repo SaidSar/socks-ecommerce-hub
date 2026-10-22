@@ -1,5 +1,6 @@
 // Reglas de pedidos (DESIGN_ADMIN.md §5.1). Funciones puras: no tocan inventario ni almacenamiento.
 import { normalize } from '../utils/format'
+import { CARRIER_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from './enums'
 
 export const STATUS = {
   pagado: { label: 'Pagado', dot: '#23211E' },
@@ -11,8 +12,12 @@ export const STATUS = {
   cancelado: { label: 'Cancelado', dot: '#B9B1A6' },
 }
 
-export const CARRIERS = ['Estafeta', 'DHL Express']
-export const PAYMENT_METHODS = ['Tarjeta', 'OXXO Pay']
+// Códigos de API (DESIGN_DB.md §1.6); las etiquetas viven en enums.js.
+export const CARRIERS = Object.keys(CARRIER_LABELS)
+export const PAYMENT_METHODS = Object.keys(PAYMENT_METHOD_LABELS)
+// Estado del pago. Tarjeta nace pagado; OXXO Pay, pendiente.
+export const PAYMENT_STATUSES = Object.keys(PAYMENT_STATUS_LABELS)
+export const PAYMENT_PENDING_ERROR = 'El pago en OXXO sigue pendiente. El pedido se prepara cuando llegue la confirmación.'
 export const LATE_HOURS = 48
 export const TRACKING_RE = /^\d{10,}$/
 export const TRACKING_ERROR = 'Escriba el número de guía (solo dígitos, mínimo 10).'
@@ -71,7 +76,10 @@ export function isLate(order, now) {
   return (new Date(now) - new Date(order.created)) / 3600e3 > LATE_HOURS
 }
 
-export const isOxxoPending = (order) => order.pay === 'OXXO Pay' && order.status === 'por_preparar'
+export const isPaymentPending = (order) => order.paymentStatus === 'pendiente'
+
+/** Pestaña "OXXO pendiente": PaymentMethod = OxxoPay AND PaymentStatus = Pendiente (DESIGN_DB.md §3.8). */
+export const isOxxoPending = (order) => order.pay === 'oxxo_pay' && isPaymentPending(order) && order.status === 'por_preparar'
 
 export const pairCount = (order) => order.items.reduce((a, it) => a + it.qty, 0)
 
@@ -82,6 +90,8 @@ export function validateTracking(tracking) {
 /** Valida lo que pide el paso siguiente. Devuelve '' si se puede avanzar o el mensaje de error. */
 export function validateAdvance(order, payload = {}) {
   if (!nextStatus(order)) return 'Este pedido ya no tiene un siguiente paso.'
+  // CK_Orders_PaymentBeforeFulfillment: sin pago solo se puede estar por preparar o cancelado.
+  if (isPaymentPending(order)) return PAYMENT_PENDING_ERROR
   if (order.status === 'preparando') {
     if (isLocal(order)) return payload.courier ? '' : COURIER_ERROR
     if (!CARRIERS.includes(payload.carrier)) return 'Elija la paquetería.'
@@ -107,6 +117,19 @@ export function advance(order, payload, by, at) {
     }
   }
   return { order: { ...order, ...patch, history: [...order.history, { status, at, by }] }, error: '' }
+}
+
+/**
+ * Confirma el pago de un pedido pendiente: paymentStatus = pagado, paidAt = at y hito "Pagado" en el historial.
+ * Devuelve `{ order, error }`; con error, `order` es el original.
+ */
+export function markPaid(order, by, at) {
+  if (order.status === 'cancelado') return { order, error: 'Un pedido cancelado no se puede marcar como pagado.' }
+  if (!isPaymentPending(order)) return { order, error: 'Este pedido ya está pagado.' }
+  return {
+    order: { ...order, paymentStatus: 'pagado', paidAt: at, history: [...order.history, { status: 'pagado', at, by }] },
+    error: '',
+  }
 }
 
 /** Cancela si el estado lo permite. */

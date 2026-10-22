@@ -3,7 +3,7 @@
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
 > **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** 🟡 Propuesta revisada (v0.3, correcciones de la revisión del PR #4) · pendiente de aprobación.
+> **Estado:** ✅ Aprobada (v0.3, PR #4) · v0.3.1: valores de API de los enums como códigos.
 
 ---
 
@@ -84,7 +84,7 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 
 ### 1.6 Equivalencias de enums: BD ↔ API (JSON) ↔ etiqueta UI
 
-Valores de BD en ASCII PascalCase **sin espacios ni acentos**. La columna API es el código que ya usan `apps/admin-panel/src/domain/*.js` y `apps/web-store`, para que los frontends no cambien al conectarse.
+Valores de BD en ASCII PascalCase **sin espacios ni acentos**. Los valores de la API son **códigos** en `snake_case` minúsculas (nunca etiquetas con espacios o acentos); la etiqueta que ve el usuario la resuelve cada frontend con un mapa único por enum (`apps/admin-panel/src/domain/enums.js`).
 
 | Enum (columna) | Valor BD | API (JSON) | Etiqueta UI | Conversión |
 |---|---|---|---|---|
@@ -97,25 +97,28 @@ Valores de BD en ASCII PascalCase **sin espacios ni acentos**. La columna API es
 | | `Pagado` (solo historial) | `pagado` | Pagado | `SnakeCaseLower` |
 | Entrega (`Orders.DeliveryMethod`, `Shipments.DeliveryMethod`) | `Local` | `local` | Entrega local | `SnakeCaseLower` |
 | | `Paqueteria` | `paqueteria` | Paquetería | `SnakeCaseLower` |
-| Método de pago (`Orders.PaymentMethod`) | `Tarjeta` | `Tarjeta` | Tarjeta | **Explícito** |
-| | `OxxoPay` | `OXXO Pay` | OXXO Pay | **Explícito** |
-| Estado de pago (`Orders.PaymentStatus`) | `Pendiente` | `pendiente` | Pendiente de pago | `SnakeCaseLower` (código nuevo; hoy el panel lo infiere con `isOxxoPending`) |
+| Método de pago (`Orders.PaymentMethod`) | `Tarjeta` | `tarjeta` | Tarjeta | `SnakeCaseLower` |
+| | `OxxoPay` | `oxxo_pay` | OXXO Pay | `SnakeCaseLower` |
+| Estado de pago (`Orders.PaymentStatus`) | `Pendiente` | `pendiente` | Pendiente de pago | `SnakeCaseLower` |
 | | `Pagado` | `pagado` | Pagado | `SnakeCaseLower` |
 | | `Reembolsado` | `reembolsado` | Reembolsado | `SnakeCaseLower` |
-| Paquetería (`Shipments.Carrier`) | `Estafeta` | `Estafeta` | Estafeta | **Explícito** |
-| | `DHLExpress` | `DHL Express` | DHL Express | **Explícito** |
-| Movimiento (`InventoryMovements.Type`) | `Entrada` | `Entrada` | Entrada | **Explícito** |
-| | `Merma` | `Merma` | Merma | **Explícito** |
-| | `Devolucion` | `Devolución` | Devolución | **Explícito** |
-| | `ConteoFisico` | `Conteo físico` | Conteo físico | **Explícito** |
-| | `Venta` | `Venta` | Venta | **Explícito** |
-| | `InventarioInicial` | `Inventario inicial` | Inventario inicial | **Explícito** |
+| Paquetería (`Shipments.Carrier`) | `Estafeta` | `estafeta` | Estafeta | **Explícito** |
+| | `DHLExpress` | `dhl_express` | DHL Express | **Explícito** |
+| Movimiento (`InventoryMovements.Type`) | `Entrada` | `entrada` | Entrada | `SnakeCaseLower` |
+| | `Merma` | `merma` | Merma | `SnakeCaseLower` |
+| | `Devolucion` | `devolucion` | Devolución | `SnakeCaseLower` |
+| | `ConteoFisico` | `conteo_fisico` | Conteo físico | `SnakeCaseLower` |
+| | `Venta` | `venta` | Venta | `SnakeCaseLower` |
+| | `InventarioInicial` | `inventario_inicial` | Inventario inicial | `SnakeCaseLower` |
 | Rol (`Users.Role`) | `Owner` | `dueno` | Dueño | **Explícito** (`config/roles.js`) |
 | | `Operations` | `operaciones` | Operaciones | **Explícito** |
 | | `Customer` | `customer` | — (tienda) | `SnakeCaseLower` |
 
-- **`SnakeCaseLower`**: `JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)` produce el código de la API a partir del nombre del `enum` de C# (`EnRuta` → `en_ruta`). Cubre estado, entrega y estado de pago.
-- **Explícito**: el código del frontend tiene espacios, acentos o mayúsculas que ninguna política genera (`OXXO Pay`, `DHL Express`, `Conteo físico`, `dueno`). Se mapea con un diccionario por enum en la capa de DTO, con una prueba unitaria que recorra todos los valores en ambos sentidos.
+- **`SnakeCaseLower`**: `JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)` produce el código de la API a partir del nombre del `enum` de C# (`EnRuta` → `en_ruta`, `OxxoPay` → `oxxo_pay`, `ConteoFisico` → `conteo_fisico`). Cubre estado, entrega, método y estado de pago, y tipo de movimiento.
+- **Explícito** (diccionario por enum en la capa de DTO, con una prueba unitaria que recorra todos los valores en ambos sentidos):
+  - **Paquetería:** API `snake_case` (`estafeta`, `dhl_express`) ↔ BD PascalCase (`Estafeta`, `DHLExpress`). Se mapea a mano para no depender de cómo la política parte las siglas (`DHL`).
+  - **Rol:** los códigos del panel (`dueno`, `operaciones`) no salen del nombre en inglés (`Owner`, `Operations`).
+- Ningún valor de API lleva espacios ni acentos; las etiquetas (`DHL Express`, `OXXO Pay`, `Conteo físico`) son solo de UI.
 - En EF Core todos se guardan con `HasConversion<string>()`: el valor de BD es el nombre del miembro del `enum`.
 
 ---
@@ -562,7 +565,7 @@ CHECK de pago antes de surtir (OXXO Pay):
 | `Id` | `INT IDENTITY` | | | **PK** |
 | `OrderId` | `INT` | | | **FK** → `Orders(Id)` `ON DELETE NO ACTION`. **UQ** (1 envío por pedido en v1) |
 | `DeliveryMethod` | `VARCHAR(12)` | | | Copia del método del pedido al crear el envío. `CK`: `IN ('Local','Paqueteria')`. Que coincida con `Orders.DeliveryMethod` lo valida el servicio (R-12) |
-| `Carrier` | `VARCHAR(20)` | N | | `CK`: `IS NULL OR IN ('Estafeta','DHLExpress')` (API: `DHL Express`, §1.6) |
+| `Carrier` | `VARCHAR(20)` | N | | `CK`: `IS NULL OR IN ('Estafeta','DHLExpress')` (API: `estafeta`, `dhl_express`, §1.6) |
 | `TrackingNumber` | `VARCHAR(30)` | N | | `CK_Shipments_Tracking`: `IS NULL OR (LEN(TrackingNumber) >= 10 AND TrackingNumber NOT LIKE '%[^0-9]%')`, equivalente a `^\d{10,}$` |
 | `CourierUserId` | `INT` | N | | **FK** → `Users(Id)` `ON DELETE NO ACTION`. Repartidor **interno** (personal de Operaciones o Dueño; el rol lo valida el servicio) |
 | `CourierName` | `NVARCHAR(80)` | N | | Repartidor **externo** (texto libre) o copia del nombre del interno |
@@ -934,5 +937,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.1 | 2026-10-21 | `sokko/db-schema` | Equipo backend (NEXUS CODE) | Propuesta inicial: ER, 13 tablas, reglas BD vs. servicios, semilla, mapa SOA, puntos abiertos P-01…P-11 y decisiones D-01…D-22 |
 | 0.2 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Hallazgos 🟡 de la revisión del PR #4: R-27 (Merma y conteo frente a lo apartado), §4.1 transacciones y concurrencia, `NO ACTION` en todas las FK salvo `PasswordResetTokens`, §1.6 equivalencias de enums (`DHLExpress`), `CK_Orders_PaymentBeforeFulfillment` e hito `Pagado` al registrar `PaidAt` |
 | 0.3 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Sugerencias 🟢 de la revisión del PR #4: cardinalidades `\|o` en el ER, §3.15 índices (incluidos los de FK), intercalación `Modern_Spanish_100_CI_AI`, repartidor interno o externo y FK simple en `Shipments`, devolución ligada al pedido, CHECK de SKU exacto, CHECK de `TaxRate`, fila `Carts` en §3.14, mapa SOA con un solo escritor de `ProductVariants` y `QuoteShipping` como tarea, contrato nuevo de `/api/config` |
+| 0.3.1 | 2026-10-22 | `said/db-alignment` | Said | Valores de API de los enums como códigos `snake_case` sin espacios ni acentos (§1.6): Carrier `estafeta`/`dhl_express` (explícito, BD sin cambios), PaymentMethod `tarjeta`/`oxxo_pay` y MovementType `entrada`…`inventario_inicial` (ahora con `SnakeCaseLower`). Las etiquetas de UI no cambian |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.

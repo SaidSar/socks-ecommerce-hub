@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FREE_SHIPPING } from '../../config/commerce'
+import { useConfig } from '../../hooks/useConfig'
 import { formatMXN } from '../../utils/currency'
 import AuthEditorialPanel from './AuthEditorialPanel'
 
@@ -8,6 +8,7 @@ import AuthEditorialPanel from './AuthEditorialPanel'
  * Pantalla completa, sin TopBar/Navbar/Footer del Home.
  */
 export default function AuthLayout({ view, children }) {
+  const { freeShippingThreshold } = useConfig()
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <AuthEditorialPanel view={view} />
@@ -17,7 +18,7 @@ export default function AuthLayout({ view, children }) {
             <Link to="/" className="inline-flex min-h-11 items-center text-ink-soft hover:text-ink">
               ← Volver a la tienda
             </Link>
-            <span className="hidden text-ink-soft sm:inline">Envío de cortesía desde {formatMXN(FREE_SHIPPING)} MXN</span>
+            <span className="hidden text-ink-soft sm:inline">Envío de cortesía desde {formatMXN(freeShippingThreshold)} MXN</span>
           </div>
 
           <div className="mx-auto my-auto w-full max-w-[460px] pt-10 pb-6 lg:mx-0">{children}</div>

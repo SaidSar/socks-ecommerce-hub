@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { FEW_UNITS } from '../../config/commerce'
 import { TONES } from '../../data/catalog.mock'
 import { useAuth } from '../../hooks/useAuth'
+import { useConfig } from '../../hooks/useConfig'
 import { formatMXN } from '../../utils/currency'
 import KnitTabi from './KnitTabi'
 import SizeSelector from './SizeSelector'
@@ -13,6 +13,7 @@ const pieceNumber = (id) => String(id).padStart(2, '0')
 /** Tarjeta de pieza del atelier (DESIGN.md §6.8). */
 export default function PieceCard({ piece, onAcquire }) {
   const { user } = useAuth()
+  const { fewUnitsThreshold } = useConfig()
   const [tone, setTone] = useState(piece.tones[0])
   // Talla elegida a mano; mientras no haya, se preselecciona la del usuario o 'M' (DESIGN_AUTH.md §3).
   const [chosenSize, setSize] = useState(null)
@@ -23,7 +24,7 @@ export default function PieceCard({ piece, onAcquire }) {
   useEffect(() => () => clearTimeout(timer.current), [])
 
   const left = piece.stock[tone] ?? 0
-  const few = left <= FEW_UNITS
+  const few = left <= fewUnitsThreshold
 
   const acquire = () => {
     onAcquire(piece, tone, size)

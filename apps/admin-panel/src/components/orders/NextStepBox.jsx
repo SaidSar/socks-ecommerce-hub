@@ -1,25 +1,30 @@
 import { useId, useState } from 'react'
-import { CARRIERS, isOxxoPending, nextLabel, nextStatus, validateAdvance } from '../../domain/orders'
+import { CARRIER_LABELS, label } from '../../domain/enums'
+import { CARRIERS, isPaymentPending, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, validateAdvance } from '../../domain/orders'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
+import MarkPaid from './MarkPaid'
 
 /**
  * Siguiente paso del pedido (DESIGN_ADMIN.md §5.1): paquetería + guía para enviar, repartidor para salir a ruta.
  * `onAdvance(payload)` llama a la API; los errores de validación se muestran junto al campo.
+ * Con pago pendiente, el Dueño puede confirmarlo con `onMarkPaid()`.
  */
-export default function NextStepBox({ order, couriers, onAdvance }) {
+export default function NextStepBox({ order, couriers, onAdvance, onMarkPaid }) {
   const [carrier, setCarrier] = useState(order.carrier || CARRIERS[0])
   const [courier, setCourier] = useState(order.courier || couriers[0] || '')
   const [tracking, setTracking] = useState(order.tracking || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [packing, setPacking] = useState(false)
-  const ids = { courier: useId(), carrier: useId(), tracking: useId(), err: useId() }
+  const ids = { courier: useId(), carrier: useId(), tracking: useId(), err: useId(), pay: useId() }
 
   if (!nextStatus(order)) return null
   const isLocal = order.delivery === 'local'
   const needsShipping = order.status === 'preparando'
   const trackingError = needsShipping && !isLocal && error
+  // Sin pago confirmado el pedido no avanza (CK_Orders_PaymentBeforeFulfillment); solo se puede cancelar.
+  const unpaid = isPaymentPending(order)
 
   const advance = async () => {
     const payload = isLocal ? { courier } : { carrier, tracking }
@@ -73,7 +78,9 @@ export default function NextStepBox({ order, couriers, onAdvance }) {
             className="h-10 max-lg:h-11 rounded-md border border-line bg-paper px-2 text-[13px]"
           >
             {CARRIERS.map((c) => (
-              <option key={c}>{c}</option>
+              <option key={c} value={c}>
+                {label(CARRIER_LABELS, c)}
+              </option>
             ))}
           </select>
           <div>
@@ -105,7 +112,7 @@ export default function NextStepBox({ order, couriers, onAdvance }) {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={advance} disabled={busy} aria-busy={busy}>
+        <Button onClick={advance} disabled={busy || unpaid} aria-busy={busy} aria-describedby={unpaid ? ids.pay : undefined}>
           <Icon name="check" className="w-4 h-4" />
           {busy ? 'Guardando…' : nextLabel(order)}
         </Button>
@@ -123,12 +130,13 @@ export default function NextStepBox({ order, couriers, onAdvance }) {
         </p>
       )}
 
-      {isOxxoPending(order) && (
-        <p className="text-[12px] text-warn-ink flex items-start gap-1.5">
+      {unpaid && (
+        <p id={ids.pay} className="text-[12px] text-warn-ink flex items-start gap-1.5">
           <Icon name="alert" className="w-4 h-4 shrink-0" />
-          Pago en OXXO: verifique la confirmación antes de preparar.
+          {PAYMENT_PENDING_ERROR}
         </p>
       )}
+      {unpaid && onMarkPaid && <MarkPaid order={order} onMarkPaid={onMarkPaid} />}
     </div>
   )
 }

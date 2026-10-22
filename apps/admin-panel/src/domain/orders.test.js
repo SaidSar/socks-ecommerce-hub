@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advance, canCancel, cancel, isLate, matchesFilter, matchesQuery, nextLabel, nextStatus, TRACKING_ERROR, validateTracking } from './orders'
+import { advance, canCancel, cancel, isLate, markPaid, matchesFilter, matchesQuery, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, TRACKING_ERROR, validateAdvance, validateTracking } from './orders'
 
 const NOW = new Date(2026, 9, 18, 9, 30)
 const hoursAgo = (h) => new Date(NOW.getTime() - h * 3600e3).toISOString()
@@ -9,7 +9,8 @@ const order = (over = {}) => ({
   created: hoursAgo(3),
   status: 'por_preparar',
   delivery: 'paqueteria',
-  pay: 'Tarjeta',
+  pay: 'tarjeta',
+  paymentStatus: 'pagado',
   customer: { name: 'Mariana López', email: 'mariana.lopez@correo.mx' },
   items: [{ sku: 'SKK-007-SUM-M', qty: 1 }],
   history: [{ status: 'pagado', at: hoursAgo(3), by: 'Tienda en línea' }],
@@ -55,16 +56,16 @@ describe('guía de paquetería', () => {
     expect(validateTracking('')).toBe(TRACKING_ERROR)
     expect(validateTracking('123456789')).toBe(TRACKING_ERROR)
     expect(validateTracking('12345abc90')).toBe(TRACKING_ERROR)
-    const res = advance(order({ status: 'preparando' }), { carrier: 'Estafeta', tracking: '12-34' }, 'Aiko M.', NOW)
+    const res = advance(order({ status: 'preparando' }), { carrier: 'estafeta', tracking: '12-34' }, 'Aiko M.', NOW)
     expect(res.error).toBe(TRACKING_ERROR)
     expect(res.order.status).toBe('preparando')
   })
 
   it('acepta guía válida (solo dígitos, mínimo 10) y guarda paquetería', () => {
     expect(validateTracking('1234567890')).toBe('')
-    const { order: o, error } = advance(order({ status: 'preparando' }), { carrier: 'DHL Express', tracking: ' 9876543210123 ' }, 'Aiko M.', NOW)
+    const { order: o, error } = advance(order({ status: 'preparando' }), { carrier: 'dhl_express', tracking: ' 9876543210123 ' }, 'Aiko M.', NOW)
     expect(error).toBe('')
-    expect(o).toMatchObject({ status: 'enviado', carrier: 'DHL Express', tracking: '9876543210123' })
+    expect(o).toMatchObject({ status: 'enviado', carrier: 'dhl_express', tracking: '9876543210123' })
   })
 
   it('exige una paquetería conocida', () => {
@@ -106,13 +107,48 @@ describe('cancelación', () => {
 describe('filtros y búsqueda', () => {
   it('filtra atrasados y OXXO pendiente', () => {
     expect(matchesFilter(order({ created: hoursAgo(60) }), 'late', NOW)).toBe(true)
-    expect(matchesFilter(order({ pay: 'OXXO Pay' }), 'oxxo', NOW)).toBe(true)
-    expect(matchesFilter(order({ pay: 'OXXO Pay', status: 'preparando' }), 'oxxo', NOW)).toBe(false)
+    expect(matchesFilter(order({ pay: 'oxxo_pay', paymentStatus: 'pendiente' }), 'oxxo', NOW)).toBe(true)
+    expect(matchesFilter(order({ pay: 'oxxo_pay', paymentStatus: 'pagado' }), 'oxxo', NOW)).toBe(false)
+    expect(matchesFilter(order({ pay: 'oxxo_pay', status: 'preparando' }), 'oxxo', NOW)).toBe(false)
   })
   it('busca sin distinguir acentos, por folio, correo o SKU', () => {
     expect(matchesQuery(order(), 'lopez')).toBe(true)
     expect(matchesQuery(order(), '1050')).toBe(true)
     expect(matchesQuery(order(), 'skk-007-sum')).toBe(true)
     expect(matchesQuery(order(), 'ramírez')).toBe(false)
+  })
+})
+
+describe('pago antes de surtir (CK_Orders_PaymentBeforeFulfillment)', () => {
+  it('un OXXO sin pagar no avanza, pero sí se puede cancelar', () => {
+    const unpaid = order({ pay: 'oxxo_pay', paymentStatus: 'pendiente' })
+    expect(validateAdvance(unpaid)).toBe(PAYMENT_PENDING_ERROR)
+    expect(advance(unpaid, {}, 'Aiko M.', NOW.toISOString())).toMatchObject({ error: PAYMENT_PENDING_ERROR, order: unpaid })
+    expect(cancel(unpaid, 'Aiko M.', NOW.toISOString()).order.status).toBe('cancelado')
+  })
+  it('pagado avanza normal', () => {
+    expect(validateAdvance(order({ pay: 'oxxo_pay', paymentStatus: 'pagado' }))).toBe('')
+  })
+})
+
+describe('marcar como pagado', () => {
+  const unpaid = () => order({ pay: 'oxxo_pay', paymentStatus: 'pendiente', history: [{ status: 'por_preparar', at: hoursAgo(3), by: 'Tienda en línea' }] })
+
+  it('registra el pago, agrega el hito al final y desbloquea el avance', () => {
+    const at = NOW.toISOString()
+    const { order: o, error } = markPaid(unpaid(), 'Aiko M.', at)
+    expect(error).toBe('')
+    expect(o).toMatchObject({ paymentStatus: 'pagado', paidAt: at })
+    expect(o.history.map((h) => h.status)).toEqual(['por_preparar', 'pagado'])
+    expect(o.history.at(-1)).toEqual({ status: 'pagado', at, by: 'Aiko M.' })
+    expect(validateAdvance(o)).toBe('')
+  })
+
+  it('no se marca uno ya pagado ni uno cancelado', () => {
+    expect(markPaid(order(), 'Aiko M.', NOW.toISOString()).error).toBe('Este pedido ya está pagado.')
+    const cancelled = { ...unpaid(), status: 'cancelado' }
+    const res = markPaid(cancelled, 'Aiko M.', NOW.toISOString())
+    expect(res.error).toBe('Un pedido cancelado no se puede marcar como pagado.')
+    expect(res.order).toBe(cancelled)
   })
 })

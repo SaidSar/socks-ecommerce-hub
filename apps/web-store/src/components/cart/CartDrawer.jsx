@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FREE_SHIPPING } from '../../config/commerce'
+import { PAYMENT_METHOD_LABELS } from '../../config/enums'
 import { useCart } from '../../hooks/useCart'
+import { useConfig } from '../../hooks/useConfig'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { formatMXN } from '../../utils/currency'
 import { CloseIcon } from '../brand/Icons'
@@ -9,12 +10,14 @@ import BrushProgress from './BrushProgress'
 import CartLine from './CartLine'
 
 const PAYING_MS = 2200
+const PAYMENT_METHODS_TEXT = Object.values(PAYMENT_METHOD_LABELS).join(' o ')
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /** Bolsa del atelier (DESIGN.md §6.9). */
 export default function CartDrawer() {
   const cart = useCart()
+  const { freeShippingThreshold } = useConfig()
   const { isOpen, close, items, count, subtotal, shipping, total, ivaIncluded, progress, missing, isFree, giftWrap } =
     cart
   const [paying, setPaying] = useState(false)
@@ -107,10 +110,10 @@ export default function CartDrawer() {
         </div>
 
         <div className="border-b border-ink/10 px-7 pb-6">
-          <BrushProgress progress={progress} reached={isFree} value={subtotal} max={FREE_SHIPPING} missing={missing} />
+          <BrushProgress progress={progress} reached={isFree} value={subtotal} max={freeShippingThreshold} missing={missing} />
           <p className="mt-2 font-serif text-[16.5px] text-ink/85 italic">
             {subtotal === 0 ? (
-              <>El envío es de cortesía a partir de {formatMXN(FREE_SHIPPING)}.</>
+              <>El envío es de cortesía a partir de {formatMXN(freeShippingThreshold)}.</>
             ) : !isFree ? (
               <>
                 Faltan <span className="tnum text-laca not-italic">{formatMXN(missing)}</span> para su envío de cortesía.
@@ -186,7 +189,7 @@ export default function CartDrawer() {
           >
             {paying ? 'Conectando con pago seguro…' : 'Proceder al Pago Seguro'}
           </button>
-          <p className="mt-3 text-center text-[11px] text-ink-soft">Tarjeta o OXXO Pay</p>
+          <p className="mt-3 text-center text-[11px] text-ink-soft">{PAYMENT_METHODS_TEXT}</p>
         </div>
       </aside>
     </div>,
