@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { PAYMENT_METHOD_LABELS } from '../../config/enums'
 import { useCart } from '../../hooks/useCart'
 import { useConfig } from '../../hooks/useConfig'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
@@ -9,6 +10,7 @@ import BrushProgress from './BrushProgress'
 import CartLine from './CartLine'
 
 const PAYING_MS = 2200
+const PAYMENT_METHODS_TEXT = Object.values(PAYMENT_METHOD_LABELS).join(' o ')
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -187,7 +189,7 @@ export default function CartDrawer() {
           >
             {paying ? 'Conectando con pago seguro…' : 'Proceder al Pago Seguro'}
           </button>
-          <p className="mt-3 text-center text-[11px] text-ink-soft">Tarjeta o OXXO Pay</p>
+          <p className="mt-3 text-center text-[11px] text-ink-soft">{PAYMENT_METHODS_TEXT}</p>
         </div>
       </aside>
     </div>,
