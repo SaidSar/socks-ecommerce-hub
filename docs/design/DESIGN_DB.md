@@ -3,7 +3,7 @@
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
 > **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** 🟡 Propuesta · pendiente de aprobación.
+> **Estado:** 🟡 Propuesta revisada (v0.3, correcciones de la revisión del PR #4) · pendiente de aprobación.
 
 ---
 
@@ -50,7 +50,11 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 | Hashes | `VARBINARY(32)` (SHA-256) / `NVARCHAR(256)` (PasswordHasher) | El token de restablecimiento se guarda como hash binario; la contraseña en el formato Base64 de `PasswordHasher<TUser>` (PBKDF2). |
 | Concurrencia | `ROWVERSION` | Concurrencia optimista **solo para ediciones desde el panel** (catálogo, ajustes manuales de stock, transiciones de pedido, configuración) en `ProductVariants`, `Orders` y `Settings`. El checkout y la salida de inventario **no** dependen de ella: usan `UPDATE` atómicos condicionados (§4.1). |
 
-**Intercalación:** la predeterminada de la instancia, `Modern_Spanish_CI_AS` o `SQL_Latin1_General_CP1_CI_AS`, ambas *case-insensitive*. Con esto `UNIQUE(Email)` ya no distingue mayúsculas, aunque la API de todos modos normaliza con `trim().ToLowerInvariant()` (igual que `authService.js`).
+**Intercalación:** explícita a nivel de base de datos, **`Modern_Spanish_100_CI_AI`** (no se depende de la predeterminada de la instancia). En EF Core se fija en el modelo con `UseCollation`, así la crea igual la migración en local, Docker o Azure SQL.
+- *CI* (sin distinguir mayúsculas) y *AI* (sin distinguir acentos): la búsqueda del panel por folio, cliente, correo o SKU (`matchesQuery` en `orders.js`, que normaliza acentos) se resuelve con un `LIKE` normal: "lopez" encuentra "López" sin `COLLATE` en cada consulta.
+- `VARCHAR` usa la página de códigos 1252, suficiente para los códigos ASCII (SKU, CP, enums).
+- **`UQ_Users_Email` sigue siendo correcto:** dos correos que solo difieren en mayúsculas (`Hola@` / `hola@`) colisionan, que es lo que pide R-01. Con *AI* también colisionan variantes que solo difieren en acentos (`jose@` / `josé@`); se acepta a propósito, porque los buzones reales son ASCII y así se evitan cuentas casi idénticas. La API sigue normalizando con `trim().ToLowerInvariant()` (igual que `authService.js`).
+- Los demás `UNIQUE` sobre texto (`Tones.Name`, `Sku`, `Folio`) tampoco cambian de comportamiento: sus valores son ASCII en mayúsculas o nombres de catálogo que no deben repetirse con otro acento.
 
 ### 1.3 Enums: `VARCHAR + CHECK` en lugar de tablas catálogo
 
@@ -121,10 +125,10 @@ Valores de BD en ASCII PascalCase **sin espacios ni acentos**. La columna API es
 ```mermaid
 erDiagram
     Users ||--o{ PasswordResetTokens : "solicita"
-    Users ||--o{ Orders : "realiza (opcional: invitado)"
-    Users ||--o{ OrderStatusHistory : "cambia estado"
-    Users ||--o{ InventoryMovements : "registra"
-    Users ||--o{ Shipments : "reparte (local)"
+    Users |o--o{ Orders : "realiza (opcional: invitado)"
+    Users |o--o{ OrderStatusHistory : "cambia estado"
+    Users |o--o{ InventoryMovements : "registra"
+    Users |o--o{ Shipments : "reparte (local, interno)"
     Sizes |o--o{ Users : "talla preferida"
 
     Products ||--|{ ProductVariants : "se vende como"
@@ -136,7 +140,7 @@ erDiagram
     Orders ||--|{ OrderItems : "contiene"
     Orders ||--|{ OrderStatusHistory : "historial"
     Orders ||--o| Shipments : "se entrega con"
-    Orders |o--o{ InventoryMovements : "origina (Venta)"
+    Orders |o--o{ InventoryMovements : "origina (Venta, Devolucion)"
 
     Products |o--o| Settings : "pieza destacada"
     Users |o--o{ Settings : "última edición"
@@ -411,7 +415,7 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 | `ProductId` | `INT` | | | **FK** → `Products(Id)` `ON DELETE NO ACTION` |
 | `ToneCode` | `VARCHAR(20)` | | | **FK** → `Tones(Code)` `ON DELETE NO ACTION` |
 | `SizeCode` | `VARCHAR(3)` | | | **FK** → `Sizes(Code)` `ON DELETE NO ACTION` |
-| `Sku` | `VARCHAR(20)` | | | **UQ**. `SKK-{PieceNumber 3 dígitos}-{Tones.SkuCode}-{SizeCode}` → `SKK-007-SUM-M`. `CK_ProductVariants_SkuFormat`: `Sku LIKE 'SKK-[0-9][0-9][0-9]-[A-Z][A-Z][A-Z]-[A-Z]%'` |
+| `Sku` | `VARCHAR(20)` | | | **UQ**. `SKK-{PieceNumber 3 dígitos}-{Tones.SkuCode}-{SizeCode}` → `SKK-007-SUM-M`. `CK_ProductVariants_SkuFormat`: `Sku COLLATE Latin1_General_100_BIN2 LIKE 'SKK-[0-9][0-9][0-9]-[A-Z][A-Z][A-Z]-' + SizeCode`. Patrón exacto, sin `%` abierto: el sufijo es la talla de la propia fila (válida por la FK a `Sizes`) y `BIN2` exige mayúsculas aunque la BD sea *CI* |
 | `Stock` | `INT` | | `0` | Pares físicos en almacén. `CK_ProductVariants_Stock`: `Stock >= 0` |
 | `Reserved` | `INT` | | `0` | Pares apartados por pedidos sin enviar. `CK_ProductVariants_Reserved`: `Reserved >= 0` |
 | `IsActive` | `BIT` | | `1` | |
@@ -439,7 +443,7 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 | `Quantity` | `INT` | | | Delta **firmado** (+ entra, − sale) |
 | `Balance` | `INT` | | | Saldo después del movimiento. `CK_InventoryMovements_Balance`: `>= 0` |
 | `Note` | `NVARCHAR(250)` | N | | Motivo. "Pedido SKK-1042" en ventas |
-| `OrderId` | `INT` | N | | **FK** → `Orders(Id)` `ON DELETE NO ACTION`. Solo para `Venta` |
+| `OrderId` | `INT` | N | | **FK** → `Orders(Id)` `ON DELETE NO ACTION`. Obligatorio en `Venta` y `Devolucion`; opcional en los demás |
 | `CreatedByUserId` | `INT` | N | | **FK** → `Users(Id)` `ON DELETE NO ACTION`. `NULL` = proceso automático |
 | `CreatedByName` | `NVARCHAR(80)` | | | Copia del nombre ("Daniel R.") para que el kárdex se lea aunque el usuario cambie |
 | `CreatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
@@ -448,7 +452,8 @@ Reglas CHECK de coherencia por tipo:
 - `CK_InventoryMovements_Sign`:
   `(Type IN ('Entrada','Devolucion') AND Quantity > 0) OR (Type IN ('Merma','Venta') AND Quantity < 0) OR (Type IN ('ConteoFisico','InventarioInicial'))`. El conteo y la importación fijan el stock, así que su delta puede ser +, − o 0.
 - `CK_InventoryMovements_NoteRequired`: `Type NOT IN ('Merma','Devolucion') OR LEN(LTRIM(RTRIM(Note))) > 0`
-- `CK_InventoryMovements_SaleHasOrder`: `(Type = 'Venta') = (OrderId IS NOT NULL)`, expresado como `(Type = 'Venta' AND OrderId IS NOT NULL) OR (Type <> 'Venta' AND OrderId IS NULL)`.
+- `CK_InventoryMovements_OrderRequired`: `Type NOT IN ('Venta','Devolucion') OR OrderId IS NOT NULL`. Una venta y una devolución siempre apuntan a su pedido; el resto puede o no llevarlo.
+- La forma de Devolución del panel aún no pide el folio (`MovementForm.jsx`) y el `seed.js` demo genera devoluciones sin pedido: ambos se ajustan en el PR del frontend.
 
 **Índices:** `IX_InventoryMovements_VariantId_CreatedAt` (`VariantId`, `CreatedAt DESC`) `INCLUDE (Type, Quantity, Balance, CreatedByName, Note)`, para el kárdex del más reciente al más antiguo · `IX_InventoryMovements_OrderId` filtrado `WHERE OrderId IS NOT NULL`.
 
@@ -483,7 +488,7 @@ Reglas CHECK de coherencia por tipo:
 | `Subtotal` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Σ `OrderItems.LineTotal` (lo garantiza el servicio) |
 | `ShippingCost` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Tarifa cobrada (0, 49, 99) **congelada** al comprar |
 | `Total` | `DECIMAL(10,2)` | | | `CK_Orders_Total`: `Total = Subtotal + ShippingCost` |
-| `TaxRate` | `DECIMAL(5,4)` | | | IVA vigente al comprar (0.1600). Copia de `Settings.IvaRate` |
+| `TaxRate` | `DECIMAL(5,4)` | | | IVA vigente al comprar (0.1600). Copia de `Settings.IvaRate`. `CK_Orders_TaxRate`: `BETWEEN 0 AND 1` |
 | `TaxIncluded` | `AS (ROUND(Total - Total / (1 + TaxRate), 2)) PERSISTED` | | | IVA incluido, informativo (`DESIGN` §4.4). Para el reporte del contador |
 | `GiftWrap` | `BIT` | | `1` | Furoshiki, **true por defecto** y sin costo (`DESIGN` §4.4) |
 | `InternalNote` | `NVARCHAR(500)` | N | | Nota del personal; nunca se expone al cliente |
@@ -498,12 +503,14 @@ CHECK de pago antes de surtir (OXXO Pay):
 - `CK_Orders_PaymentBeforeFulfillment`: `PaymentStatus = 'Pagado' OR Status IN ('PorPreparar','Cancelado')`. Un pedido OXXO sin pagar no puede pasar a `Preparando`, `Enviado`, `EnRuta` ni `Entregado`; un pedido `Reembolsado` solo puede estar `Cancelado` (o `PorPreparar` mientras se cancela en la misma transacción).
 - La pestaña "OXXO pendiente" del panel pasa a ser `PaymentMethod = 'OxxoPay' AND PaymentStatus = 'Pendiente'`.
 
-`UQ_Orders_Id_DeliveryMethod` (`Id`, `DeliveryMethod`): llave alterna que solo existe para la FK compuesta desde `Shipments` (§3.11).
+`DeliveryMethod` es editable (sin llave alterna) mientras el pedido no tenga envío: el servicio solo lo permite en `PorPreparar`/`Preparando` y lo recalcula si se corrige el CP (§3.11).
 
 **Índices:**
 - `IX_Orders_Status_CreatedAt` (`Status`, `CreatedAt`) `INCLUDE (DeliveryMethod, PaymentMethod, PaymentStatus, Total)`: pestañas de Pedidos, cola de trabajo y atrasados.
 - `IX_Orders_CreatedAt` (`CreatedAt`) `INCLUDE (Status, Total, ShippingCost, Subtotal)`: KPIs y gráfica del dashboard por rango.
+- `IX_Orders_PendingPayment` (`CreatedAt`) filtrado `WHERE PaymentStatus = 'Pendiente'` `INCLUDE (PaymentMethod, Status)`: pestaña "OXXO pendiente" y vencimiento de 72 h (P-03).
 - `IX_Orders_UserId_CreatedAt` filtrado `WHERE UserId IS NOT NULL`: "Mis pedidos" (`GET /api/orders/mine`).
+- Lista completa, con los de FK, en §3.15.
 - `IX_Orders_CustomerEmail`: búsqueda en el panel y número de pedidos por cliente (incluye invitados).
 
 **¿Por qué copiar los datos del cliente y del envío?** El pedido es un documento histórico: si el cliente cambia de nombre o de domicilio, la guía y el reporte de ese pedido no deben cambiar. Además, el invitado no tiene fila en `Users`.
@@ -553,18 +560,19 @@ CHECK de pago antes de surtir (OXXO Pay):
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
 | `Id` | `INT IDENTITY` | | | **PK** |
-| `OrderId` | `INT` | | | **UQ** (1 envío por pedido en v1) |
-| `DeliveryMethod` | `VARCHAR(12)` | | | Repite el método del pedido. **FK compuesta** (`OrderId`, `DeliveryMethod`) → `Orders(Id, DeliveryMethod)` `ON DELETE NO ACTION`: la BD garantiza que el envío y el pedido digan lo mismo |
+| `OrderId` | `INT` | | | **FK** → `Orders(Id)` `ON DELETE NO ACTION`. **UQ** (1 envío por pedido en v1) |
+| `DeliveryMethod` | `VARCHAR(12)` | | | Copia del método del pedido al crear el envío. `CK`: `IN ('Local','Paqueteria')`. Que coincida con `Orders.DeliveryMethod` lo valida el servicio (R-12) |
 | `Carrier` | `VARCHAR(20)` | N | | `CK`: `IS NULL OR IN ('Estafeta','DHLExpress')` (API: `DHL Express`, §1.6) |
 | `TrackingNumber` | `VARCHAR(30)` | N | | `CK_Shipments_Tracking`: `IS NULL OR (LEN(TrackingNumber) >= 10 AND TrackingNumber NOT LIKE '%[^0-9]%')`, equivalente a `^\d{10,}$` |
-| `CourierUserId` | `INT` | N | | **FK** → `Users(Id)` `ON DELETE NO ACTION`. Repartidor (personal de Operaciones) |
-| `CourierName` | `NVARCHAR(80)` | N | | Copia del nombre |
+| `CourierUserId` | `INT` | N | | **FK** → `Users(Id)` `ON DELETE NO ACTION`. Repartidor **interno** (personal de Operaciones o Dueño; el rol lo valida el servicio) |
+| `CourierName` | `NVARCHAR(80)` | N | | Repartidor **externo** (texto libre) o copia del nombre del interno |
 | `ShippedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
 | `DeliveredAt` | `DATETIME2(3)` | N | | `CK`: `IS NULL OR DeliveredAt >= ShippedAt` |
 
 - `CK_Shipments_ByMethod`:
-  `(DeliveryMethod = 'Paqueteria' AND Carrier IS NOT NULL AND TrackingNumber IS NOT NULL AND CourierUserId IS NULL) OR (DeliveryMethod = 'Local' AND CourierUserId IS NOT NULL AND Carrier IS NULL AND TrackingNumber IS NULL)`
-- **Índices:** `UQ_Shipments_OrderId` · `IX_Shipments_TrackingNumber` filtrado `WHERE TrackingNumber IS NOT NULL` (búsqueda por guía).
+  `(DeliveryMethod = 'Paqueteria' AND Carrier IS NOT NULL AND TrackingNumber IS NOT NULL AND CourierUserId IS NULL AND CourierName IS NULL) OR (DeliveryMethod = 'Local' AND (CourierUserId IS NOT NULL OR CourierName IS NOT NULL) AND Carrier IS NULL AND TrackingNumber IS NULL)`. En Local basta con uno de los dos: repartidor interno (FK) o externo (nombre).
+- **Sin FK compuesta** (cambio de la versión 0.1): una FK compuesta hacia `Orders(Id, DeliveryMethod)` obligaba a una llave alterna, y en EF Core las llaves alternas son inmutables, así que `Orders.DeliveryMethod` no se habría podido corregir ni antes de enviar. Ahora la FK es simple (`OrderId`) y el servicio garantiza que `Shipments.DeliveryMethod = Orders.DeliveryMethod` al crear el envío y que el método del pedido ya no cambie después.
+- **Índices:** `UQ_Shipments_OrderId` · `IX_Shipments_TrackingNumber` filtrado `WHERE TrackingNumber IS NOT NULL` (búsqueda por guía) · `IX_Shipments_CourierUserId` filtrado `WHERE CourierUserId IS NOT NULL`.
 - **Costo cobrado:** `DESIGN_ADMIN` §9 lo sugiere en `Shipments`, pero aquí se queda solo en `Orders.ShippingCost`. Así hay una sola fuente del total y el pedido existe con su costo desde antes de enviarse (ver **D-14**).
 - **¿Por qué una tabla aparte y no columnas en `Orders`?** Separa lo comercial (pedido) de lo logístico (salida) y deja lista la evolución a **varios envíos por pedido** (envío parcial, reenvío por devolución): basta con quitar el `UNIQUE(OrderId)`.
 
@@ -587,6 +595,19 @@ CHECK de pago antes de surtir (OXXO Pay):
 | `RowVersion` | `ROWVERSION` | | | |
 
 **¿Por qué una fila tipada y no una tabla clave-valor (`Key`, `Value`)?** Con columnas reales cada valor tiene su tipo y su `CHECK` (un costo no puede ser texto ni negativo), EF Core lo mapea a una clase normal y no hay que convertir cadenas. La desventaja (agregar un parámetro requiere migración) no pesa: cada parámetro nuevo trae código nuevo de todos modos.
+
+**Contrato nuevo de `GET /api/config`.** `DESIGN` §9 expone un solo `shippingCost`; con este esquema la respuesta pasa a tener estos campos (todos de `Settings`):
+
+| Campo JSON | Columna | Valor semilla |
+|---|---|---|
+| `freeShippingThreshold` | `FreeShippingThreshold` | 799 |
+| `parcelShippingCost` | `ParcelShippingCost` (sustituye a `shippingCost`) | 99 |
+| `localShippingCost` | `LocalShippingCost` | 49 |
+| `localFreeShipping` | `LocalFreeShipping` | `true` |
+| `fewUnitsThreshold` | `FewUnitsThreshold` | 4 |
+| `ivaRate` | `IvaRate` | 0.16 |
+
+Las zonas locales no viajan en `/api/config`: la tienda cotiza por CP con `POST /api/shipping/quote` y el checkout recalcula en el servidor. `web-store` (`config/commerce.js`, hoy con `SHIPPING_COST`) y `admin-panel` se adaptan a este contrato en la **rama de integración** con la API, no en este PR.
 
 ### 3.13 `LocalDeliveryZones` — zona de entrega local
 
@@ -619,6 +640,43 @@ CHECK de pago antes de surtir (OXXO Pay):
 | `DailySales` (agregado) | ❌ | Se calcula de `Orders` con `IX_Orders_CreatedAt`; con el volumen esperado no hace falta materializar. Se puede proponer una **vista** `vw_DailySales` en la fase de API |
 | `AuditLogs` | ⏳ P2 | `DESIGN_ADMIN` §9 la marca como P2. `OrderStatusHistory` y `InventoryMovements` ya cubren lo crítico |
 | `Payments` | ⏳ Al integrar pasarela | En v1 el pago es simulado y cabe en 4 columnas de `Orders`. Con pagos parciales o reintentos se separa |
+| `Carts` / `CartItems` | ❌ | Sin tabla de carrito: vive en el navegador (`localStorage` `sokko.cart.v1`, `DESIGN` §4.4); el checkout recalcula precios y envío en el servidor |
+
+### 3.15 Índices (resumen)
+
+SQL Server **no** indexa las FK por sí solo; EF Core sí crea por convención un índice para cada FK que no esté cubierta por otro índice cuyo prefijo sean esas columnas. La lista completa que debe salir en la migración:
+
+| Tabla | Índice | Columnas | Motivo |
+|---|---|---|---|
+| `Users` | `UQ_Users_Email` | `Email` | Login, R-01 |
+| | `IX_Users_Role` (filtrado `Role <> 'Customer'`) | `Role` | Usuarios internos en Configuración |
+| | `IX_Users_PreferredSizeCode` | `PreferredSizeCode` | FK (convención EF) |
+| `PasswordResetTokens` | `UQ_PasswordResetTokens_TokenHash` | `TokenHash` | `reset-password` |
+| | `IX_PasswordResetTokens_UserId_ExpiresAt` | `UserId`, `ExpiresAt` | Cubre la FK `UserId`; invalidar y depurar |
+| `Tones` | `UQ_Tones_Name`, `UQ_Tones_SkuCode` | | Unicidad |
+| `Sizes` | `UQ_Sizes_SortOrder` | | Unicidad |
+| `Products` | `UQ_Products_PieceNumber` · `IX_Products_IsActive` | | SKU y listado de la tienda |
+| `ProductVariants` | `UQ_ProductVariants_Sku` | `Sku` | Búsqueda, importación CSV |
+| | `UQ_ProductVariants_Product_Tone_Size` | `ProductId`, `ToneCode`, `SizeCode` | R-05; cubre la FK `ProductId` |
+| | `IX_ProductVariants_ToneCode` | `ToneCode` | FK; filtro por tono |
+| | `IX_ProductVariants_SizeCode` | `SizeCode` | FK (convención EF); ventas por talla |
+| `InventoryMovements` | `IX_InventoryMovements_VariantId_CreatedAt` | `VariantId`, `CreatedAt DESC` + `INCLUDE` | Kárdex; cubre la FK `VariantId` |
+| | `IX_InventoryMovements_OrderId` (filtrado `OrderId IS NOT NULL`) | `OrderId` | FK; ventas y devoluciones de un pedido |
+| | `IX_InventoryMovements_CreatedByUserId` | `CreatedByUserId` | FK (convención EF) |
+| `Orders` | `UQ_Orders_FolioNumber`, `UQ_Orders_Folio` | | Folio público |
+| | `IX_Orders_Status_CreatedAt` | `Status`, `CreatedAt` + `INCLUDE (DeliveryMethod, PaymentMethod, PaymentStatus, Total)` | Pestañas de Pedidos, cola de trabajo, atrasados +48 h |
+| | `IX_Orders_CreatedAt` | `CreatedAt` + `INCLUDE (Status, Total, ShippingCost, Subtotal)` | Dashboard por rango |
+| | `IX_Orders_PendingPayment` (filtrado `PaymentStatus = 'Pendiente'`) | `CreatedAt` + `INCLUDE (PaymentMethod, Status)` | Pestaña "OXXO pendiente" y vencimiento de 72 h (P-03) |
+| | `IX_Orders_UserId_CreatedAt` (filtrado `UserId IS NOT NULL`) | `UserId`, `CreatedAt` | FK; "Mis pedidos" |
+| | `IX_Orders_CustomerEmail` | `CustomerEmail` | Búsqueda y pedidos por cliente |
+| `OrderItems` | `UQ_OrderItems_Order_Variant` | `OrderId`, `VariantId` | Una línea por SKU; cubre la FK `OrderId` |
+| | `IX_OrderItems_VariantId` | `VariantId` | FK; más vendidas |
+| `OrderStatusHistory` | `IX_OrderStatusHistory_OrderId_ChangedAt` | `OrderId`, `ChangedAt` | Línea de tiempo; cubre la FK `OrderId` |
+| | `IX_OrderStatusHistory_ChangedByUserId` | `ChangedByUserId` | FK (convención EF) |
+| `Shipments` | `UQ_Shipments_OrderId` | `OrderId` | 1:1; cubre la FK |
+| | `IX_Shipments_TrackingNumber` (filtrado) · `IX_Shipments_CourierUserId` (filtrado) | | Búsqueda por guía; FK y entregas por repartidor |
+| `Settings` | `IX_Settings_FeaturedProductId`, `IX_Settings_UpdatedByUserId` | | FK (convención EF; tabla de una fila, costo nulo) |
+| `LocalDeliveryZones` | `UQ_LocalDeliveryZones_Range` | `PostalCodeFrom`, `PostalCodeTo` | Consulta por CP |
 
 ---
 
@@ -636,16 +694,16 @@ CHECK de pago antes de surtir (OXXO Pay):
 | R-06 | Formato de SKU `SKK-###-XXX-T` | ADMIN §6.1 | `CK_ProductVariants_SkuFormat` (forma) | Garantiza que corresponda a la pieza, el tono y la talla |
 | R-07 | Stock y apartados nunca negativos; apartado ≤ stock | ADMIN §5.1, §5.3 | `CK` `Stock >= 0`, `Reserved >= 0`, `Reserved <= Stock` | Valida disponible antes de apartar ("No hay pares suficientes") |
 | R-08 | Pedido pagado aparta pares | ADMIN §5.1 | `CK_ProductVariants_ReservedLeStock` (red de seguridad) | `UPDATE` atómico condicionado por línea en la transacción del checkout (§4.1) |
-| R-09 | Enviar / salir a ruta descuenta stock y escribe "Venta" | ADMIN §5.1 | `CK_InventoryMovements_SaleHasOrder`, `CK` de signo | `Stock -= qty`, `Reserved -= qty` con `OUTPUT inserted.Stock` como `Balance`, inserta movimiento, todo en **una transacción** (§4.1) |
+| R-09 | Enviar / salir a ruta descuenta stock y escribe "Venta" | ADMIN §5.1 | `CK_InventoryMovements_OrderRequired`, `CK` de signo | `Stock -= qty`, `Reserved -= qty` con `OUTPUT inserted.Stock` como `Balance`, inserta movimiento, todo en **una transacción** (§4.1) |
 | R-10 | Cancelar libera apartados | ADMIN §5.1 | — | `Reserved -= qty` atómico + historial (§4.1) |
 | R-11 | Transiciones válidas según método de entrega y pago | ADMIN §5.1 | `CK_Orders_StatusMatchesDelivery`, `CK_Orders_PaymentBeforeFulfillment` (combinaciones imposibles) | Máquina de estados (`nextStatus`, `canCancel`); una tabla de filas sueltas no conoce el estado anterior |
-| R-12 | Paquetería exige paquetería + guía `^\d{10,}$`; local exige repartidor | ADMIN §5.1 | `CK_Shipments_ByMethod`, `CK_Shipments_Tracking`, FK compuesta | Mensajes "Escriba el número de guía…" / "Elija quién lleva el pedido." |
+| R-12 | Paquetería exige paquetería + guía `^\d{10,}$`; local exige repartidor interno o externo | ADMIN §5.1 | `CK_Shipments_ByMethod`, `CK_Shipments_Tracking` | Mensajes "Escriba el número de guía…" / "Elija quién lleva el pedido."; copia `Orders.DeliveryMethod` al envío y no permite cambiarlo después |
 | R-13 | Total = subtotal + envío | DESIGN §4.4 | `CK_Orders_Total` | **Recalcula todo en el servidor**: nunca confía en totales del cliente |
 | R-14 | Envío: local si el CP está en zona; gratis desde umbral (local solo si `LocalFreeShipping`) | ADMIN §5.2 | `CK` de montos ≥ 0 en `Settings` | `computeShipping` reproducido en C# con pruebas |
 | R-15 | Precio histórico en el pedido | DESIGN §9 | `OrderItems.UnitPrice NOT NULL` | Copia `Products.Price` al crear la línea |
 | R-16 | Folio único `SKK-####` | ADMIN §6.1 | `SEQUENCE` + `UQ_Orders_Folio` | — |
 | R-17 | Atrasado = en bodega +48 h | ADMIN §5.1 | `IX_Orders_Status_CreatedAt` (rendimiento) | Calcula con `CreatedAt` y la hora del servidor |
-| R-18 | Kárdex: saldo nunca negativo; motivo obligatorio en Merma y Devolución | ADMIN §5.3 | `CK_InventoryMovements_Balance`, `CK_..._NoteRequired`, `CK_..._Sign` | Valida cantidades y mensajes ("No puede sacar más de {n} pares.") |
+| R-18 | Kárdex: saldo nunca negativo; motivo obligatorio en Merma y Devolución; Venta y Devolución ligadas a su pedido | ADMIN §5.3 | `CK_InventoryMovements_Balance`, `CK_..._NoteRequired`, `CK_..._Sign`, `CK_..._OrderRequired` | Valida cantidades y mensajes ("No puede sacar más de {n} pares.") |
 | R-19 | Último saldo del kárdex = stock del SKU | ADMIN §6.1 | — (cruza filas) | Movimiento y stock en la misma transacción; prueba de integración que lo verifica |
 | R-20 | Importación CSV: SKU existente, stock entero ≥ 0, duplicados | ADMIN §5.4 | FK/`UQ` de SKU, `CK` de stock | `previewCsv` en C#; aplica solo filas válidas como `InventarioInicial` |
 | R-21 | CP de 5 dígitos; rango con inicio ≤ fin | ADMIN §5.2 | `CK` de formato y `From <= To` | Valida y además evita rangos encimados |
@@ -780,18 +838,18 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 
 | Servicio | Tipo Erl | Tablas que **escribe** | Tablas que **lee** | Consumidores |
 |---|---|---|---|---|
-| `CatalogService` (Productos) | Entidad | `Products`, `ProductVariants` (alta de SKU) | `Tones`, `Sizes`, `Settings` (pieza destacada) | web-store (`GET /api/products`), admin |
+| `CatalogService` (Productos) | Entidad | `Products`, `Tones`, `Sizes` (el alta de SKU la pide a `InventoryService`) | `ProductVariants`, `Settings` (pieza destacada) | web-store (`GET /api/products`), admin |
 | `UserService` (Usuarios) | Entidad | `Users` | `Sizes` | Auth, admin (`/users`) |
-| `OrderService` (Pedidos) | Entidad | `Orders`, `OrderItems`, `OrderStatusHistory` | `Shipments` | Checkout, Fulfill, admin |
-| `InventoryService` (Inventario) | Entidad | `ProductVariants.Stock/Reserved`, `InventoryMovements` | `Settings.FewUnitsThreshold` | Checkout, Fulfill, Adjust, Import |
+| `OrderService` (Pedidos) | Entidad | `Orders`, `OrderItems`, `OrderStatusHistory`, `Shipments` | — | Checkout, Fulfill, admin |
+| `InventoryService` (Inventario) | Entidad | **Único escritor** de `ProductVariants` (alta de SKU, `Stock`, `Reserved`, `IsActive`) e `InventoryMovements` | `Settings.FewUnitsThreshold` | Catálogo, Checkout, Fulfill, Adjust, Import |
 | `SettingsService` (Configuración) | Entidad | `Settings`, `LocalDeliveryZones` | — | web-store (`GET /api/config`), admin |
-| `ShippingService` (cotización) | Entidad (regla de envío) | — | `Settings`, `LocalDeliveryZones` | Checkout, `POST /api/shipping/quote` |
+| `QuoteShipping` (cotización de envío) | **Tarea** | — (no tiene tabla) | `Settings`, `LocalDeliveryZones` vía `SettingsService` | Checkout, `POST /api/shipping/quote` |
 | `CheckoutOrder` | **Tarea** | (vía entidades) `Orders`, `OrderItems`, `OrderStatusHistory`, `ProductVariants.Reserved` | `Products`, `Settings`, `LocalDeliveryZones` | web-store `POST /api/orders` |
-| `FulfillOrder` | **Tarea** | `Orders.Status`, `OrderStatusHistory`, `Shipments`, `ProductVariants`, `InventoryMovements` | `Users` (repartidores) | admin `/orders/{folio}/transitions`, `/cancel` |
-| `AdjustInventory` | **Tarea** | `ProductVariants.Stock`, `InventoryMovements` | — | admin `/inventory/{sku}/movements` |
-| `ImportInventory` | **Tarea** | `ProductVariants.Stock`, `InventoryMovements` (`InventarioInicial`) | `ProductVariants` (SKU) | admin `/inventory/import` |
-| `RegisterCustomer` / `ResetPassword` | **Tarea** | `Users`, `PasswordResetTokens` | — | web-store `/api/auth/*` |
-| `AuthService` (hash + JWT + RBAC) | **Utilidad** | `Users.LastLoginAt` | `Users` | Todos |
+| `FulfillOrder` | **Tarea** | (vía entidades) `Orders.Status`, `OrderStatusHistory`, `Shipments`, `ProductVariants`, `InventoryMovements` | `Users` (repartidores) | admin `/orders/{folio}/transitions`, `/cancel` |
+| `AdjustInventory` | **Tarea** | (vía entidades) `ProductVariants.Stock`, `InventoryMovements` | — | admin `/inventory/{sku}/movements` |
+| `ImportInventory` | **Tarea** | (vía entidades) `ProductVariants.Stock`, `InventoryMovements` (`InventarioInicial`) | `ProductVariants` (SKU) | admin `/inventory/import` |
+| `RegisterCustomer` / `ResetPassword` | **Tarea** | (vía entidades) `Users`, `PasswordResetTokens` | — | web-store `/api/auth/*` |
+| `AuthService` (hash + JWT + RBAC) | **Utilidad** | — (`LastLoginAt` lo escribe `UserService`) | `Users` | Todos |
 | `AuditService` (P2) | **Utilidad** | `AuditLogs` (P2) | — | Todos |
 | `ExportService` (Excel/CSV) | **Utilidad** | — | `Orders`, `OrderItems`, `ProductVariants` | admin (finanzas, plantilla CSV) |
 | `Clock` / `TimeZone` | **Utilidad** | — | — | Fechas UTC ↔ `America/Mazatlan` |
@@ -804,14 +862,16 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 | `PasswordResetTokens` | UserService | ResetPassword | AuthService (hash del token) |
 | `Tones`, `Sizes` | CatalogService | — | — |
 | `Products` | CatalogService | CheckoutOrder (precio) | — |
-| `ProductVariants` | InventoryService (stock) · CatalogService (alta) | CheckoutOrder, FulfillOrder, AdjustInventory, ImportInventory | ExportService |
+| `ProductVariants` | InventoryService (único escritor; CatalogService le pide el alta) | CheckoutOrder, FulfillOrder, AdjustInventory, ImportInventory | ExportService |
 | `InventoryMovements` | InventoryService | FulfillOrder, AdjustInventory, ImportInventory | ExportService |
 | `Orders`, `OrderItems` | OrderService | CheckoutOrder, FulfillOrder | ExportService |
 | `OrderStatusHistory` | OrderService | CheckoutOrder, FulfillOrder | AuditService (P2) |
 | `Shipments` | OrderService | FulfillOrder | — |
-| `Settings`, `LocalDeliveryZones` | SettingsService | CheckoutOrder (lectura) | — |
+| `Settings`, `LocalDeliveryZones` | SettingsService | CheckoutOrder, QuoteShipping (lectura) | — |
 
 **Regla de capas:** una tabla tiene **un solo** servicio de entidad que la escribe; los de tarea nunca escriben directo en el `DbContext`, sino que llaman a los servicios de entidad dentro de una transacción compartida (`IDbContextTransaction` / unidad de trabajo). Así se cumple el principio de **abstracción** de `CONTEXTO_MAESTRO` §3.
+
+**Cotización de envío como tarea:** `QuoteShipping` no es dueña de ninguna tabla (por eso no es de entidad) y aplica una regla de negocio (CP en zona, umbral, `LocalFreeShipping`), por eso tampoco es de utilidad, que en Erl es transversal y agnóstica del negocio. Es una tarea pequeña y reutilizable: la llaman el carrito (`POST /api/shipping/quote`) y `CheckoutOrder`.
 
 ---
 
@@ -853,7 +913,7 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-10 | 2026-10-21 | Precio histórico y copias (nombre, SKU, tono, talla) en `OrderItems` | El pedido no cambia si cambia el catálogo | Leer siempre de `Products` (reescribe la historia) | Propuesta |
 | D-11 | 2026-10-21 | Stock y apartados en `ProductVariants` con `CHECK Reserved <= Stock`; disponible calculado | Garantía en la BD contra sobreventa; un solo número que mantener | Columna `Available` guardada (puede desincronizarse) | Propuesta |
 | D-12 | 2026-10-21 | Kárdex de solo inserción con delta firmado, saldo y CHECKs por tipo | Trazabilidad completa; correcciones por movimiento compensatorio | Permitir editar movimientos (pierde auditoría) | Propuesta |
-| D-13 | 2026-10-21 | `Shipments` 1:1 con FK compuesta (`OrderId`, `DeliveryMethod`) y CHECK por método | La BD impide guía en entregas locales o repartidor en paquetería; lista para varios envíos | Columnas en `Orders` (mezcla comercial y logística) | Propuesta |
+| D-13 | 2026-10-21 | `Shipments` 1:1 con FK simple (`OrderId`), copia de `DeliveryMethod` y CHECK por método; repartidor interno (FK) o externo (nombre) | La BD impide guía en entregas locales o repartidor en paquetería; `Orders.DeliveryMethod` sigue editable en EF (sin llave alterna); lista para varios envíos | FK compuesta a `Orders(Id, DeliveryMethod)` (versión 0.1: llave alterna inmutable en EF), columnas en `Orders` | **Cambiada** (rev. 0.3) |
 | D-14 | 2026-10-21 | Costo de envío solo en `Orders.ShippingCost` | Una sola fuente del total; existe antes del envío | Duplicarlo en `Shipments` (sugerido en ADMIN §9) | Por validar (P-09) |
 | D-15 | 2026-10-21 | `PaymentStatus`, `PaidAt` y `PaymentReference` en `Orders`; `CK_Orders_PaymentBeforeFulfillment`; hito `Pagado` al registrar `PaidAt` | OXXO Pay paga después; el panel necesita "OXXO pendiente" sin inventar un 7.º estado, y un pedido sin pago no se surte | Estado `PendientePago`, tabla `Payments` (prematura con pago simulado) | **Cambiada** (rev. 0.2: CHECK e hito); P-03 por confirmar con el cliente |
 | D-16 | 2026-10-21 | `Settings` como fila única tipada con `CHECK Id = 1` | Tipos y CHECK por parámetro; mapeo directo a una clase | Clave-valor (`NVARCHAR` sin validación) | Propuesta |
@@ -862,7 +922,10 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-19 | 2026-10-21 | `TaxRate` copiado y `TaxIncluded` calculado en `Orders` | El reporte de IVA del contador no cambia si cambia la tasa | Recalcular con la tasa vigente | Propuesta |
 | D-20 | 2026-10-21 | `Tones.SkuCode` explícito en lugar de derivar las 3 letras del código | El SKU sigue siendo único aunque llegue un tono con el mismo prefijo | Derivar con `LEFT(Code,3)` (como `skuOf` del panel hoy) | Propuesta |
 | D-21 | 2026-10-21 | Semilla con `Products.Id = PieceNumber` y stock por talla repartido desde el mock | Coincidencia con los datos que ya ven la tienda y el panel | Ids nuevos (rompe enlaces y pruebas) | Por validar (P-07) |
-| D-22 | 2026-10-21 | Tablas descartadas o pospuestas: `UserRoles`, `Customers`, `Addresses`, `Carriers`, `DailySales`, `AuditLogs`, `Payments` | Sin pantalla ni regla que las necesite en v1 (§3.14) | Crearlas desde ahora (complejidad sin uso) | Propuesta |
+| D-22 | 2026-10-21 | Tablas descartadas o pospuestas: `UserRoles`, `Customers`, `Addresses`, `Carriers`, `DailySales`, `AuditLogs`, `Payments`, `Carts` | Sin pantalla ni regla que las necesite en v1 (§3.14) | Crearlas desde ahora (complejidad sin uso) | Propuesta |
+| D-23 | 2026-10-22 | Intercalación explícita de la BD `Modern_Spanish_100_CI_AI` | Búsqueda del panel sin distinguir mayúsculas ni acentos con un `LIKE` normal; mismo resultado en cualquier instancia; `UQ_Users_Email` sigue siendo *case-insensitive* | Predeterminada de la instancia (`*_CI_AS`, distingue acentos) | Propuesta (rev. 0.3) |
+| D-24 | 2026-10-22 | `InventoryMovements.OrderId` obligatorio en `Venta` y `Devolucion` | Una devolución se rastrea hasta el pedido que la originó | Solo en `Venta` (versión 0.1) | Propuesta (rev. 0.3) |
+| D-25 | 2026-10-22 | Un solo escritor de `ProductVariants` (`InventoryService`) y cotización de envío como tarea (`QuoteShipping`) | Cumple la regla de capas de §6 y la taxonomía de Erl (sin servicio de entidad sin tabla) | `CatalogService` e `InventoryService` escribiendo la misma tabla; `ShippingService` como entidad | Propuesta (rev. 0.3) |
 
 ### 8.2 Registro de cambios del documento
 
@@ -870,5 +933,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 |---|---|---|---|---|
 | 0.1 | 2026-10-21 | `sokko/db-schema` | Equipo backend (NEXUS CODE) | Propuesta inicial: ER, 13 tablas, reglas BD vs. servicios, semilla, mapa SOA, puntos abiertos P-01…P-11 y decisiones D-01…D-22 |
 | 0.2 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Hallazgos 🟡 de la revisión del PR #4: R-27 (Merma y conteo frente a lo apartado), §4.1 transacciones y concurrencia, `NO ACTION` en todas las FK salvo `PasswordResetTokens`, §1.6 equivalencias de enums (`DHLExpress`), `CK_Orders_PaymentBeforeFulfillment` e hito `Pagado` al registrar `PaidAt` |
+| 0.3 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Sugerencias 🟢 de la revisión del PR #4: cardinalidades `\|o` en el ER, §3.15 índices (incluidos los de FK), intercalación `Modern_Spanish_100_CI_AI`, repartidor interno o externo y FK simple en `Shipments`, devolución ligada al pedido, CHECK de SKU exacto, CHECK de `TaxRate`, fila `Carts` en §3.14, mapa SOA con un solo escritor de `ProductVariants` y `QuoteShipping` como tarea, contrato nuevo de `/api/config` |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.
