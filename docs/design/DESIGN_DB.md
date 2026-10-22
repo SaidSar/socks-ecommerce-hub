@@ -34,7 +34,7 @@
 | Restricciones | `PK_{Tabla}`, `FK_{Tabla}_{Referida}`, `UQ_{Tabla}_{Cols}`, `CK_{Tabla}_{Regla}`, `IX_{Tabla}_{Cols}`, `DF_{Tabla}_{Col}` | `CK_ProductVariants_ReservedLeStock` |
 | Valores de enums | ASCII, PascalCase, **sin acentos** | `PorPreparar`, `Devolucion`, `OxxoPay` |
 
-Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` §8 (`Products`, `PieceNumber`, `PasswordHash`…) y coinciden 1:1 con las propiedades de C# en EF Core, sin mapeos manuales. Los **valores** de los enums de negocio quedan en español porque son vocabulario del cliente (`Paqueteria`, `OxxoPay`, `Merma`) y así aparecen en `DECISIONES_ADMIN.md`. Los roles quedan en inglés (`Owner`, `Operations`, `Customer`) porque así los define el contrato de autorización (`[Authorize(Roles = "...")]`).
+Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` §8 (`Products`, `PieceNumber`, `PasswordHash`…) y coinciden 1:1 con las propiedades de C# en EF Core, sin mapeos manuales. Los **valores** de los enums de negocio quedan en español porque son vocabulario del cliente (`Paqueteria`, `OxxoPay`, `Merma`) y así aparecen en `DECISIONES_ADMIN.md`. Los roles quedan en inglés (`Owner`, `Operations`, `Customer`) porque así los define el contrato de autorización (`[Authorize(Roles = "...")]`). **Ningún valor de enum en BD lleva espacios ni acentos**; la traducción a los códigos que ya usan los frontends está en §1.6.
 
 ### 1.2 Tipos de datos
 
@@ -48,7 +48,7 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 | Banderas | `BIT NOT NULL` con default | `GiftWrap`, `IsActive`, `MarketingOptIn`. |
 | Cantidades de pares | `INT` | Enteros; los CHECK impiden negativos. |
 | Hashes | `VARBINARY(32)` (SHA-256) / `NVARCHAR(256)` (PasswordHasher) | El token de restablecimiento se guarda como hash binario; la contraseña en el formato Base64 de `PasswordHasher<TUser>` (PBKDF2). |
-| Concurrencia | `ROWVERSION` | Concurrencia optimista en filas que editan varios operadores a la vez (`ProductVariants`, `Orders`, `Settings`). |
+| Concurrencia | `ROWVERSION` | Concurrencia optimista **solo para ediciones desde el panel** (catálogo, ajustes manuales de stock, transiciones de pedido, configuración) en `ProductVariants`, `Orders` y `Settings`. El checkout y la salida de inventario **no** dependen de ella: usan `UPDATE` atómicos condicionados (§4.1). |
 
 **Intercalación:** la predeterminada de la instancia, `Modern_Spanish_CI_AS` o `SQL_Latin1_General_CP1_CI_AS`, ambas *case-insensitive*. Con esto `UNIQUE(Email)` ya no distingue mayúsculas, aunque la API de todos modos normaliza con `trim().ToLowerInvariant()` (igual que `authService.js`).
 
@@ -66,14 +66,53 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 ### 1.4 Borrado: lógico, no físico
 
 - **Nunca se borran** `Users`, `Products`, `ProductVariants`, `Orders` ni el kárdex: tienen historia contable. Se desactivan con `IsActive = 0`.
-- Por eso casi todas las FK son `ON DELETE NO ACTION` y SQL Server rechaza borrar un padre con hijos. Solo hay `CASCADE` donde el hijo no tiene sentido sin el padre y nunca se borra por separado (`OrderItems`, `OrderStatusHistory`, `Shipments`, `PasswordResetTokens`).
-- Además, así se evita el error de SQL Server *"may cause cycles or multiple cascade paths"*: `Users` llega a `OrderStatusHistory` por dos caminos (directo y vía `Orders`).
+- Por eso **todas** las FK son `ON DELETE NO ACTION`, incluidas las que apuntan a `Orders` (`OrderItems`, `OrderStatusHistory`, `Shipments`, `InventoryMovements`) y a `ProductVariants` (`OrderItems`, `InventoryMovements`). Un `DELETE` accidental sobre un pedido o un SKU con historia **falla** en lugar de arrastrar líneas, historial, envío o kárdex.
+- La **única** excepción es `PasswordResetTokens.UserId` (`CASCADE`): el token no tiene valor de auditoría.
+- **EF Core:** una FK requerida es `Cascade` por convención, así que cada relación se configura con `OnDelete(DeleteBehavior.NoAction)` explícito (salvo la de `PasswordResetTokens`). La revisión de la migración debe confirmar que no aparece ningún `ON DELETE CASCADE` adicional.
+- Purgar pedidos de prueba en Development es un paso explícito del *seeder* (borra hijos y luego el pedido), nunca una cascada.
+- Con una sola cascada tampoco existe riesgo del error 1785 de SQL Server (*"may cause cycles or multiple cascade paths"*).
 
 ### 1.5 Folio del pedido `SKK-####`
 
 - `CREATE SEQUENCE dbo.OrderFolioSeq AS INT START WITH 1001 INCREMENT BY 1` (sin caché, `NO CACHE`, para no perder números tras un reinicio).
 - `Orders.FolioNumber INT NOT NULL DEFAULT (NEXT VALUE FOR dbo.OrderFolioSeq)` y `Orders.Folio AS ('SKK-' + CAST(FolioNumber AS VARCHAR(10))) PERSISTED` con `UNIQUE`.
 - Se usa una secuencia en vez de `IDENTITY` para que el folio sea independiente de la PK y para que la API pueda reservarlo antes de insertar si lo necesita. Al partir de 1001 siempre hay al menos 4 dígitos (`SKK-1001`), como en el panel (`SKK-1027`…`SKK-1060`).
+
+### 1.6 Equivalencias de enums: BD ↔ API (JSON) ↔ etiqueta UI
+
+Valores de BD en ASCII PascalCase **sin espacios ni acentos**. La columna API es el código que ya usan `apps/admin-panel/src/domain/*.js` y `apps/web-store`, para que los frontends no cambien al conectarse.
+
+| Enum (columna) | Valor BD | API (JSON) | Etiqueta UI | Conversión |
+|---|---|---|---|---|
+| Estado (`Orders.Status`, `OrderStatusHistory.Status`) | `PorPreparar` | `por_preparar` | Por preparar | `SnakeCaseLower` |
+| | `Preparando` | `preparando` | Preparando | `SnakeCaseLower` |
+| | `Enviado` | `enviado` | Enviado | `SnakeCaseLower` |
+| | `EnRuta` | `en_ruta` | En ruta local | `SnakeCaseLower` |
+| | `Entregado` | `entregado` | Entregado | `SnakeCaseLower` |
+| | `Cancelado` | `cancelado` | Cancelado | `SnakeCaseLower` |
+| | `Pagado` (solo historial) | `pagado` | Pagado | `SnakeCaseLower` |
+| Entrega (`Orders.DeliveryMethod`, `Shipments.DeliveryMethod`) | `Local` | `local` | Entrega local | `SnakeCaseLower` |
+| | `Paqueteria` | `paqueteria` | Paquetería | `SnakeCaseLower` |
+| Método de pago (`Orders.PaymentMethod`) | `Tarjeta` | `Tarjeta` | Tarjeta | **Explícito** |
+| | `OxxoPay` | `OXXO Pay` | OXXO Pay | **Explícito** |
+| Estado de pago (`Orders.PaymentStatus`) | `Pendiente` | `pendiente` | Pendiente de pago | `SnakeCaseLower` (código nuevo; hoy el panel lo infiere con `isOxxoPending`) |
+| | `Pagado` | `pagado` | Pagado | `SnakeCaseLower` |
+| | `Reembolsado` | `reembolsado` | Reembolsado | `SnakeCaseLower` |
+| Paquetería (`Shipments.Carrier`) | `Estafeta` | `Estafeta` | Estafeta | **Explícito** |
+| | `DHLExpress` | `DHL Express` | DHL Express | **Explícito** |
+| Movimiento (`InventoryMovements.Type`) | `Entrada` | `Entrada` | Entrada | **Explícito** |
+| | `Merma` | `Merma` | Merma | **Explícito** |
+| | `Devolucion` | `Devolución` | Devolución | **Explícito** |
+| | `ConteoFisico` | `Conteo físico` | Conteo físico | **Explícito** |
+| | `Venta` | `Venta` | Venta | **Explícito** |
+| | `InventarioInicial` | `Inventario inicial` | Inventario inicial | **Explícito** |
+| Rol (`Users.Role`) | `Owner` | `dueno` | Dueño | **Explícito** (`config/roles.js`) |
+| | `Operations` | `operaciones` | Operaciones | **Explícito** |
+| | `Customer` | `customer` | — (tienda) | `SnakeCaseLower` |
+
+- **`SnakeCaseLower`**: `JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)` produce el código de la API a partir del nombre del `enum` de C# (`EnRuta` → `en_ruta`). Cubre estado, entrega y estado de pago.
+- **Explícito**: el código del frontend tiene espacios, acentos o mayúsculas que ninguna política genera (`OXXO Pay`, `DHL Express`, `Conteo físico`, `dueno`). Se mapea con un diccionario por enum en la capa de DTO, con una prueba unitaria que recorra todos los valores en ambos sentidos.
+- En EF Core todos se guardan con `HasConversion<string>()`: el valor de BD es el nombre del miembro del `enum`.
 
 ---
 
@@ -235,7 +274,7 @@ erDiagram
         int Id PK
         int OrderId FK,UK
         varchar DeliveryMethod
-        varchar Carrier "NULL · Estafeta | DHL Express"
+        varchar Carrier "NULL · Estafeta | DHLExpress"
         varchar TrackingNumber "NULL · solo digitos, min 10"
         int CourierUserId FK "NULL"
         nvarchar CourierName "NULL"
@@ -376,9 +415,14 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 | `Stock` | `INT` | | `0` | Pares físicos en almacén. `CK_ProductVariants_Stock`: `Stock >= 0` |
 | `Reserved` | `INT` | | `0` | Pares apartados por pedidos sin enviar. `CK_ProductVariants_Reserved`: `Reserved >= 0` |
 | `IsActive` | `BIT` | | `1` | |
-| `RowVersion` | `ROWVERSION` | | | Concurrencia optimista (dos operadores ajustando el mismo SKU) |
+| `RowVersion` | `ROWVERSION` | | | Concurrencia optimista solo para ediciones del panel (catálogo, ajuste manual). El checkout y la salida usan `UPDATE` atómico (§4.1) |
 
-- `CK_ProductVariants_ReservedLeStock`: `Reserved <= Stock` → **disponible = Stock − Reserved nunca es negativo**.
+- `CK_ProductVariants_ReservedLeStock`: `Reserved <= Stock` → **disponible = Stock − Reserved nunca es negativo**. Es la **red de seguridad**: el servicio valida antes (R-27) para que la API nunca responda 500 por este CHECK.
+- **R-27 · Movimientos que bajan el stock frente a lo apartado:**
+  - **Merma** ≤ `Stock − Reserved`. Mensaje: "No puede sacar más de {disponible} pares; {apartados} están apartados para pedidos."
+  - **Conteo físico** o **importación** (`InventarioInicial`) con un número menor que `Reserved` se rechaza: "El conteo ({n}) es menor que los {apartados} pares apartados. Cancele o surta esos pedidos antes de ajustar."
+  - La API responde **409** (conflicto con pedidos apartados) o **422** (cantidad inválida) con ese mensaje; nunca deja que salte el CHECK. En la importación, la fila se marca con error en la vista previa y no se aplica.
+  - El dominio del panel (`apps/admin-panel/src/domain/inventory.js`, que hoy valida la Merma contra `stock`) se alinea en un **PR aparte del frontend**; este documento no lo modifica.
 - `UQ_ProductVariants_Product_Tone_Size`: (`ProductId`, `ToneCode`, `SizeCode`) → no hay dos SKU para la misma combinación.
 - **Índices:** `UQ_ProductVariants_Sku` (búsqueda del panel, importación CSV) · `IX_ProductVariants_ToneCode` (filtro por tono).
 - "Disponible" (`Stock − Reserved`) y el estado `agotado/pocos/ok` **no** se guardan: se calculan en consulta, porque el umbral vive en `Settings` y cambia.
@@ -433,7 +477,7 @@ Reglas CHECK de coherencia por tipo:
 | `DeliveryMethod` | `VARCHAR(12)` | | | `CK_Orders_DeliveryMethod`: `IN ('Local','Paqueteria')`. Lo calcula el servidor con el CP |
 | `Status` | `VARCHAR(15)` | | `'PorPreparar'` | `CK_Orders_Status`: `IN ('PorPreparar','Preparando','Enviado','EnRuta','Entregado','Cancelado')` |
 | `PaymentMethod` | `VARCHAR(10)` | | | `CK_Orders_PaymentMethod`: `IN ('Tarjeta','OxxoPay')` |
-| `PaymentStatus` | `VARCHAR(12)` | | `'Pendiente'` | `CK`: `IN ('Pendiente','Pagado','Reembolsado')`. Ver **P-03** |
+| `PaymentStatus` | `VARCHAR(12)` | | `'Pendiente'` | `CK`: `IN ('Pendiente','Pagado','Reembolsado')`. Tarjeta nace `Pagado`; OXXO Pay nace `Pendiente`. Ver **P-03** |
 | `PaymentReference` | `NVARCHAR(100)` | N | | Id de la pasarela o referencia OXXO (`TODO(api)`) |
 | `PaidAt` | `DATETIME2(3)` | N | | `CK_Orders_PaidAt`: `PaymentStatus = 'Pendiente' OR PaidAt IS NOT NULL` |
 | `Subtotal` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Σ `OrderItems.LineTotal` (lo garantiza el servicio) |
@@ -449,6 +493,10 @@ Reglas CHECK de coherencia por tipo:
 
 CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStatus`):
 - `CK_Orders_StatusMatchesDelivery`: `NOT (Status = 'Enviado' AND DeliveryMethod = 'Local') AND NOT (Status = 'EnRuta' AND DeliveryMethod = 'Paqueteria')`.
+
+CHECK de pago antes de surtir (OXXO Pay):
+- `CK_Orders_PaymentBeforeFulfillment`: `PaymentStatus = 'Pagado' OR Status IN ('PorPreparar','Cancelado')`. Un pedido OXXO sin pagar no puede pasar a `Preparando`, `Enviado`, `EnRuta` ni `Entregado`; un pedido `Reembolsado` solo puede estar `Cancelado` (o `PorPreparar` mientras se cancela en la misma transacción).
+- La pestaña "OXXO pendiente" del panel pasa a ser `PaymentMethod = 'OxxoPay' AND PaymentStatus = 'Pendiente'`.
 
 `UQ_Orders_Id_DeliveryMethod` (`Id`, `DeliveryMethod`): llave alterna que solo existe para la FK compuesta desde `Shipments` (§3.11).
 
@@ -467,7 +515,7 @@ CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStat
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
 | `Id` | `INT IDENTITY` | | | **PK** |
-| `OrderId` | `INT` | | | **FK** → `Orders(Id)` `ON DELETE CASCADE` |
+| `OrderId` | `INT` | | | **FK** → `Orders(Id)` `ON DELETE NO ACTION` |
 | `VariantId` | `INT` | | | **FK** → `ProductVariants(Id)` `ON DELETE NO ACTION` |
 | `SkuSnapshot` | `VARCHAR(20)` | | | Copia del SKU |
 | `ProductNameSnapshot` | `NVARCHAR(120)` | | | Copia del nombre de la pieza |
@@ -479,7 +527,7 @@ CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStat
 
 - `UQ_OrderItems_Order_Variant` (`OrderId`, `VariantId`): una línea por SKU por pedido; repetir un SKU suma cantidad, igual que el carrito (`DESIGN` §4.4) y el seed.
 - **Índices:** `IX_OrderItems_VariantId` (más vendidas y ventas por talla del dashboard).
-- `ON DELETE CASCADE` desde `Orders` es seguro porque los pedidos nunca se borran (§1.4). Solo actúa si se purga un pedido de prueba.
+- `ON DELETE NO ACTION` desde `Orders` (§1.4): las líneas son historial de ventas y no se borran en cascada.
 
 ### 3.10 `OrderStatusHistory` — historial de estados
 
@@ -488,13 +536,14 @@ CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStat
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
 | `Id` | `BIGINT IDENTITY` | | | **PK** |
-| `OrderId` | `INT` | | | **FK** → `Orders(Id)` `ON DELETE CASCADE` |
-| `Status` | `VARCHAR(15)` | | | `CK`: `IN ('Pagado','PorPreparar','Preparando','Enviado','EnRuta','Entregado','Cancelado')`. Incluye el hito `Pagado`, que el panel muestra como primer paso |
+| `OrderId` | `INT` | | | **FK** → `Orders(Id)` `ON DELETE NO ACTION` |
+| `Status` | `VARCHAR(15)` | | | `CK`: `IN ('Pagado','PorPreparar','Preparando','Enviado','EnRuta','Entregado','Cancelado')`. Incluye el hito `Pagado`, que el panel muestra en la línea de tiempo |
 | `ChangedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
 | `ChangedByUserId` | `INT` | N | | **FK** → `Users(Id)` `ON DELETE NO ACTION`. `NULL` = sistema |
 | `ChangedByName` | `NVARCHAR(80)` | | | "Tienda en línea", "Aiko M." |
 | `Note` | `NVARCHAR(250)` | N | | Motivo de cancelación, etc. |
 
+- **Hito `Pagado`:** se inserta en la misma transacción en que se registra `Orders.PaidAt` (`ChangedAt = PaidAt`), **no** al crear el pedido. Con Tarjeta coincide con la creación; con OXXO Pay llega cuando se confirma el pago. El *seeder* demo del panel (`apps/admin-panel/src/data/seed.js`, que hoy lo pone al crear también en OXXO) se ajusta en el PR del frontend.
 - **Índices:** `IX_OrderStatusHistory_OrderId_ChangedAt`.
 
 ### 3.11 `Shipments` — entrega del pedido
@@ -505,8 +554,8 @@ CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStat
 |---|---|---|---|---|
 | `Id` | `INT IDENTITY` | | | **PK** |
 | `OrderId` | `INT` | | | **UQ** (1 envío por pedido en v1) |
-| `DeliveryMethod` | `VARCHAR(12)` | | | Repite el método del pedido. **FK compuesta** (`OrderId`, `DeliveryMethod`) → `Orders(Id, DeliveryMethod)` `ON DELETE CASCADE`: la BD garantiza que el envío y el pedido digan lo mismo |
-| `Carrier` | `VARCHAR(20)` | N | | `CK`: `IS NULL OR IN ('Estafeta','DHL Express')` |
+| `DeliveryMethod` | `VARCHAR(12)` | | | Repite el método del pedido. **FK compuesta** (`OrderId`, `DeliveryMethod`) → `Orders(Id, DeliveryMethod)` `ON DELETE NO ACTION`: la BD garantiza que el envío y el pedido digan lo mismo |
+| `Carrier` | `VARCHAR(20)` | N | | `CK`: `IS NULL OR IN ('Estafeta','DHLExpress')` (API: `DHL Express`, §1.6) |
 | `TrackingNumber` | `VARCHAR(30)` | N | | `CK_Shipments_Tracking`: `IS NULL OR (LEN(TrackingNumber) >= 10 AND TrackingNumber NOT LIKE '%[^0-9]%')`, equivalente a `^\d{10,}$` |
 | `CourierUserId` | `INT` | N | | **FK** → `Users(Id)` `ON DELETE NO ACTION`. Repartidor (personal de Operaciones) |
 | `CourierName` | `NVARCHAR(80)` | N | | Copia del nombre |
@@ -586,10 +635,10 @@ CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStat
 | R-05 | Un SKU por combinación pieza-tono-talla | DESIGN §9 | `UQ_ProductVariants_Product_Tone_Size`, `UQ` de `Sku` | Genera el SKU con el formato |
 | R-06 | Formato de SKU `SKK-###-XXX-T` | ADMIN §6.1 | `CK_ProductVariants_SkuFormat` (forma) | Garantiza que corresponda a la pieza, el tono y la talla |
 | R-07 | Stock y apartados nunca negativos; apartado ≤ stock | ADMIN §5.1, §5.3 | `CK` `Stock >= 0`, `Reserved >= 0`, `Reserved <= Stock` | Valida disponible antes de apartar ("No hay pares suficientes") |
-| R-08 | Pedido pagado aparta pares | ADMIN §5.1 | — | `Reserved += qty` en la transacción del checkout |
-| R-09 | Enviar / salir a ruta descuenta stock y escribe "Venta" | ADMIN §5.1 | `CK_InventoryMovements_SaleHasOrder`, `CK` de signo | `Stock -= qty`, `Reserved -= qty`, inserta movimiento, todo en **una transacción** |
-| R-10 | Cancelar libera apartados | ADMIN §5.1 | — | `Reserved -= qty` + historial |
-| R-11 | Transiciones válidas según método de entrega | ADMIN §5.1 | `CK_Orders_StatusMatchesDelivery` (combinaciones imposibles) | Máquina de estados (`nextStatus`, `canCancel`); una tabla de filas sueltas no conoce el estado anterior |
+| R-08 | Pedido pagado aparta pares | ADMIN §5.1 | `CK_ProductVariants_ReservedLeStock` (red de seguridad) | `UPDATE` atómico condicionado por línea en la transacción del checkout (§4.1) |
+| R-09 | Enviar / salir a ruta descuenta stock y escribe "Venta" | ADMIN §5.1 | `CK_InventoryMovements_SaleHasOrder`, `CK` de signo | `Stock -= qty`, `Reserved -= qty` con `OUTPUT inserted.Stock` como `Balance`, inserta movimiento, todo en **una transacción** (§4.1) |
+| R-10 | Cancelar libera apartados | ADMIN §5.1 | — | `Reserved -= qty` atómico + historial (§4.1) |
+| R-11 | Transiciones válidas según método de entrega y pago | ADMIN §5.1 | `CK_Orders_StatusMatchesDelivery`, `CK_Orders_PaymentBeforeFulfillment` (combinaciones imposibles) | Máquina de estados (`nextStatus`, `canCancel`); una tabla de filas sueltas no conoce el estado anterior |
 | R-12 | Paquetería exige paquetería + guía `^\d{10,}$`; local exige repartidor | ADMIN §5.1 | `CK_Shipments_ByMethod`, `CK_Shipments_Tracking`, FK compuesta | Mensajes "Escriba el número de guía…" / "Elija quién lleva el pedido." |
 | R-13 | Total = subtotal + envío | DESIGN §4.4 | `CK_Orders_Total` | **Recalcula todo en el servidor**: nunca confía en totales del cliente |
 | R-14 | Envío: local si el CP está en zona; gratis desde umbral (local solo si `LocalFreeShipping`) | ADMIN §5.2 | `CK` de montos ≥ 0 en `Settings` | `computeShipping` reproducido en C# con pruebas |
@@ -603,8 +652,25 @@ CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStat
 | R-22 | Configuración: montos enteros ≥ 0, umbral > 0, al menos una zona | ADMIN §7 | `CK` de `Settings` | "Al menos un CP" y enteros (la BD admite centavos) |
 | R-23 | Una sola fila de configuración | — | `CK_Settings_Singleton` | — |
 | R-24 | Operaciones no ve montos en pesos | ADMIN §3 | — | Los DTOs de Operaciones omiten montos |
-| R-25 | Concurrencia: dos operadores sobre el mismo pedido o SKU | — | `ROWVERSION` | Captura `DbUpdateConcurrencyException` → `409` con mensaje |
+| R-25 | Concurrencia: dos operadores sobre el mismo pedido o SKU desde el panel | — | `ROWVERSION` | Captura `DbUpdateConcurrencyException` → `409` con mensaje. El checkout y la salida no usan este mecanismo (§4.1) |
 | R-26 | Cliente registrado acepta términos | AUTH §4.3 | `CK_Users_CustomerAcceptedTerms` | Rechaza el registro sin `acceptedTerms` |
+| R-27 | Merma ≤ `Stock − Reserved`; Conteo físico o importación por debajo de `Reserved` se rechaza | ADMIN §5.3, §5.4 | `CK_ProductVariants_ReservedLeStock` (red de seguridad) | Valida antes de escribir y responde `409`/`422` con mensaje claro, **nunca 500** (§3.6). El panel se alinea en un PR aparte del frontend |
+
+### 4.1 Transacciones de inventario y concurrencia
+
+Las operaciones que tocan `Stock`/`Reserved` desde la tienda o al surtir **no** leen la fila, la modifican en memoria y la guardan: cada cambio es un `UPDATE` atómico condicionado, que SQL Server ejecuta con bloqueo de fila. Así dos compras simultáneas del último par no pueden apartarlo las dos, sin reintentos ni `409` por `RowVersion`.
+
+| Operación | Transacción (`READ COMMITTED`) | Si falla |
+|---|---|---|
+| **Apartar** (checkout, `CheckoutOrder`) | Por cada línea, **en orden ascendente de `VariantId`**: `UPDATE ProductVariants SET Reserved = Reserved + @q WHERE Id = @id AND IsActive = 1 AND Stock - Reserved >= @q`, y se verifica `@@ROWCOUNT = 1`. Después se insertan `Orders`, `OrderItems` y, si el pago es con Tarjeta, el hito `Pagado`. | `@@ROWCOUNT = 0` en cualquier línea → `ROLLBACK` y `409` "No hay pares suficientes de {SKU}" |
+| **Surtir** (`Enviado`/`EnRuta`, `FulfillOrder`) | Por línea, en orden ascendente de `VariantId`: `UPDATE … SET Stock = Stock - @q, Reserved = Reserved - @q OUTPUT inserted.Stock WHERE Id = @id AND Reserved >= @q`. El valor de `OUTPUT inserted.Stock` es el `Balance` del movimiento `Venta`. Luego `Shipments`, `Orders.Status` (con `RowVersion`) y `OrderStatusHistory`. | Fila no afectada → `ROLLBACK` y `409` (inconsistencia de apartados; se registra para revisión) |
+| **Cancelar** (`FulfillOrder`) | Por línea, en orden ascendente de `VariantId`: `UPDATE … SET Reserved = Reserved - @q WHERE Id = @id AND Reserved >= @q`; luego estado e historial. | Igual que surtir |
+| **Ajuste manual / importación** (`AdjustInventory`, `ImportInventory`) | Valida R-27; `UPDATE … SET Stock = @nuevo OUTPUT inserted.Stock WHERE Id = @id AND RowVersion = @rv AND @nuevo >= Reserved` e inserta el movimiento con ese `Balance`. | `409` si cambió la fila (otro operador o una venta) o si queda por debajo de lo apartado |
+
+- **Orden de bloqueo:** todas las transacciones que tocan varias variantes las actualizan en orden ascendente de `VariantId`, así dos pedidos con los mismos SKU nunca se esperan en círculo (sin *deadlocks*).
+- **Balance del kárdex:** siempre sale de `OUTPUT inserted.Stock` del mismo `UPDATE`, nunca de una lectura previa; con eso R-19 (último saldo = stock) se mantiene aunque haya ventas y ajustes simultáneos.
+- **`RowVersion`** queda solo para ediciones desde el panel (catálogo, ajustes manuales, transiciones de pedido, configuración). Un `UPDATE` atómico de checkout también cambia el `RowVersion` de la variante, de modo que un ajuste manual abierto sobre ese SKU recibe `409` y se recarga.
+- **EF Core:** estos `UPDATE` se ejecutan con SQL parametrizado dentro de la transacción del `DbContext` (no con el seguimiento de cambios), porque `ExecuteUpdate` no devuelve `OUTPUT`.
 
 ---
 
@@ -754,8 +820,8 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 | Id | Pregunta | Propuesta en este documento | Alternativa |
 |---|---|---|---|
 | **P-01** | `hola@sokko.mx` es cliente demo en la tienda **y** Dueño en el panel. Con `Email UNIQUE` y un solo rol, ¿cómo se resuelve? | Una sola fila con `Role = 'Owner'`. El login de la tienda acepta cualquier usuario activo (el Dueño también puede comprar) y el del panel exige `Owner` u `Operations` | (a) `Roles` + `UserRoles` (multi-rol), (b) cambiar el correo del cliente demo |
-| **P-02** | Valores de enums: ¿español PascalCase (`PorPreparar`, `EnRuta`) o los códigos del frontend (`por_preparar`, `en_ruta`)? | Español PascalCase en BD; el DTO traduce a los códigos actuales del panel para no tocar el frontend | Guardar los códigos del frontend tal cual |
-| **P-03** | OXXO Pay: ¿el pedido se crea `PorPreparar` con `PaymentStatus = 'Pendiente'` y **aparta** pares desde ese momento? ¿Vence? | Sí aparta (evita sobreventa) y se agrega `PaymentStatus`. Un trabajo posterior cancela los OXXO no pagados en 72 h y libera los pares | Apartar solo al confirmar el pago (riesgo de sobreventa) |
+| **P-02** | Valores de enums: ¿español PascalCase (`PorPreparar`, `EnRuta`) o los códigos del frontend (`por_preparar`, `en_ruta`)? | ✅ Aceptada en revisión: PascalCase sin espacios en BD; equivalencias y conversión en §1.6 | Guardar los códigos del frontend tal cual |
+| **P-03** | OXXO Pay: ¿el pedido se crea `PorPreparar` con `PaymentStatus = 'Pendiente'` y **aparta** pares desde ese momento? ¿Vence? | Sí aparta (evita sobreventa) y se agrega `PaymentStatus`; `CK_Orders_PaymentBeforeFulfillment` impide surtirlo sin pago. Un trabajo posterior cancela los OXXO no pagados en 72 h y libera los pares (**pendiente de confirmar con el cliente**) | Apartar solo al confirmar el pago (riesgo de sobreventa) |
 | **P-04** | ¿Se agrega un 7.º estado `PendientePago` en lugar de `PaymentStatus`? | No: se respetan los 6 estados del panel y el pago va en su propia columna | Estado extra (cambia el panel) |
 | **P-05** | Datos de envío: ninguna pantalla de checkout los define aún. ¿Basta con calle, colonia, ciudad, estado, CP, referencias y teléfono? | Sí (mínimo de Estafeta/DHL) | Separar número exterior/interior |
 | **P-06** | La zona `81300–81399` está "por confirmar". ¿Aplica ya la tarifa local o no? | Sí aplica (igual que el panel hoy); `IsConfirmed = 0` solo es informativo | Que `IsConfirmed = 0` no cuente como local |
@@ -779,9 +845,9 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-02 | 2026-10-21 | Dinero en `DECIMAL(10,2)` | Exactitud decimal; `FLOAT` introduce error binario y `MONEY` redondea en divisiones y es exclusivo de SQL Server | `FLOAT`, `MONEY`, centavos en `INT` (obliga a convertir en todas las capas) | Propuesta |
 | D-03 | 2026-10-21 | Fechas `DATETIME2(3)` en UTC con `SYSUTCDATETIME()`; zona del negocio `America/Mazatlan` en .NET | Sin ambigüedad ni horario de verano; los rangos "Hoy/7d/30d" se calculan en la zona del cliente | `DATETIME` (precisión 3.33 ms, rango menor), `DATETIMEOFFSET` (más bytes; el offset no aporta con un solo negocio), hora local | Propuesta |
 | D-04 | 2026-10-21 | Enums de flujo como `VARCHAR + CHECK`; `Tones` y `Sizes` como tablas catálogo | Los enums dependen de código; tonos y tallas los administra el negocio y tienen atributos | Todo como tablas catálogo (JOINs sin beneficio) o todo como `CHECK` (no cumple `DESIGN` §9) | Propuesta |
-| D-05 | 2026-10-21 | Valores de enums en español ASCII PascalCase; roles en inglés | Vocabulario del cliente y del contrato de autorización; sin acentos para evitar problemas de intercalación y de mapeo | Ver P-02 | Por validar |
+| D-05 | 2026-10-21 | Valores de enums en español ASCII PascalCase sin espacios; roles en inglés; tabla de equivalencias BD ↔ API ↔ UI (§1.6) | Vocabulario del cliente y del contrato de autorización; sin acentos ni espacios para evitar problemas de intercalación y de mapeo (`DHL Express` → `DHLExpress`) | Ver P-02 | **Cambiada** (rev. 0.2: §1.6 y `DHLExpress`) |
 | D-06 | 2026-10-21 | `Users.Role` (columna) en lugar de `Roles` + `UserRoles` | Un rol por persona en v1; menos tablas y JOINs en el login | `UserRoles` (queda como evolución para P2) | Por validar (P-01) |
-| D-07 | 2026-10-21 | Borrado lógico (`IsActive`) y FK `NO ACTION` salvo dependientes puros con `CASCADE` | Historia contable intacta y sin rutas de cascada múltiples en SQL Server | `CASCADE` generalizado (borra pedidos al borrar un usuario y SQL Server lo rechaza por ciclos) | Propuesta |
+| D-07 | 2026-10-21 | Borrado lógico (`IsActive`) y **todas** las FK `NO ACTION`; `CASCADE` solo en `PasswordResetTokens`; `OnDelete(DeleteBehavior.NoAction)` explícito en EF | Historia contable intacta: un `DELETE` accidental falla en lugar de borrar líneas, historial o envío; sin rutas de cascada múltiples | `CASCADE` en dependientes de `Orders` (versión 0.1) | **Cambiada** (rev. 0.2) |
 | D-08 | 2026-10-21 | Folio por `SEQUENCE` + columna calculada persistida `SKK-####` | Folio legible, único y separado de la PK interna; disponible antes del INSERT | Folio = `Id` (expone la PK), generarlo en .NET con `MAX()+1` (condición de carrera) | Propuesta |
 | D-09 | 2026-10-21 | Copia de datos del cliente y de envío en `Orders`; `UserId` opcional | Soporta invitados y preserva el documento histórico | Tabla `Addresses` referenciada (pierde historia al editar) | Propuesta |
 | D-10 | 2026-10-21 | Precio histórico y copias (nombre, SKU, tono, talla) en `OrderItems` | El pedido no cambia si cambia el catálogo | Leer siempre de `Products` (reescribe la historia) | Propuesta |
@@ -789,10 +855,10 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-12 | 2026-10-21 | Kárdex de solo inserción con delta firmado, saldo y CHECKs por tipo | Trazabilidad completa; correcciones por movimiento compensatorio | Permitir editar movimientos (pierde auditoría) | Propuesta |
 | D-13 | 2026-10-21 | `Shipments` 1:1 con FK compuesta (`OrderId`, `DeliveryMethod`) y CHECK por método | La BD impide guía en entregas locales o repartidor en paquetería; lista para varios envíos | Columnas en `Orders` (mezcla comercial y logística) | Propuesta |
 | D-14 | 2026-10-21 | Costo de envío solo en `Orders.ShippingCost` | Una sola fuente del total; existe antes del envío | Duplicarlo en `Shipments` (sugerido en ADMIN §9) | Por validar (P-09) |
-| D-15 | 2026-10-21 | `PaymentStatus`, `PaidAt` y `PaymentReference` en `Orders` | OXXO Pay paga después; el panel necesita "OXXO pendiente" sin inventar un 7.º estado | Estado `PendientePago`, tabla `Payments` (prematura con pago simulado) | Por validar (P-03, P-04) |
+| D-15 | 2026-10-21 | `PaymentStatus`, `PaidAt` y `PaymentReference` en `Orders`; `CK_Orders_PaymentBeforeFulfillment`; hito `Pagado` al registrar `PaidAt` | OXXO Pay paga después; el panel necesita "OXXO pendiente" sin inventar un 7.º estado, y un pedido sin pago no se surte | Estado `PendientePago`, tabla `Payments` (prematura con pago simulado) | **Cambiada** (rev. 0.2: CHECK e hito); P-03 por confirmar con el cliente |
 | D-16 | 2026-10-21 | `Settings` como fila única tipada con `CHECK Id = 1` | Tipos y CHECK por parámetro; mapeo directo a una clase | Clave-valor (`NVARCHAR` sin validación) | Propuesta |
 | D-17 | 2026-10-21 | Zonas locales como rangos `CHAR(5)` (`From`, `To`) con `IsConfirmed` | Consulta con `BETWEEN`, CP con cero inicial, marca de "por confirmar" | Texto `"81200–81299"` (no consultable), `INT` (pierde el cero inicial) | Propuesta |
-| D-18 | 2026-10-21 | `ROWVERSION` en `ProductVariants`, `Orders` y `Settings` | Varios operadores editan a la vez; concurrencia optimista nativa en EF Core | Bloqueo pesimista | Propuesta |
+| D-18 | 2026-10-21 | `ROWVERSION` en `ProductVariants`, `Orders` y `Settings` solo para ediciones del panel; apartar, surtir y cancelar con `UPDATE` atómico condicionado, orden ascendente de `VariantId` y `OUTPUT inserted.Stock` (§4.1) | Sin sobreventa ni *deadlocks* en el checkout y sin `409` por contención; el saldo del kárdex sale del mismo `UPDATE` | `RowVersion` en el checkout (409 con SKU muy pedidos), bloqueo pesimista con lectura previa | **Cambiada** (rev. 0.2) |
 | D-19 | 2026-10-21 | `TaxRate` copiado y `TaxIncluded` calculado en `Orders` | El reporte de IVA del contador no cambia si cambia la tasa | Recalcular con la tasa vigente | Propuesta |
 | D-20 | 2026-10-21 | `Tones.SkuCode` explícito en lugar de derivar las 3 letras del código | El SKU sigue siendo único aunque llegue un tono con el mismo prefijo | Derivar con `LEFT(Code,3)` (como `skuOf` del panel hoy) | Propuesta |
 | D-21 | 2026-10-21 | Semilla con `Products.Id = PieceNumber` y stock por talla repartido desde el mock | Coincidencia con los datos que ya ven la tienda y el panel | Ids nuevos (rompe enlaces y pruebas) | Por validar (P-07) |
@@ -803,5 +869,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | Versión | Fecha | Rama | Autor | Cambio |
 |---|---|---|---|---|
 | 0.1 | 2026-10-21 | `sokko/db-schema` | Equipo backend (NEXUS CODE) | Propuesta inicial: ER, 13 tablas, reglas BD vs. servicios, semilla, mapa SOA, puntos abiertos P-01…P-11 y decisiones D-01…D-22 |
+| 0.2 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Hallazgos 🟡 de la revisión del PR #4: R-27 (Merma y conteo frente a lo apartado), §4.1 transacciones y concurrencia, `NO ACTION` en todas las FK salvo `PasswordResetTokens`, §1.6 equivalencias de enums (`DHLExpress`), `CK_Orders_PaymentBeforeFulfillment` e hito `Pagado` al registrar `PaidAt` |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.
