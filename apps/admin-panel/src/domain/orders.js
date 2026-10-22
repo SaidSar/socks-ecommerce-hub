@@ -119,6 +119,19 @@ export function advance(order, payload, by, at) {
   return { order: { ...order, ...patch, history: [...order.history, { status, at, by }] }, error: '' }
 }
 
+/**
+ * Confirma el pago de un pedido pendiente: paymentStatus = pagado, paidAt = at y hito "Pagado" en el historial.
+ * Devuelve `{ order, error }`; con error, `order` es el original.
+ */
+export function markPaid(order, by, at) {
+  if (order.status === 'cancelado') return { order, error: 'Un pedido cancelado no se puede marcar como pagado.' }
+  if (!isPaymentPending(order)) return { order, error: 'Este pedido ya está pagado.' }
+  return {
+    order: { ...order, paymentStatus: 'pagado', paidAt: at, history: [...order.history, { status: 'pagado', at, by }] },
+    error: '',
+  }
+}
+
 /** Cancela si el estado lo permite. */
 export function cancel(order, by, at) {
   if (!canCancel(order)) return { order, error: 'Solo se cancelan pedidos por preparar o en preparación.' }

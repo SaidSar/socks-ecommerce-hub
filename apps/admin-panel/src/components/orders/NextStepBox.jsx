@@ -3,12 +3,14 @@ import { CARRIER_LABELS, label } from '../../domain/enums'
 import { CARRIERS, isPaymentPending, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, validateAdvance } from '../../domain/orders'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
+import MarkPaid from './MarkPaid'
 
 /**
  * Siguiente paso del pedido (DESIGN_ADMIN.md §5.1): paquetería + guía para enviar, repartidor para salir a ruta.
  * `onAdvance(payload)` llama a la API; los errores de validación se muestran junto al campo.
+ * Con pago pendiente, el Dueño puede confirmarlo con `onMarkPaid()`.
  */
-export default function NextStepBox({ order, couriers, onAdvance }) {
+export default function NextStepBox({ order, couriers, onAdvance, onMarkPaid }) {
   const [carrier, setCarrier] = useState(order.carrier || CARRIERS[0])
   const [courier, setCourier] = useState(order.courier || couriers[0] || '')
   const [tracking, setTracking] = useState(order.tracking || '')
@@ -134,6 +136,7 @@ export default function NextStepBox({ order, couriers, onAdvance }) {
           {PAYMENT_PENDING_ERROR}
         </p>
       )}
+      {unpaid && onMarkPaid && <MarkPaid order={order} onMarkPaid={onMarkPaid} />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advance, canCancel, cancel, isLate, matchesFilter, matchesQuery, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, TRACKING_ERROR, validateAdvance, validateTracking } from './orders'
+import { advance, canCancel, cancel, isLate, markPaid, matchesFilter, matchesQuery, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, TRACKING_ERROR, validateAdvance, validateTracking } from './orders'
 
 const NOW = new Date(2026, 9, 18, 9, 30)
 const hoursAgo = (h) => new Date(NOW.getTime() - h * 3600e3).toISOString()
@@ -128,5 +128,27 @@ describe('pago antes de surtir (CK_Orders_PaymentBeforeFulfillment)', () => {
   })
   it('pagado avanza normal', () => {
     expect(validateAdvance(order({ pay: 'oxxo_pay', paymentStatus: 'pagado' }))).toBe('')
+  })
+})
+
+describe('marcar como pagado', () => {
+  const unpaid = () => order({ pay: 'oxxo_pay', paymentStatus: 'pendiente', history: [{ status: 'por_preparar', at: hoursAgo(3), by: 'Tienda en línea' }] })
+
+  it('registra el pago, agrega el hito al final y desbloquea el avance', () => {
+    const at = NOW.toISOString()
+    const { order: o, error } = markPaid(unpaid(), 'Aiko M.', at)
+    expect(error).toBe('')
+    expect(o).toMatchObject({ paymentStatus: 'pagado', paidAt: at })
+    expect(o.history.map((h) => h.status)).toEqual(['por_preparar', 'pagado'])
+    expect(o.history.at(-1)).toEqual({ status: 'pagado', at, by: 'Aiko M.' })
+    expect(validateAdvance(o)).toBe('')
+  })
+
+  it('no se marca uno ya pagado ni uno cancelado', () => {
+    expect(markPaid(order(), 'Aiko M.', NOW.toISOString()).error).toBe('Este pedido ya está pagado.')
+    const cancelled = { ...unpaid(), status: 'cancelado' }
+    const res = markPaid(cancelled, 'Aiko M.', NOW.toISOString())
+    expect(res.error).toBe('Un pedido cancelado no se puede marcar como pagado.')
+    expect(res.order).toBe(cancelled)
   })
 })

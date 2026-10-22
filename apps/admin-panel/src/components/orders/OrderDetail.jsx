@@ -63,7 +63,13 @@ function OrderBody({ order, showMoney, now, couriers }) {
   return (
     <div className="px-5 py-5 space-y-6">
       {order.status !== 'cancelado' && (
-        <NextStepBox key={order.status} order={order} couriers={couriers} onAdvance={(payload) => api.advanceOrder(order.id, payload)} />
+        <NextStepBox
+          key={order.status}
+          order={order}
+          couriers={couriers}
+          onAdvance={(payload) => api.advanceOrder(order.id, payload)}
+          onMarkPaid={() => api.markOrderPaid(order.id)}
+        />
       )}
 
       <section aria-labelledby="items-title">

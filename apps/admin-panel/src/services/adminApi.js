@@ -5,7 +5,7 @@ import { can } from '../config/roles'
 import { buildDashboard } from '../domain/dashboard'
 import { buildTemplate, previewCsv } from '../domain/importCsv'
 import { applyInitial, applyMovement, applySale, available, matchesStockFilter, release, sortMovements, stockState, STOCK_FILTERS } from '../domain/inventory'
-import { advance, cancel, countByFilter, isLate, matchesFilter, matchesQuery } from '../domain/orders'
+import { advance, cancel, countByFilter, isLate, markPaid, matchesFilter, matchesQuery } from '../domain/orders'
 import { computeShipping, formatZone, validateZone } from '../domain/shipping'
 import { normalize } from '../utils/format'
 import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES, TONES } from '../data/seed'
@@ -145,6 +145,21 @@ export async function advanceOrder(id, payload, user) {
       db().movements.push(res.movement)
     })
   }
+  replaceOrder(order)
+  save()
+  return copy(redactOrder(order, user?.role))
+}
+
+/**
+ * Marca como pagado un pedido con pago pendiente (OXXO Pay). Solo el Dueño.
+ * TODO(api): POST /api/admin/orders/{folio}/payment. En producción el pago lo confirma el webhook de la pasarela
+ * (OXXO Pay avisa al servidor cuando el cliente paga), no una persona; este botón queda solo como respaldo manual.
+ */
+export async function markOrderPaid(id, user) {
+  await latency()
+  if (!can(user?.role, 'payments.confirm')) throw new ApiError('Solo el Dueño puede confirmar pagos.', 403)
+  const { order, error } = markPaid(findOrder(id), by(user), stamp())
+  if (error) throw new ApiError(error, 409)
   replaceOrder(order)
   save()
   return copy(redactOrder(order, user?.role))

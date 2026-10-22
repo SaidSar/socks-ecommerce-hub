@@ -158,6 +158,38 @@ describe('efecto de los pedidos en inventario', () => {
   })
 })
 
+describe('marcar como pagado', () => {
+  it('el Dueño confirma un OXXO pendiente; el historial queda en orden y ya puede pasar a preparando', async () => {
+    const { orders } = await api.getOrders({ filter: 'oxxo' }, 'dueno')
+    const o = orders[0]
+    await expect(api.advanceOrder(o.id, {}, OWNER)).rejects.toThrow('pendiente')
+    const paid = await api.markOrderPaid(o.id, OWNER)
+    expect(paid).toMatchObject({ paymentStatus: 'pagado', paidAt: expect.any(String) })
+    expect(paid.history.map((h) => h.status)).toEqual(['por_preparar', 'pagado'])
+    const times = paid.history.map((h) => new Date(h.at).getTime())
+    expect(times).toEqual([...times].sort((a, b) => a - b))
+    expect(paid.history.at(-1)).toMatchObject({ at: paid.paidAt, by: 'Aiko M.' })
+    const next = await api.advanceOrder(o.id, {}, OWNER)
+    expect(next.status).toBe('preparando')
+    expect(next.history.map((h) => h.status)).toEqual(['por_preparar', 'pagado', 'preparando'])
+    expect((await api.getOrders({ filter: 'oxxo' }, 'dueno')).orders.some((x) => x.id === o.id)).toBe(false)
+  })
+
+  it('Operaciones recibe 403 y el pedido no cambia', async () => {
+    const [o] = (await api.getOrders({ filter: 'oxxo' }, 'operaciones')).orders
+    await expect(api.markOrderPaid(o.id, OPS)).rejects.toMatchObject({ status: 403 })
+    expect((await api.getOrder(o.id, 'dueno')).paymentStatus).toBe('pendiente')
+  })
+
+  it('no se marca uno ya pagado ni uno cancelado', async () => {
+    const { orders } = await api.getOrders({}, 'dueno')
+    const paid = orders.find((x) => x.paymentStatus === 'pagado')
+    await expect(api.markOrderPaid(paid.id, OWNER)).rejects.toMatchObject({ status: 409 })
+    const cancelled = orders.find((x) => x.status === 'cancelado' && x.paymentStatus === 'pendiente')
+    await expect(api.markOrderPaid(cancelled.id, OWNER)).rejects.toMatchObject({ status: 409 })
+  })
+})
+
 describe('movimientos con folio', () => {
   it('una devolución exige un pedido existente y queda ligada a él', async () => {
     const { rows } = await api.getInventory()
