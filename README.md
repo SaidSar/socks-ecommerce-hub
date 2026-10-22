@@ -106,6 +106,30 @@ cd apps/admin-panel && npm run build
 cd apps/api-service && dotnet build
 ```
 
+## CI
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) corre en cada PR hacia `main` y en cada push a `main`. Un push nuevo al mismo PR cancela la ejecución anterior.
+
+| Job | Corre si cambió… | Pasos |
+|---|---|---|
+| `changes` | siempre | Detecta qué apps cambiaron (`dorny/paths-filter`) |
+| `web-store` | `apps/web-store/**` o el workflow | Node LTS · `npm ci` · `npm run lint` · `npm test` · `npm run build` |
+| `admin-panel` | `apps/admin-panel/**` o el workflow | Node LTS · `npm ci` · `npm run lint` · `npm test` · `npm run build` |
+| `api-service` | `apps/api-service/**`, `docs/design/DESIGN_DB.md` o el workflow | .NET 10 · `dotnet restore` · `dotnet build -c Release` · `dotnet test` (solo si existe `apps/api-service.Tests`) |
+
+Un job que no aplica queda como *skipped*, y GitHub lo cuenta como exitoso, así que no bloquea el merge. Para correr lo mismo en local:
+
+```bash
+# Tienda
+cd apps/web-store && npm ci && npm run lint && npm test && npm run build
+
+# Panel administrativo
+cd apps/admin-panel && npm ci && npm run lint && npm test && npm run build
+
+# Backend
+cd apps/api-service && dotnet restore Sokko.Api.csproj && dotnet build Sokko.Api.csproj --no-restore -c Release
+```
+
 ## Endpoints
 
 | Método | Ruta          | Descripción                         |

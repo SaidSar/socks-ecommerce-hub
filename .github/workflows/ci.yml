@@ -1,0 +1,115 @@
+# CI del monorepo SOKKO: lint, test y build por app.
+# Cada job corre solo si cambió su app o este workflow (job "changes"); un job saltado
+# cuenta como exitoso, así que no bloquea el merge si se marca como check requerido.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Mínimo privilegio: solo lectura del código.
+permissions:
+  contents: read
+
+# Un push nuevo al mismo PR (o a main) cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter lista los archivos del PR con la API
+    outputs:
+      web-store: ${{ steps.filter.outputs.web-store }}
+      admin-panel: ${{ steps.filter.outputs.admin-panel }}
+      api-service: ${{ steps.filter.outputs.api-service }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            web-store:
+              - 'apps/web-store/**'
+              - '.github/workflows/ci.yml'
+            admin-panel:
+              - 'apps/admin-panel/**'
+              - '.github/workflows/ci.yml'
+            api-service:
+              - 'apps/api-service/**'
+              - 'apps/api-service.Tests/**'
+              - 'docs/design/DESIGN_DB.md'
+              - '.github/workflows/ci.yml'
+
+  web-store:
+    name: web-store
+    needs: changes
+    if: needs.changes.outputs.web-store == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web-store
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # Sin .nvmrc ni "engines": Node LTS (Vite 8 pide Node 20.19+ o 22.12+).
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: apps/web-store/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - name: npm test
+        run: |
+          if npm pkg get scripts.test | grep -qv '{}'; then npm test; else echo "Sin script test: se omite."; fi
+      - run: npm run build
+
+  admin-panel:
+    name: admin-panel
+    needs: changes
+    if: needs.changes.outputs.admin-panel == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin-panel
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: apps/admin-panel/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - name: npm test
+        run: |
+          if npm pkg get scripts.test | grep -qv '{}'; then npm test; else echo "Sin script test: se omite."; fi
+      - run: npm run build
+
+  api-service:
+    name: api-service
+    needs: changes
+    if: needs.changes.outputs.api-service == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api-service
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          # TargetFramework de Sokko.Api.csproj: net10.0
+          dotnet-version: 10.0.x
+      # Se nombra el .csproj porque la carpeta también tiene un .slnx.
+      - run: dotnet restore Sokko.Api.csproj
+      - run: dotnet build Sokko.Api.csproj --no-restore -c Release
+      - name: dotnet test
+        if: hashFiles('apps/api-service.Tests/*.csproj') != ''
+        working-directory: apps/api-service.Tests
+        run: dotnet test -c Release
