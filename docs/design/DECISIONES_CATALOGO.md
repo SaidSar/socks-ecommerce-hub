@@ -45,14 +45,16 @@
 | T-12 | `ProductVariants.Barcode VARCHAR(32) NULL UNIQUE` (código de barras o UPC del proveedor). | Las marcas traen código de barras; facilita inventario y búsqueda. |
 | T-13 | **Paquetes armados** (por ejemplo, gorro + bufanda + calcetas): **fuera de v1.** | El cliente no lo pidió; se puede agregar después como `Bundles`. |
 
+> **Ajustes de la revisión (Said, `DESIGN_DB` v0.4.2):** T-06 y T-07 usan una **ventana anual recurrente** (`StartMonth`, `StartDay`, `EndMonth`, `EndDay`, inclusiva, puede cruzar de año) en lugar de `StartsAt`/`EndsAt` con fechas fijas, para que Navidad y Halloween no se capturen cada año. Los productos licenciados usan como marca la licencia y los genéricos la marca "Sin marca" (P-15). El precio efectivo es una capacidad de `CatalogService` (P-17).
+
 ## 5. Impacto por componente
 
 ### Base de datos (Carlos)
 - **Nuevas:** `Brands`, `ProductTypes`, `Collections`.
-- **Cambian:** `Products` (Line, BrandId, ProductTypeId, CollectionId, UnitsPerPack), `Sizes` (SizeSystem), `Tones → Colors`, `ProductVariants` (UnitCost, Barcode, CHECK del SKU).
+- **Cambian:** `Products` (Line, BrandId, ProductTypeId, CollectionId, UnitsPerPack), `Sizes` (SizeSystem), `Tones → Colors`, `ProductVariants` (UnitCost, Barcode, CHECK del SKU) y `Users` (`PreferredSizeCode` → `PreferredSizeId`, porque el código de talla deja de ser único con las tallas por sistema; la API no cambia. `DESIGN_DB` P-16).
 - **Reglas nuevas:** R-28 (visibilidad por temporada), R-29 (precio fuera de temporada), R-30 (costo solo para el Dueño).
 - **Semillas:** se conservan las 6 piezas SOKKO. Se agregan como ejemplo 2 de Marcas (una de ellas un paquete de 3), 3 Especiales (Navidad, Halloween y una temática) y 3 Accesorios (gorro, guantes, lentes), con colecciones y fechas.
-- **Sin cambios:** Users, PasswordResetTokens, Orders, OrderItems, OrderStatusHistory, Shipments, Settings, LocalDeliveryZones, InventoryMovements (solo cambia la etiqueta de unidad).
+- **Sin cambios:** PasswordResetTokens, Orders, OrderItems, OrderStatusHistory, Shipments, Settings, LocalDeliveryZones, InventoryMovements (solo cambia la etiqueta de unidad).
 
 ### API
 - `GET /api/products`: filtros `line`, `brand`, `type`, `collection`; aplica R-28.
