@@ -7,7 +7,12 @@ export const PERMISSIONS = [
   'inventory.adjust',
   'inventory.import',
   'settings.manage',
-  'catalog.manage',
+  'catalog.view',
+  'catalog.edit',
+  'brands.edit',
+  'collections.edit',
+  'types.edit',
+  'costs.view',
   'customers.view',
   'finance.view',
   'promotions.manage',
@@ -17,7 +22,8 @@ export const PERMISSIONS = [
 
 export const ROLES = {
   dueno: { label: 'Dueño', permissions: PERMISSIONS },
-  operaciones: { label: 'Operaciones', permissions: ['orders.manage', 'inventory.adjust', 'shipping.view'] },
+  // Catálogo (DESIGN_CATALOG_UI.md §4.1): Operaciones lo consulta; editar y ver costos es solo del Dueño.
+  operaciones: { label: 'Operaciones', permissions: ['orders.manage', 'inventory.adjust', 'shipping.view', 'catalog.view'] },
 }
 
 /** ¿El rol tiene el permiso? `null` como permiso = libre para cualquier rol con sesión. */

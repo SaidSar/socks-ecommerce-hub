@@ -2,13 +2,17 @@
 // Estado en memoria persistido en localStorage; si el almacenamiento falla, se trabaja solo en memoria.
 // Cada función devuelve copias: los componentes nunca mutan el estado ni ven seed.js.
 import { can } from '../config/roles'
+import { brandMargins, grossMargin, lineStats, productDto, seasonStatus, skuOf, validateCollection, validateProduct } from '../domain/catalog'
 import { buildDashboard } from '../domain/dashboard'
+import { LINES } from '../domain/enums'
 import { buildTemplate, previewCsv } from '../domain/importCsv'
 import { applyInitial, applyMovement, applySale, available, matchesStockFilter, release, sortMovements, stockState, STOCK_FILTERS } from '../domain/inventory'
 import { advance, cancel, countByFilter, isLate, markPaid, matchesFilter, matchesQuery } from '../domain/orders'
 import { computeShipping, formatZone, validateZone } from '../domain/shipping'
+import { localDate } from '../domain/season'
 import { normalize } from '../utils/format'
-import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES, TONES } from '../data/seed'
+import { COLORS } from '../data/catalogSeed'
+import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
 
 export const STORAGE_KEY = 'sokko.admin.data.v1'
@@ -58,8 +62,9 @@ const stamp = () => {
 
 const by = (user) => shortName(user?.name ?? 'Sistema')
 
-// El servidor manda el nombre y color del tono junto con cada SKU.
-const withTone = (x) => ({ ...x, toneName: TONES[x.tone]?.name ?? x.tone, toneHex: TONES[x.tone]?.hex ?? '#ccc' })
+// El servidor manda el nombre y color del tono junto con cada SKU (tonos Kyoto y colores de las demás líneas).
+const colorOf = (apiCode) => COLORS.find((c) => c.apiCode === apiCode)
+const withTone = (x) => ({ ...x, toneName: colorOf(x.tone)?.name ?? x.tone, toneHex: colorOf(x.tone)?.hex ?? '#ccc' })
 
 // Sin `money.view` el servidor no manda importes (Operaciones).
 function redactOrder(order, role) {
@@ -199,7 +204,7 @@ export async function getInventory({ filter = 'todos', q = '' } = {}) {
   const few = settings.fewUnitsThreshold
   const rows = inventory.map((r) => decorate(r, few, pieces))
   const term = normalize(q)
-  const list = rows.filter((r) => matchesStockFilter(r, filter, few) && (!term || normalize(`${r.sku} ${r.piece} ${TONES[r.tone].name}`).includes(term)))
+  const list = rows.filter((r) => matchesStockFilter(r, filter, few) && (!term || normalize(`${r.sku} ${r.piece} ${colorOf(r.tone)?.name ?? r.tone}`).includes(term)))
   const counts = Object.fromEntries(STOCK_FILTERS.map((f) => [f.key, rows.filter((r) => matchesStockFilter(r, f.key, few)).length]))
   const totals = {
     units: rows.reduce((a, r) => a + r.stock, 0),
@@ -269,7 +274,200 @@ export async function applyImport(rows, user) {
 /** CSV con los SKU actuales y su stock. */
 export async function getTemplateCsv() {
   await latency()
-  return buildTemplate(db().inventory, (t) => TONES[t]?.name ?? t)
+  return buildTemplate(db().inventory, (t) => colorOf(t)?.name ?? t)
+}
+
+// ---------------------------------------------------------------- Catálogo (DESIGN_CATALOG_UI.md §4)
+
+const catalogToday = () => localDate(refNow())
+
+function forbidden(user, permission, message) {
+  if (!can(user?.role, permission)) throw new ApiError(message, 403)
+}
+
+function invalid(errors) {
+  const err = new ApiError('Revisa los campos marcados.', 422)
+  err.errors = errors
+  return err
+}
+
+/** DTO de cada producto para el rol: unitCost y margin solo con `costs.view` (§2.2). */
+function catalogProducts(role) {
+  const { catalog, inventory } = db()
+  const today = catalogToday()
+  const canSeeCosts = can(role, 'costs.view')
+  return catalog.products.map((p) => {
+    const type = catalog.types.find((t) => t.code === p.type)
+    return productDto(p, {
+      brand: catalog.brands.find((b) => b.slug === p.brand),
+      type,
+      collection: catalog.collections.find((c) => c.slug === p.collection),
+      colors: catalog.colors,
+      sizes: catalog.sizes[type.sizeSystem],
+      inventory,
+      today,
+      canSeeCosts,
+    })
+  })
+}
+
+/** Todo el catálogo para las pantallas de Productos, Marcas, Colecciones y Tipos. TODO(api): GET /api/admin/catalog */
+export async function getCatalog(role) {
+  await latency()
+  const { catalog } = db()
+  const today = catalogToday()
+  const products = catalogProducts(role)
+  return copy({
+    today,
+    products,
+    brands: catalog.brands.map((b) => {
+      const ps = products.filter((p) => p.brand.slug === b.slug)
+      return { ...b, products: ps.length, lines: LINES.filter((l) => ps.some((p) => p.line === l)) }
+    }),
+    collections: catalog.collections.map((c) => ({
+      ...c,
+      status: seasonStatus(c, today),
+      products: products.filter((p) => p.collection?.slug === c.slug).map(({ slug, name, price, offSeasonPrice }) => ({ slug, name, price, offSeasonPrice })),
+    })),
+    types: catalog.types.map((t) => ({ ...t, sizes: catalog.sizes[t.sizeSystem], products: products.filter((p) => p.type.code === t.code).length })),
+    sizes: catalog.sizes,
+    colors: catalog.colors,
+  })
+}
+
+/** Resumen por línea y temporadas para el Dashboard (§4.2). Los importes y el margen solo para el Dueño. */
+export async function getCatalogSummary(role) {
+  await latency()
+  const { catalog, settings } = db()
+  const today = catalogToday()
+  const products = catalogProducts(role)
+  const owner = can(role, 'costs.view')
+  const lines = lineStats(products, LINES)
+  return copy({
+    lines: owner ? lines : lines.map(({ line, units }) => ({ line, units })),
+    grossMargin: owner ? grossMargin(products) : null,
+    brands: owner ? brandMargins(products) : null,
+    unitsSold: products.reduce((a, p) => a + p.sold, 0),
+    fewUnits: products.filter((p) => p.stock <= settings.fewUnitsThreshold).map(({ slug, name, stock }) => ({ slug, name, stock })),
+    seasons: catalog.collections
+      .filter((c) => c.kind === 'temporada')
+      .map((c) => ({
+        ...c,
+        status: seasonStatus(c, today),
+        stock: products.filter((p) => p.collection?.slug === c.slug).reduce((a, p) => a + p.stock, 0),
+      })),
+  })
+}
+
+const slugify = (s) =>
+  normalize(s)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+/**
+ * Alta o edición de producto (§4.3). 403 sin `catalog.edit`; 422 con `errors` por campo (R-30, R-31, R-32, código de barras).
+ * Las variantes nuevas (color × talla) entran al inventario con stock 0: el stock se ajusta en Inventario.
+ * TODO(api): POST/PUT /api/admin/products
+ */
+export async function saveProduct(form, user) {
+  await latency()
+  forbidden(user, 'catalog.edit', 'Solo el Dueño puede editar productos.')
+  const { catalog, inventory } = db()
+  const existing = catalog.products.find((p) => p.slug === form.slug)
+  const type = catalog.types.find((t) => t.code === form.type)
+  const line = existing?.line ?? form.line
+  const pieceNumber = existing?.pieceNumber ?? Math.max(0, ...catalog.products.filter((p) => p.line === line).map((p) => p.pieceNumber)) + 1
+  const sizes = catalog.sizes[type.sizeSystem]
+  const skus = form.colors.flatMap((c) => sizes.map((s) => skuOf(line, pieceNumber, c, s.code)))
+  const barcodes = Object.fromEntries(Object.entries(form.barcodes ?? {}).filter(([sku, code]) => skus.includes(sku) && String(code ?? '').trim()))
+  const barcodeOwners = {}
+  catalog.products
+    .filter((p) => p.slug !== existing?.slug)
+    .forEach((p) => Object.entries(p.barcodes ?? {}).forEach(([sku, code]) => (barcodeOwners[code] = sku)))
+  const errors = validateProduct({ ...form, line, barcodes }, { brands: catalog.brands, colors: catalog.colors, barcodeOwners })
+  if (Object.keys(errors).length) throw invalid(errors)
+
+  const keepCost = !can(user?.role, 'costs.view')
+  const product = {
+    ...(existing ?? { slug: slugify(form.name), art: 'crew', note: '', sold: 0, stock: 0 }),
+    line,
+    pieceNumber,
+    name: form.name.trim(),
+    brand: form.brand,
+    type: form.type,
+    collection: line === 'especiales' || form.collection ? form.collection || null : null,
+    unitsPerPack: Math.max(1, Number(form.unitsPerPack) || 1),
+    price: Number(form.price),
+    unitCost: keepCost ? (existing?.unitCost ?? null) : form.unitCost === '' || form.unitCost == null ? null : Number(form.unitCost),
+    colors: [...form.colors],
+    barcodes,
+  }
+  if (!existing && catalog.products.some((p) => p.slug === product.slug)) product.slug = `${product.slug}-${pieceNumber}`
+  catalog.products = existing ? catalog.products.map((p) => (p.slug === existing.slug ? product : p)) : [...catalog.products, product]
+  const unit = type.unit === 'par' && product.unitsPerPack === 1 ? 'par' : 'unidad'
+  form.colors.forEach((c) =>
+    sizes.forEach((s) => {
+      const sku = skuOf(line, pieceNumber, c, s.code)
+      const row = inventory.find((r) => r.sku === sku)
+      const tone = catalog.colors.find((x) => x.code === c).apiCode
+      if (row) Object.assign(row, { piece: product.name, unit })
+      else inventory.push({ sku, pieceId: product.slug, piece: product.name, tone, size: s.code, stock: 0, reserved: 0, line, unit })
+    }),
+  )
+  save()
+  return copy(catalogProducts(user?.role).find((p) => p.slug === product.slug))
+}
+
+/** Nueva marca (§4.4): sin duplicados, sin distinguir mayúsculas. TODO(api): POST /api/admin/brands */
+export async function addBrand(name, user) {
+  await latency()
+  forbidden(user, 'brands.edit', 'Solo el Dueño puede crear marcas.')
+  const clean = String(name ?? '').trim()
+  const { catalog } = db()
+  if (!clean) throw invalid({ name: 'Escribe el nombre de la marca.' })
+  if (catalog.brands.some((b) => normalize(b.name) === normalize(clean))) throw invalid({ name: `Ya existe la marca ${clean}.` })
+  const brand = { slug: slugify(clean), name: clean, isOwnBrand: false, showInFilters: true }
+  catalog.brands = [...catalog.brands, brand]
+  save()
+  return copy(brand)
+}
+
+/** Mostrar u ocultar una marca en el filtro de la tienda. La marca propia siempre es visible. TODO(api): PUT /api/admin/brands/{slug} */
+export async function setBrandVisibility(slug, showInFilters, user) {
+  await latency()
+  forbidden(user, 'brands.edit', 'Solo el Dueño puede editar marcas.')
+  const { catalog } = db()
+  const brand = catalog.brands.find((b) => b.slug === slug)
+  if (!brand) throw new ApiError('No encontramos esa marca.', 404)
+  if (brand.isOwnBrand) throw new ApiError('La marca propia siempre es visible.', 409)
+  brand.showInFilters = Boolean(showInFilters)
+  save()
+  return copy(brand)
+}
+
+/** Guarda tipo, ventana anual y descuento de una colección (§4.5). TODO(api): PUT /api/admin/collections/{slug} */
+export async function saveCollection(form, user) {
+  await latency()
+  forbidden(user, 'collections.edit', 'Solo el Dueño puede editar colecciones.')
+  const errors = validateCollection(form)
+  if (Object.keys(errors).length) throw invalid(errors)
+  const { catalog } = db()
+  const current = catalog.collections.find((c) => c.slug === form.slug)
+  if (!current) throw new ApiError('No encontramos esa colección.', 404)
+  const next =
+    form.kind === 'temporada'
+      ? { ...current, kind: 'temporada', startMonth: form.startMonth, startDay: form.startDay, endMonth: form.endMonth, endDay: form.endDay, offSeasonDiscountPct: form.offSeasonDiscountPct }
+      : { slug: current.slug, name: current.name, kind: 'tematica', offSeasonDiscountPct: current.offSeasonDiscountPct }
+  catalog.collections = catalog.collections.map((c) => (c.slug === current.slug ? next : c))
+  save()
+  return copy(next)
+}
+
+/** Tipos y tallas: solo lectura en v1 (§4.6). La edición responderá 403 a Operaciones. TODO(api): PUT /api/admin/product-types/{code} */
+export async function saveProductType(_code, _form, user) {
+  await latency()
+  forbidden(user, 'types.edit', 'Solo el Dueño puede editar tipos.')
+  throw new ApiError('La edición de tipos llega en una versión posterior.', 501)
 }
 
 // ---------------------------------------------------------------- Configuración

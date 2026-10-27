@@ -9,7 +9,7 @@ export const NAV = [
     label: 'Catálogo',
     to: '/catalogo',
     icon: 'cat',
-    perm: 'catalog.manage',
+    perm: 'catalog.view',
     ready: false,
     soon: ['Alta de piezas con variantes tono × talla y SKU', 'Fotos, material, edición limitada y costo (opcional)', 'Publicar u ocultar en la tienda'],
   },
