@@ -183,6 +183,11 @@ export async function getLinePage(line, filters = {}, { now } = {}) {
     products: visible.filter((p) => !active || matches(p, { [facet.key]: active })).map((p) => toCard(p, today)),
     total: visible.length,
     hiddenCount: inLine.length - visible.length,
+    // Colecciones de temporada inactivas de esta línea: la vista enlaza al buscador con su nombre.
+    hiddenCollections: unique(inLine.filter((p) => !isVisible(p, today)).map((p) => p.collection)).map((c) => ({
+      slug: c,
+      name: collectionsBySlug[c].name,
+    })),
   })
 }
 
