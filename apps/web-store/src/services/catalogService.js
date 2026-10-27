@@ -60,8 +60,8 @@ function toCard(product, today) {
   }
 }
 
-const skuOf = (product, colorCode, sizeCode) =>
-  `${SKU_PREFIX[product.line]}-${String(product.pieceNumber).padStart(3, '0')}-${colorCode}-${sizeCode}`
+const skuPrefix = (product) => `${SKU_PREFIX[product.line]}-${String(product.pieceNumber).padStart(3, '0')}`
+const skuOf = (product, colorCode, sizeCode) => `${skuPrefix(product)}-${colorCode}-${sizeCode}`
 
 /** Ficha: la tarjeta más nota, tallas del sistema del tipo, ventana de la colección y SKU por variante. */
 function toDetail(product, today) {
@@ -72,6 +72,7 @@ function toDetail(product, today) {
     ...card,
     pieceNumber: product.pieceNumber,
     note: product.note,
+    skuPrefix: skuPrefix(product),
     sizes: sizes.map((s) => ({ ...s })),
     seasonWindow:
       collection?.kind === 'temporada'
