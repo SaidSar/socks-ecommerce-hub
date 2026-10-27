@@ -36,3 +36,9 @@ export function unitText(unit, unitsPerPack = 1) {
   if (unitsPerPack > 1) return `Paquete de ${unitsPerPack} ${UNIT_PLURALS[unit] ?? unit}`
   return label(UNIT_LABELS, unit)
 }
+
+export const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+export const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** Día y mes cortos: "1 nov". */
+export const dayMonth = (month, day) => `${day} ${MONTHS_SHORT[month - 1]}`

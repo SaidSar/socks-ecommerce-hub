@@ -203,6 +203,18 @@ describe('catálogo: DTO por rol y permisos (§2.2, §4.1)', () => {
     expect(saved).toMatchObject({ price: 209, unitCost: 82 })
   })
 
+  it('colecciones: el Dueño cambia la ventana y el descuento; el estado y el precio fuera se recalculan', async () => {
+    const navidad = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
+    await expect(api.saveCollection({ ...navidad, endMonth: 2, endDay: 29 }, OWNER)).rejects.toMatchObject({ status: 422, errors: { window: expect.any(String) } })
+    await api.saveCollection({ ...navidad, startMonth: 10, startDay: 15, offSeasonDiscountPct: 0.4 }, OWNER)
+    const after = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
+    expect(after.status).toMatchObject({ tone: 'ok', inSeason: true })
+    expect(after.products.every((p) => p.offSeasonPrice === null)).toBe(true)
+    await api.saveCollection({ ...after, startMonth: 11, startDay: 1 }, OWNER)
+    const off = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
+    expect(off.products.find((p) => p.price === 199).offSeasonPrice).toBe(119.4)
+  })
+
   it('marcas: duplicado sin distinguir mayúsculas, y la propia siempre visible', async () => {
     await expect(api.addBrand('nike', OWNER)).rejects.toMatchObject({ status: 422, errors: { name: 'Ya existe la marca nike.' } })
     await expect(api.setBrandVisibility('sokko', false, OWNER)).rejects.toMatchObject({ status: 409 })

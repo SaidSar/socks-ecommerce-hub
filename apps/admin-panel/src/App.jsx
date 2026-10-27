@@ -3,6 +3,7 @@ import { ProtectedLayout, RequirePermission } from './components/layout/Guards'
 import { NAV } from './config/navigation'
 import { AdminAuthProvider } from './context/AdminAuthContext'
 import Brands from './pages/Brands'
+import Collections from './pages/Collections'
 import ComingSoon from './pages/ComingSoon'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: 'pedidos/:folio', element: guard('pedidos', <Orders />) },
       { path: 'inventario', element: guard('inventario', <Inventory />) },
       { path: 'catalogo/marcas', element: guard('marcas', <Brands />) },
+      { path: 'catalogo/colecciones', element: guard('colecciones', <Collections />) },
       { path: 'catalogo/tipos', element: guard('tipos', <ProductTypes />) },
       { path: 'configuracion', element: guard('configuracion', <Settings />) },
       ...soonRoutes,

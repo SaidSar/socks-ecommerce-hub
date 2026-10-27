@@ -31,7 +31,8 @@ export const marginOf = (price, unitCost) => (unitCost == null || !price ? null 
 
 // ---------------------------------------------------------------- Temporadas
 
-const dayOfYear = (month, day) => DAYS_IN_MONTH.slice(0, month - 1).reduce((a, b) => a + b, 0) + day
+/** Día del año (1–365) de un mes y día. */
+export const dayOfYear = (month, day) => DAYS_IN_MONTH.slice(0, month - 1).reduce((a, b) => a + b, 0) + day
 
 /** Días que faltan para (month, day) desde `today`, dando la vuelta al año (año de 365 días). */
 export const daysUntil = (today, month, day) => (dayOfYear(month, day) - dayOfYear(today.month, today.day) + 365) % 365
