@@ -6,7 +6,7 @@ const SILHOUETTE =
 
 /**
  * Calceta tabi con textura de punto. Placeholder hasta tener fotografía (DESIGN.md §6.1):
- * cuando exista `imageUrl`, PieceCard y el hero renderizan <img> y esto queda como fallback.
+ * cuando exista `imageUrl`, la tarjeta y el hero renderizan <img> y esto queda como fallback.
  */
 export default function KnitTabi({ tone = 'washi', className = '', strokeWidth = 2.2 }) {
   const t = TONES[tone] ?? TONES.washi

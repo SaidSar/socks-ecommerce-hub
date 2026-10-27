@@ -16,7 +16,9 @@
   --color-laca-dark-bg: #c8473f; /* solo sobre fondo ink, texto grande */
   --color-matcha: #5a6654;
   --color-moss: #8f9779;
-  --color-ocre: #b07a3c; /* solo trazo del medidor de contraseña (puntaje 2) */
+  --color-ocre: #b07a3c; /* solo trazos y bordes, nunca texto */
+  --color-ocre-ink: #85571f; /* precio con descuento e insignia "Fuera de temporada" (AA sobre linen y con blanco encima) */
+  --color-shelf: #eee9e2; /* fondo de imagen de las líneas que no son SOKKO Japón */
   --color-sokko-red: #d91f25; /* solo logotipo; no usar en UI */
 
   --font-serif: 'Cormorant Garamond', 'Cormorant', 'Garamond', 'Times New Roman', serif;

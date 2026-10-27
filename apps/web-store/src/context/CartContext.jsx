@@ -1,31 +1,45 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react'
-import { FEATURED_PIECE_ID, PIECES } from '../data/catalog.mock'
+import { unitText } from '../config/enums'
+import { FEATURED_SLUG } from '../data/catalogSeed'
 import { useConfig } from '../hooks/useConfig'
+import { getProductSync } from '../services/catalogService'
 import { CartContext } from './cart-context'
 
-const STORAGE_KEY = 'sokko.cart.v1'
+// v2: líneas del catálogo multilínea (precio efectivo, precio de lista y unidad). Las de v1 se descartan.
+const STORAGE_KEY = 'sokko.cart.v2'
 
-const lineKey = (pieceId, tone, size) => `${pieceId}-${tone}-${size}`
+const lineKey = (slug, color, size) => `${slug}-${color}-${size}`
 const clamp = (q, max) => Math.min(q, max)
 
 function devPreload() {
   // Solo en desarrollo: 1 × Tabi Origami Noche (Tinta Sumi, M) para revisión visual (DESIGN.md §4.4).
-  const piece = PIECES.find((p) => p.id === FEATURED_PIECE_ID)
-  if (!piece) return []
-  return [toLine(piece, 'sumi', 'M')]
+  const product = getProductSync(FEATURED_SLUG)
+  return product ? [toLine(product, 'SUM', 'M')] : []
 }
 
-function toLine(piece, tone, size) {
-  // Cuando la API dé stock por talla, max = piece.stock[tone][size].
+/**
+ * Línea de la bolsa a partir de la ficha (DESIGN_CATALOG_UI.md §3.8): guarda el precio efectivo que calculó el
+ * servicio (`price`, con R-29 si aplica) y el de lista (`listPrice`), más la unidad de venta.
+ * TODO(api): si cambia el día y una temporada se activa o termina, el checkout recalcula los precios en el servidor.
+ */
+function toLine(product, color, size) {
+  const swatch = product.colors.find((c) => c.code === color) ?? product.colors[0]
+  const sizeLabel = product.sizes.find((s) => s.code === size)?.label ?? size
   return {
-    key: lineKey(piece.id, tone, size),
-    id: piece.id,
-    name: piece.name,
-    price: piece.price,
-    tone,
+    key: lineKey(product.slug, swatch.code, size),
+    slug: product.slug,
+    line: product.line,
+    name: product.name,
+    art: product.art,
+    price: product.price,
+    listPrice: product.listPrice,
+    unit: unitText(product.type.unit, product.unitsPerPack),
+    color: swatch,
     size,
+    sizeLabel: product.type.sizeSystem === 'unitalla' ? sizeLabel : `Talla ${size}`,
     qty: 1,
-    max: piece.stock[tone] ?? 0,
+    // TODO(api): cuando la API dé stock por variante, max = stock de la variante.
+    max: product.stock,
   }
 }
 
@@ -50,8 +64,8 @@ function init() {
 function reducer(state, action) {
   switch (action.type) {
     case 'ADD': {
-      const { piece, tone, size } = action
-      const key = lineKey(piece.id, tone, size)
+      const { product, color, size } = action
+      const key = lineKey(product.slug, color, size)
       const existing = state.items.find((i) => i.key === key)
       if (existing) {
         if (existing.qty >= existing.max) return state
@@ -60,7 +74,7 @@ function reducer(state, action) {
           items: state.items.map((i) => (i.key === key ? { ...i, qty: clamp(i.qty + 1, i.max) } : i)),
         }
       }
-      const line = toLine(piece, tone, size)
+      const line = toLine(product, color, size)
       if (line.max <= 0) return state
       return { ...state, items: [...state.items, line] }
     }
@@ -112,7 +126,7 @@ export function CartProvider({ children }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const add = useCallback((piece, tone, size) => dispatch({ type: 'ADD', piece, tone, size }), [])
+  const add = useCallback((product, color, size) => dispatch({ type: 'ADD', product, color, size }), [])
   const setQty = useCallback((key, qty) => dispatch({ type: 'SET_QTY', key, qty }), [])
   const remove = useCallback((key) => dispatch({ type: 'REMOVE', key }), [])
   const toggleGift = useCallback(() => dispatch({ type: 'TOGGLE_GIFT' }), [])

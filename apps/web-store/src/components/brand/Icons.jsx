@@ -62,6 +62,14 @@ export function EyeOffIcon(props) {
   )
 }
 
+export function ArrowIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  )
+}
+
 export function MenuIcon(props) {
   return (
     <svg {...base} {...props}>
