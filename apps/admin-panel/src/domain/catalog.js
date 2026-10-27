@@ -21,6 +21,7 @@ export const MSG = {
   brandTaken: (name) => `Ya existe la marca ${name}.`,
   day: 'Ese día no existe en el mes elegido (el 29 de febrero no se acepta).',
   discount: 'El descuento va de 0 a 60 %.',
+  review: 'Revisa los campos marcados.',
 }
 
 export const skuPrefix = (line, pieceNumber) => `${SKU_PREFIX[line]}-${String(pieceNumber).padStart(3, '0')}`

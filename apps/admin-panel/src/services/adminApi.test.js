@@ -203,6 +203,15 @@ describe('catálogo: DTO por rol y permisos (§2.2, §4.1)', () => {
     expect(saved).toMatchObject({ price: 209, unitCost: 82 })
   })
 
+  it('producto nuevo: siguiente número de pieza de la línea y variantes en inventario con stock 0', async () => {
+    const form = { line: 'especiales', name: 'Copo de Prueba', brand: 'sin-marca', type: 'calcetas', collection: 'navidad', colors: ['ROJ'], price: 199, unitCost: 150, unitsPerPack: 1 }
+    const saved = await api.saveProduct(form, OWNER)
+    expect(saved).toMatchObject({ pieceNumber: 9, stock: 0, margin: expect.any(Number) })
+    expect(saved.variants.map((v) => v.sku)).toEqual(['ESP-009-ROJ-S', 'ESP-009-ROJ-M', 'ESP-009-ROJ-L'])
+    const { rows } = await api.getInventory({ filter: 'todos', q: 'ESP-009' })
+    expect(rows.map((r) => r.stock)).toEqual([0, 0, 0])
+  })
+
   it('colecciones: el Dueño cambia la ventana y el descuento; el estado y el precio fuera se recalculan', async () => {
     const navidad = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
     await expect(api.saveCollection({ ...navidad, endMonth: 2, endDay: 29 }, OWNER)).rejects.toMatchObject({ status: 422, errors: { window: expect.any(String) } })

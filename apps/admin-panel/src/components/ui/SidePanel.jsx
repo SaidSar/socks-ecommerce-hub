@@ -8,9 +8,10 @@ const SAFE = { paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(
 /**
  * Panel de detalle. En 2xl se acomoda a la derecha de la tabla (columna del grid, sticky);
  * abajo de 2xl es un panel modal con fondo, foco atrapado y Esc que cierra y devuelve el foco (`returnFocus`).
+ * `modal` lo deja siempre como panel modal (formulario de producto, 560 px).
  */
-export default function SidePanel({ label, onClose, returnFocus, width = 'sm:w-[440px]', children }) {
-  const inline = useMediaQuery('(min-width: 1536px)')
+export default function SidePanel({ label, onClose, returnFocus, width = 'sm:w-[440px]', modal = false, children }) {
+  const inline = useMediaQuery('(min-width: 1536px)') && !modal
   const ref = useRef(null)
   useLockBodyScroll(!inline)
   useFocusTrap(ref, { active: !inline, onEscape: onClose, returnFocus })
