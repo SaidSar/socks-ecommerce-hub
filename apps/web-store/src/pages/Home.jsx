@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import CartDrawer from '../components/cart/CartDrawer'
 import AtelierCatalog from '../components/home/AtelierCatalog'
 import Filosofia from '../components/home/Filosofia'
 import HeroEditorial from '../components/home/HeroEditorial'
 import MateriaCuration from '../components/home/MateriaCuration'
-import Footer from '../components/layout/Footer'
-import Navbar from '../components/layout/Navbar'
-import TopBar from '../components/layout/TopBar'
 import { useCart } from '../hooks/useCart'
 import { getHomePieces } from '../services/productService'
 
 const OPEN_CART_DELAY_MS = 500
 
 export default function Home() {
-  const [query, setQuery] = useState('')
   const [status, setStatus] = useState('loading') // 'loading' | 'error' | 'ready'
   const [data, setData] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -56,23 +51,11 @@ export default function Home() {
   const featured = data?.pieces.find((p) => p.id === data.featuredId) ?? null
 
   return (
-    <>
-      <TopBar />
-      <Navbar query={query} onQueryChange={setQuery} />
-      <main>
-        <HeroEditorial piece={featured} />
-        <MateriaCuration />
-        <AtelierCatalog
-          pieces={data?.pieces ?? []}
-          status={status}
-          query={query}
-          onAcquire={acquire}
-          onRetry={retry}
-        />
-        <Filosofia />
-      </main>
-      <Footer />
-      <CartDrawer />
-    </>
+    <main>
+      <HeroEditorial piece={featured} />
+      <MateriaCuration />
+      <AtelierCatalog pieces={data?.pieces ?? []} status={status} query="" onAcquire={acquire} onRetry={retry} />
+      <Filosofia />
+    </main>
   )
 }
