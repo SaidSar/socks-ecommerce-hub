@@ -2,12 +2,14 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ProtectedLayout, RequirePermission } from './components/layout/Guards'
 import { NAV } from './config/navigation'
 import { AdminAuthProvider } from './context/AdminAuthContext'
+import Brands from './pages/Brands'
 import ComingSoon from './pages/ComingSoon'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import Orders from './pages/Orders'
+import ProductTypes from './pages/ProductTypes'
 import Settings from './pages/Settings'
 
 const guard = (section, element) => <RequirePermission section={section}>{element}</RequirePermission>
@@ -26,6 +28,8 @@ const router = createBrowserRouter([
       { path: 'pedidos', element: guard('pedidos', <Orders />) },
       { path: 'pedidos/:folio', element: guard('pedidos', <Orders />) },
       { path: 'inventario', element: guard('inventario', <Inventory />) },
+      { path: 'catalogo/marcas', element: guard('marcas', <Brands />) },
+      { path: 'catalogo/tipos', element: guard('tipos', <ProductTypes />) },
       { path: 'configuracion', element: guard('configuracion', <Settings />) },
       ...soonRoutes,
       { path: '*', element: <NotFound /> },

@@ -1,18 +1,15 @@
 // Secciones del panel (DESIGN_ADMIN.md §3 y §7). `perm` es el permiso de config/roles.js que la habilita
 // (null = todos los roles). `ready: false` = sección sin construir: muestra ComingSoon con `soon`.
+// `group` agrupa secciones bajo un título en la barra lateral.
 export const NAV = [
   { key: 'dashboard', label: 'Dashboard', to: '/', icon: 'dash', perm: null, ready: true },
   { key: 'pedidos', label: 'Pedidos', to: '/pedidos', icon: 'orders', perm: 'orders.manage', ready: true },
   { key: 'inventario', label: 'Inventario', to: '/inventario', icon: 'inv', perm: 'inventory.adjust', ready: true },
-  {
-    key: 'catalogo',
-    label: 'Catálogo',
-    to: '/catalogo',
-    icon: 'cat',
-    perm: 'catalog.view',
-    ready: false,
-    soon: ['Alta de piezas con variantes tono × talla y SKU', 'Fotos, material, edición limitada y costo (opcional)', 'Publicar u ocultar en la tienda'],
-  },
+  // Catálogo multilínea (DESIGN_CATALOG_UI.md §4.1): visible para los dos roles; editar es solo del Dueño.
+  { key: 'productos', label: 'Productos', to: '/catalogo/productos', icon: 'cat', perm: 'catalog.view', ready: false, group: 'Catálogo', soon: ['Productos de las 4 líneas con costo y margen', 'Variantes con SKU y código de barras'] },
+  { key: 'marcas', label: 'Marcas', to: '/catalogo/marcas', icon: 'brand', perm: 'catalog.view', ready: true, group: 'Catálogo' },
+  { key: 'colecciones', label: 'Colecciones', to: '/catalogo/colecciones', icon: 'cal', perm: 'catalog.view', ready: false, group: 'Catálogo', soon: ['Ventana anual de cada temporada', 'Descuento fuera de temporada'] },
+  { key: 'tipos', label: 'Tipos y tallas', to: '/catalogo/tipos', icon: 'ruler', perm: 'catalog.view', ready: true, group: 'Catálogo' },
   {
     key: 'clientes',
     label: 'Clientes',
