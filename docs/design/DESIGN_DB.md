@@ -1,9 +1,9 @@
 # DESIGN_DB.md — Esquema de base de datos · SOKKO (ソッコ)
 
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
-> **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
+> **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, `DECISIONES_CATALOGO.md` (catálogo multilínea, v0.4), y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** ✅ Aprobada (v0.3, PR #4) · v0.3.1: valores de API de los enums como códigos.
+> **Estado:** 🟡 Propuesta (v0.4.2) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
 
 ---
 
@@ -30,7 +30,7 @@
 | Tablas | Inglés, **PascalCase, plural** | `ProductVariants`, `OrderStatusHistory` (sustantivo incontable, se deja en singular) |
 | Columnas | Inglés, PascalCase | `UnitPrice`, `CreatedAt` |
 | PK | `Id` | `Orders.Id` |
-| FK | `{Entidad}Id` o `{Entidad}Code` para catálogos con clave natural | `OrderId`, `ToneCode` |
+| FK | `{Entidad}Id` o `{Entidad}Code` para catálogos con clave natural | `OrderId`, `ColorCode` |
 | Restricciones | `PK_{Tabla}`, `FK_{Tabla}_{Referida}`, `UQ_{Tabla}_{Cols}`, `CK_{Tabla}_{Regla}`, `IX_{Tabla}_{Cols}`, `DF_{Tabla}_{Col}` | `CK_ProductVariants_ReservedLeStock` |
 | Valores de enums | ASCII, PascalCase, **sin acentos** | `PorPreparar`, `Devolucion`, `OxxoPay` |
 
@@ -44,9 +44,10 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 | Tasas (IVA) | `DECIMAL(5,4)` | 0.1600 con 4 decimales permite tasas como 0.0800 (frontera) sin redondeo. |
 | Fechas y horas | `DATETIME2(3)` **en UTC**, default `SYSUTCDATETIME()` | Precisión de milisegundos, rango 0001–9999 y 6–8 bytes (menos que `DATETIMEOFFSET`). Guardar siempre UTC evita ambigüedad; la conversión a la hora del negocio (`America/Mazatlan`, UTC−7, sin horario de verano desde 2022) se hace en .NET para "Hoy", "7d", "30d" y "atrasado +48 h". Columnas con sufijo `At` (`CreatedAt`, `ShippedAt`). |
 | Texto visible | `NVARCHAR(n)` | Unicode: nombres en japonés (`折紙・夜`), acentos y `ñ`. |
-| Códigos técnicos | `VARCHAR(n)` / `CHAR(n)` | SKU, códigos de tono/talla, CP y enums son ASCII; ocupan la mitad. |
+| Códigos técnicos | `VARCHAR(n)` / `CHAR(n)` | SKU, códigos de color/talla, *slugs*, código de barras, CP y enums son ASCII; ocupan la mitad. |
 | Banderas | `BIT NOT NULL` con default | `GiftWrap`, `IsActive`, `MarketingOptIn`. |
-| Cantidades de pares | `INT` | Enteros; los CHECK impiden negativos. |
+| Cantidades (unidades vendibles) | `INT` | Enteros; los CHECK impiden negativos. Una unidad es un par, un paquete o una pieza según `ProductTypes.UnitLabel` y `Products.UnitsPerPack` (T-10). |
+| Porcentajes de descuento | `DECIMAL(5,4)` | `Collections.OffSeasonDiscountPct` = 0.3000 (30 %), igual que las tasas. |
 | Hashes | `VARBINARY(32)` (SHA-256) / `NVARCHAR(256)` (PasswordHasher) | El token de restablecimiento se guarda como hash binario; la contraseña en el formato Base64 de `PasswordHasher<TUser>` (PBKDF2). |
 | Concurrencia | `ROWVERSION` | Concurrencia optimista **solo para ediciones desde el panel** (catálogo, ajustes manuales de stock, transiciones de pedido, configuración) en `ProductVariants`, `Orders` y `Settings`. El checkout y la salida de inventario **no** dependen de ella: usan `UPDATE` atómicos condicionados (§4.1). |
 
@@ -54,22 +55,22 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 - *CI* (sin distinguir mayúsculas) y *AI* (sin distinguir acentos): la búsqueda del panel por folio, cliente, correo o SKU (`matchesQuery` en `orders.js`, que normaliza acentos) se resuelve con un `LIKE` normal: "lopez" encuentra "López" sin `COLLATE` en cada consulta.
 - `VARCHAR` usa la página de códigos 1252, suficiente para los códigos ASCII (SKU, CP, enums).
 - **`UQ_Users_Email` sigue siendo correcto:** dos correos que solo difieren en mayúsculas (`Hola@` / `hola@`) colisionan, que es lo que pide R-01. Con *AI* también colisionan variantes que solo difieren en acentos (`jose@` / `josé@`); se acepta a propósito, porque los buzones reales son ASCII y así se evitan cuentas casi idénticas. La API sigue normalizando con `trim().ToLowerInvariant()` (igual que `authService.js`).
-- Los demás `UNIQUE` sobre texto (`Tones.Name`, `Sku`, `Folio`) tampoco cambian de comportamiento: sus valores son ASCII en mayúsculas o nombres de catálogo que no deben repetirse con otro acento.
+- Los demás `UNIQUE` sobre texto (`Colors.Name`, `Brands.Name`, `Collections.Name`, `Sku`, `Folio`) tampoco cambian de comportamiento: sus valores son ASCII en mayúsculas o nombres de catálogo que no deben repetirse con otro acento.
 
 ### 1.3 Enums: `VARCHAR + CHECK` en lugar de tablas catálogo
 
-| Criterio | `VARCHAR + CHECK` ✅ (elegido para enums de flujo) | Tabla catálogo (elegido para Tonos y Tallas) |
+| Criterio | `VARCHAR + CHECK` ✅ (elegido para enums de flujo) | Tabla catálogo (elegido para Colores, Tallas, Marcas, Tipos y Colecciones) |
 |---|---|---|
-| ¿Quién cambia los valores? | Solo el equipo de desarrollo (cada valor nuevo exige código nuevo: transiciones, botones, reglas) | El Dueño, desde el panel (tono nuevo, talla XL) |
+| ¿Quién cambia los valores? | Solo el equipo de desarrollo (cada valor nuevo exige código nuevo: transiciones, botones, reglas) | El Dueño, desde el panel (color nuevo, talla XL, marca, colección de temporada) |
 | ¿Tienen atributos propios? | No (solo el código) | Sí (nombre, hex, etiqueta en cm, orden, código de SKU) |
 | Lectura de datos | El valor se lee directo en la tabla (`Status = 'Enviado'`) sin JOIN | Requiere JOIN para mostrar el nombre |
 | Mapeo EF Core | `enum` de C# + `HasConversion<string>()` | Entidad con navegación |
 
-**Regla:** si la lógica del sistema depende del valor (estados del pedido, tipo de movimiento, método de pago o de entrega, rol, paquetería), es un enum con `CHECK`. Si es un dato que el negocio administra y que tiene atributos, es una tabla catálogo. Por eso `Tones` y `Sizes` son tablas (lo pide `DESIGN.md` §9) y los estados no lo son. Además, se guarda el texto y no un entero para que una consulta en SSMS se lea sola y la entrega escolar sea auditable.
+**Regla:** si la lógica del sistema depende del valor (estados del pedido, tipo de movimiento, método de pago o de entrega, rol, paquetería, **línea de producto, tipo de colección, sistema de tallas, unidad**), es un enum con `CHECK`. Si es un dato que el negocio administra y que tiene atributos, es una tabla catálogo. Por eso `Colors`, `Sizes`, `Brands`, `ProductTypes` y `Collections` son tablas y las 4 líneas no lo son (T-01: son fijas y cada una cambia la tienda). Además, se guarda el texto y no un entero para que una consulta en SSMS se lea sola y la entrega escolar sea auditable.
 
 ### 1.4 Borrado: lógico, no físico
 
-- **Nunca se borran** `Users`, `Products`, `ProductVariants`, `Orders` ni el kárdex: tienen historia contable. Se desactivan con `IsActive = 0`.
+- **Nunca se borran** `Users`, `Products`, `ProductVariants`, `Brands`, `Collections`, `Orders` ni el kárdex: tienen historia contable. Se desactivan con `IsActive = 0`.
 - Por eso **todas** las FK son `ON DELETE NO ACTION`, incluidas las que apuntan a `Orders` (`OrderItems`, `OrderStatusHistory`, `Shipments`, `InventoryMovements`) y a `ProductVariants` (`OrderItems`, `InventoryMovements`). Un `DELETE` accidental sobre un pedido o un SKU con historia **falla** en lugar de arrastrar líneas, historial, envío o kárdex.
 - La **única** excepción es `PasswordResetTokens.UserId` (`CASCADE`): el token no tiene valor de auditoría.
 - **EF Core:** una FK requerida es `Cascade` por convención, así que cada relación se configura con `OnDelete(DeleteBehavior.NoAction)` explícito (salvo la de `PasswordResetTokens`). La revisión de la migración debe confirmar que no aparece ningún `ON DELETE CASCADE` adicional.
@@ -113,13 +114,25 @@ Valores de BD en ASCII PascalCase **sin espacios ni acentos**. Los valores de la
 | Rol (`Users.Role`) | `Owner` | `dueno` | Dueño | **Explícito** (`config/roles.js`) |
 | | `Operations` | `operaciones` | Operaciones | **Explícito** |
 | | `Customer` | `customer` | — (tienda) | `SnakeCaseLower` |
+| Línea (`Products.Line`) · v0.4 | `Sokko` | `sokko` | SOKKO Japón | `SnakeCaseLower` |
+| | `Marcas` | `marcas` | Marcas | `SnakeCaseLower` |
+| | `Especiales` | `especiales` | Especiales | `SnakeCaseLower` |
+| | `Accesorios` | `accesorios` | Accesorios | `SnakeCaseLower` |
+| Tipo de colección (`Collections.Kind`) · v0.4 | `Temporada` | `temporada` | Temporada | `SnakeCaseLower` |
+| | `Tematica` | `tematica` | Temática | `SnakeCaseLower` |
+| Sistema de tallas (`ProductTypes.SizeSystem`, `Sizes.SizeSystem`) · v0.4 | `Calceta` | `calceta` | Calceta | `SnakeCaseLower` |
+| | `Guante` | `guante` | Guante | `SnakeCaseLower` |
+| | `Unitalla` | `unitalla` | Unitalla | `SnakeCaseLower` |
+| Unidad (`ProductTypes.UnitLabel`) · v0.4 | `Par` | `par` | par / pares | `SnakeCaseLower` |
+| | `Pieza` | `pieza` | pieza / piezas | `SnakeCaseLower` |
 
-- **`SnakeCaseLower`**: `JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)` produce el código de la API a partir del nombre del `enum` de C# (`EnRuta` → `en_ruta`, `OxxoPay` → `oxxo_pay`, `ConteoFisico` → `conteo_fisico`). Cubre estado, entrega, método y estado de pago, y tipo de movimiento.
+- **`SnakeCaseLower`**: `JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)` produce el código de la API a partir del nombre del `enum` de C# (`EnRuta` → `en_ruta`, `OxxoPay` → `oxxo_pay`, `ConteoFisico` → `conteo_fisico`). Cubre estado, entrega, método y estado de pago, tipo de movimiento y, desde v0.4, línea, tipo de colección, sistema de tallas y unidad.
 - **Explícito** (diccionario por enum en la capa de DTO, con una prueba unitaria que recorra todos los valores en ambos sentidos):
   - **Paquetería:** API `snake_case` (`estafeta`, `dhl_express`) ↔ BD PascalCase (`Estafeta`, `DHLExpress`). Se mapea a mano para no depender de cómo la política parte las siglas (`DHL`).
   - **Rol:** los códigos del panel (`dueno`, `operaciones`) no salen del nombre en inglés (`Owner`, `Operations`).
 - Ningún valor de API lleva espacios ni acentos; las etiquetas (`DHL Express`, `OXXO Pay`, `Conteo físico`) son solo de UI.
 - En EF Core todos se guardan con `HasConversion<string>()`: el valor de BD es el nombre del miembro del `enum`.
+- **Línea:** `DECISIONES_CATALOGO` T-01 escribe los códigos en minúsculas (`sokko`, `especiales`…); esos son los valores de **API**. En BD siguen la convención de esta tabla (`Sokko`, `Especiales`…), igual que el resto de enums.
 
 ---
 
@@ -134,8 +147,11 @@ erDiagram
     Users |o--o{ Shipments : "reparte (local, interno)"
     Sizes |o--o{ Users : "talla preferida"
 
+    Brands ||--o{ Products : "marca"
+    ProductTypes ||--o{ Products : "tipo"
+    Collections |o--o{ Products : "coleccion (obligatoria en Especiales)"
     Products ||--|{ ProductVariants : "se vende como"
-    Tones ||--o{ ProductVariants : "tiñe"
+    Colors ||--o{ ProductVariants : "color"
     Sizes ||--o{ ProductVariants : "mide"
     ProductVariants ||--o{ InventoryMovements : "kárdex"
     ProductVariants ||--o{ OrderItems : "se pide en"
@@ -155,7 +171,7 @@ erDiagram
         nvarchar Email UK
         nvarchar PasswordHash
         varchar Role "Customer | Owner | Operations"
-        varchar PreferredSizeCode FK "NULL"
+        int PreferredSizeId FK "NULL, sistema Calceta"
         bit MarketingOptIn
         datetime2 AcceptedTermsAt "NULL"
         datetime2 EmailConfirmedAt "NULL"
@@ -172,29 +188,69 @@ erDiagram
         datetime2 ExpiresAt
         datetime2 UsedAt "NULL"
     }
-    Tones {
-        varchar Code PK "sumi"
-        nvarchar Name
-        char Hex
-        char LineHex
-        char SkuCode UK "SUM"
+    Colors {
+        char Code PK "SUM, NEG, MUL"
+        varchar Slug UK "sumi"
+        nvarchar Name UK
+        char Hex "NULL"
+        char LineHex "NULL"
+        bit IsSokkoTone
         tinyint SortOrder
         bit IsActive
     }
     Sizes {
-        varchar Code PK "S | M | L"
-        nvarchar Label "22–24 cm"
+        int Id PK
+        varchar SizeSystem "Calceta, Guante, Unitalla"
+        varchar Code "S, M, L, U"
+        nvarchar Label "22-24 cm"
         tinyint SortOrder
         bit IsActive
     }
+    Brands {
+        int Id PK
+        nvarchar Name UK
+        varchar Slug UK
+        bit IsOwnBrand
+        bit ShowInFilters
+        bit IsActive
+        datetime2 CreatedAt
+    }
+    ProductTypes {
+        int Id PK
+        varchar Code UK "calcetas, gorros"
+        nvarchar Name UK
+        varchar SizeSystem
+        varchar UnitLabel "Par, Pieza"
+        tinyint SortOrder
+        bit IsActive
+    }
+    Collections {
+        int Id PK
+        nvarchar Name UK
+        varchar Slug UK
+        varchar Kind "Temporada, Tematica"
+        tinyint StartMonth "NULL en Tematica"
+        tinyint StartDay "NULL en Tematica"
+        tinyint EndMonth "NULL en Tematica"
+        tinyint EndDay "NULL en Tematica"
+        decimal OffSeasonDiscountPct
+        bit IsActive
+        datetime2 CreatedAt
+        datetime2 UpdatedAt
+    }
     Products {
         int Id PK
-        smallint PieceNumber UK
+        varchar Line "Sokko, Marcas, Especiales, Accesorios"
+        smallint PieceNumber "UK con Line"
+        varchar Slug UK
+        int BrandId FK
+        int ProductTypeId FK
+        int CollectionId FK "NULL"
         nvarchar Name
-        nvarchar NameJp
+        nvarchar NameJp "NULL"
         nvarchar Material
         decimal Price
-        decimal Cost "NULL"
+        tinyint UnitsPerPack
         int EditionSize "NULL"
         nvarchar ImageUrl "NULL"
         bit IsActive
@@ -204,9 +260,11 @@ erDiagram
     ProductVariants {
         int Id PK
         int ProductId FK
-        varchar ToneCode FK
-        varchar SizeCode FK
+        char ColorCode FK
+        int SizeId FK
         varchar Sku UK
+        varchar Barcode "NULL, UK filtrado"
+        decimal UnitCost "NULL, solo Dueno"
         int Stock
         int Reserved
         bit IsActive
@@ -332,7 +390,7 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 | `Email` | `NVARCHAR(254)` | | | **UQ** `UQ_Users_Email`. Guardado en minúsculas y sin espacios (RFC 5321: 254) |
 | `PasswordHash` | `NVARCHAR(256)` | | | Salida de `PasswordHasher<User>` (PBKDF2 + sal). Nunca texto plano |
 | `Role` | `VARCHAR(20)` | | `'Customer'` | `CK_Users_Role`: `IN ('Customer','Owner','Operations')` |
-| `PreferredSizeCode` | `VARCHAR(3)` | N | | **FK** → `Sizes(Code)` `ON DELETE NO ACTION` |
+| `PreferredSizeId` | `INT` | N | | **FK** → `Sizes(Id)` `ON DELETE NO ACTION`. v0.4: antes `PreferredSizeCode → Sizes(Code)`; con tallas por sistema el código ya no es único (P-16). Solo tallas del sistema `Calceta` (lo valida el servicio); la API sigue exponiendo `preferredSize: "M"` |
 | `MarketingOptIn` | `BIT` | | `0` | Aviso de ediciones limitadas |
 | `AcceptedTermsAt` | `DATETIME2(3)` | N | | `CK_Users_CustomerAcceptedTerms`: `Role <> 'Customer' OR AcceptedTermsAt IS NOT NULL` |
 | `EmailConfirmedAt` | `DATETIME2(3)` | N | | Confirmación por correo (futuro) |
@@ -360,67 +418,164 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 
 - **Índices:** `UQ_PasswordResetTokens_TokenHash` (búsqueda en `reset-password`) · `IX_PasswordResetTokens_UserId_ExpiresAt` (invalidar los tokens anteriores al emitir uno nuevo y depurar los vencidos).
 
-### 3.3 `Tones` — catálogo de tonos
+### 3.3 `Colors` — colores y diseños (antes `Tones`) · v0.4
 
-**Para qué sirve:** colores de tinte del catálogo (`TONES` en `catalog.mock.js`). Alimenta el filtro por tono, las muestras de color y la parte del SKU.
+**Para qué sirve:** una sola tabla de color o diseño para todas las líneas (T-05). Los 4 tonos Kyoto (`TONES` en `catalog.mock.js`) quedan con `IsSokkoTone = 1`; las demás líneas usan colores genéricos (`NEG`, `BLA`, `GRI`) o `MUL` para diseños estampados. Alimenta el filtro por color, las muestras y la parte del SKU.
 
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
-| `Code` | `VARCHAR(20)` | | | **PK** natural: `sumi`, `washi`, `laca`, `matcha` (lo que usa el JSON de `DESIGN` §9) |
-| `Name` | `NVARCHAR(40)` | | | **UQ**. "Tinta Sumi" |
-| `Hex` | `CHAR(7)` | | | `CK_Tones_Hex`: `Hex LIKE '#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]'` |
-| `LineHex` | `CHAR(7)` | | | Color del trazo sobre el tono (mismo CHECK) |
-| `SkuCode` | `CHAR(3)` | | | **UQ**. `SUM`, `WAS`, `LAC`, `MAT`. `CK_Tones_SkuCode`: `LIKE '[A-Z][A-Z][A-Z]'` |
+| `Code` | `CHAR(3)` | | | **PK** natural y código del SKU: `SUM`, `WAS`, `LAC`, `MAT`, `NEG`, `MUL`… `CK_Colors_Code`: `Code COLLATE Latin1_General_100_BIN2 LIKE '[A-Z][A-Z][A-Z]'` |
+| `Slug` | `VARCHAR(20)` | | | **UQ**. Código de API: `sumi`, `washi`, `laca`, `matcha` (los que ya usa el JSON de `DESIGN` §9), `negro`, `multicolor`… `CK`: `Slug NOT LIKE '%[^a-z0-9-]%'` |
+| `Name` | `NVARCHAR(40)` | | | **UQ**. "Tinta Sumi", "Negro" |
+| `Hex` | `CHAR(7)` | N | | `CK_Colors_Hex`: `Hex IS NULL OR Hex LIKE '#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]'`. `NULL` en `MUL` (diseño estampado: la muestra es la imagen) |
+| `LineHex` | `CHAR(7)` | N | | Color del trazo sobre la muestra (mismo CHECK) |
+| `IsSokkoTone` | `BIT` | | `0` | `1` = tono Kyoto, exclusivo de la línea `Sokko` (R-32) |
 | `SortOrder` | `TINYINT` | | `0` | Orden en filtros |
 | `IsActive` | `BIT` | | `1` | |
 
-- `SkuCode` existe aparte del `Code` para que el SKU no dependa de que las 3 primeras letras del código sean únicas (hoy lo son; con un tono "sumire" ya no).
+- **Cambio frente a v0.3:** `Tones.Code` (`sumi`) y `Tones.SkuCode` (`SUM`) se fusionan. El código de 3 letras pasa a ser la PK (T-05) y el código de API se conserva como `Slug`, así el JSON de la tienda no cambia. D-20 queda sustituida por D-27.
+- **Índices:** `UQ_Colors_Slug` · `UQ_Colors_Name` · `IX_Colors_IsSokkoTone` (filtro de la tienda SOKKO Japón).
 
-### 3.4 `Sizes` — catálogo de tallas
+### 3.4 `Sizes` — tallas por sistema · v0.4
 
-**Para qué sirve:** tallas S/M/L con su rango en cm.
+**Para qué sirve:** tallas agrupadas por **sistema** (T-04): `Calceta` (S/M/L en cm), `Guante` (S/M/L) y `Unitalla` (gorras, gorros, bufandas, mangas, lentes). El tipo de producto (`ProductTypes.SizeSystem`) decide qué tallas aplican.
 
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
-| `Code` | `VARCHAR(3)` | | | **PK** natural: `S`, `M`, `L` (3 caracteres por si llega `XL`) |
-| `Label` | `NVARCHAR(20)` | | | "22–24 cm" |
-| `SortOrder` | `TINYINT` | | `0` | **UQ** |
+| `Id` | `INT IDENTITY` | | | **PK** (v0.4; antes la PK era `Code`) |
+| `SizeSystem` | `VARCHAR(10)` | | | `CK_Sizes_SizeSystem`: `IN ('Calceta','Guante','Unitalla')` |
+| `Code` | `VARCHAR(3)` | | | `S`, `M`, `L`, `U`… Es el sufijo del SKU. `CK_Sizes_Code`: `Code COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^A-Z0-9]%'` |
+| `Label` | `NVARCHAR(20)` | | | "22–24 cm", "Mediana", "Unitalla" |
+| `SortOrder` | `TINYINT` | | `0` | |
 | `IsActive` | `BIT` | | `1` | |
 
-### 3.5 `Products` — piezas del catálogo
+- `UQ_Sizes_System_Code` (`SizeSystem`, `Code`): `M` puede existir en `Calceta` y en `Guante`, pero no dos veces en el mismo sistema.
+- `UQ_Sizes_System_SortOrder` (`SizeSystem`, `SortOrder`).
+- El sistema `Unitalla` tiene una sola talla: `U`.
 
-**Para qué sirve:** la "pieza" (modelo de calcetín): nombre, material, precio y tiraje. No tiene stock: el stock vive en la variante.
+### 3.5 `Products` — productos del catálogo · v0.4
+
+**Para qué sirve:** el producto (modelo): línea, marca, tipo, colección, nombre, material, precio y tiraje. No tiene stock: el stock vive en la variante.
 
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
-| `Id` | `INT IDENTITY` | | | **PK**. En la semilla se inserta igual a `PieceNumber` (7, 12, 3…) para que coincida con el mock |
-| `PieceNumber` | `SMALLINT` | | | **UQ**. Número editorial de la pieza y base del SKU. `CK_Products_PieceNumber`: `BETWEEN 1 AND 999` |
+| `Id` | `INT IDENTITY` | | | **PK**. En la semilla, los 6 de SOKKO se insertan igual a `PieceNumber` (7, 12, 3…) para que coincidan con el mock |
+| `Line` | `VARCHAR(12)` | | | v0.4 (T-01). `CK_Products_Line`: `IN ('Sokko','Marcas','Especiales','Accesorios')` |
+| `PieceNumber` | `SMALLINT` | | | Número del producto **dentro de su línea** y base del SKU. `CK_Products_PieceNumber`: `BETWEEN 1 AND 999`. v0.4: el `UNIQUE` pasa a (`Line`, `PieceNumber`), así `SKK-001` y `MRC-001` conviven |
+| `Slug` | `VARCHAR(120)` | | | v0.4. **UQ**. URL directa `GET /api/products/{slug}` (R-28). `CK`: `Slug NOT LIKE '%[^a-z0-9-]%'` |
+| `BrandId` | `INT` | | | v0.4 (T-02). **FK** → `Brands(Id)` `ON DELETE NO ACTION`. Obligatorio; los de SOKKO apuntan a la marca propia |
+| `ProductTypeId` | `INT` | | | v0.4 (T-03). **FK** → `ProductTypes(Id)` `ON DELETE NO ACTION` |
+| `CollectionId` | `INT` | N | | v0.4 (T-06). **FK** → `Collections(Id)` `ON DELETE NO ACTION`. Obligatorio en `Especiales` (`CK_Products_CollectionRequired`) |
 | `Name` | `NVARCHAR(120)` | | | |
-| `NameJp` | `NVARCHAR(60)` | | | "折紙・夜" |
-| `Material` | `NVARCHAR(200)` | | | |
-| `Price` | `DECIMAL(10,2)` | | | Precio vigente, IVA incluido. `CK_Products_Price`: `> 0` |
-| `Cost` | `DECIMAL(10,2)` | N | | Opcional (`DECISIONES_ADMIN`: habilita margen después). `CK`: `IS NULL OR >= 0` |
+| `NameJp` | `NVARCHAR(60)` | N | | "折紙・夜". v0.4: acepta `NULL` porque solo SOKKO Japón lleva kanji. `CK_Products_NameJp`: `Line <> 'Sokko' OR NameJp IS NOT NULL` |
+| `Material` | `NVARCHAR(200)` | | | En Marcas, la composición del proveedor |
+| `Price` | `DECIMAL(10,2)` | | | Precio de lista, IVA incluido, por **unidad vendible** (un paquete de 3 es una unidad). `CK_Products_Price`: `> 0`. El precio fuera de temporada **no** se guarda: se calcula (R-29) |
+| `UnitsPerPack` | `TINYINT` | | `1` | v0.4 (T-10). Pares o piezas por unidad vendible: 3 en un paquete Nike de 3 pares. `CK_Products_UnitsPerPack`: `BETWEEN 1 AND 24` |
 | `EditionSize` | `INT` | N | | Tiraje de edición limitada (120, 80). `CK`: `IS NULL OR > 0` |
 | `ImageUrl` | `NVARCHAR(500)` | N | | |
-| `IsActive` | `BIT` | | `1` | Pieza visible en la tienda |
+| `IsActive` | `BIT` | | `1` | Producto publicado (R-28 decide además si se lista) |
 | `CreatedAt` / `UpdatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
 
-- **Índices:** `UQ_Products_PieceNumber` · `IX_Products_IsActive` (listado de la tienda).
-- La pieza destacada del hero (`featuredId`) **no** es columna de `Products`, sino `Settings.FeaturedProductId`. Así solo puede haber una y no hay que vigilar un `IsFeatured` duplicado.
+- `CK_Products_CollectionRequired`: `Line <> 'Especiales' OR CollectionId IS NOT NULL` (T-06, R-31). Las demás líneas pueden tener colección o no (por ejemplo, una gorra navideña en Accesorios).
+- `UQ_Products_Line_PieceNumber` (`Line`, `PieceNumber`) · `UQ_Products_Slug`.
+- **Índices:** `IX_Products_Line_IsActive` (`Line`, `IsActive`) `INCLUDE (BrandId, ProductTypeId, CollectionId, Price)` para los listados por línea · `IX_Products_BrandId` · `IX_Products_ProductTypeId` · `IX_Products_CollectionId` filtrado `WHERE CollectionId IS NOT NULL`.
+- **Sin `Cost` en `Products`** (v0.4): el costo pasa a la variante (`ProductVariants.UnitCost`, T-09), porque una talla o un color pueden costar distinto al proveedor.
+- La pieza destacada del hero (`featuredId`) **no** es columna de `Products`, sino `Settings.FeaturedProductId`, y sigue siendo de la línea `Sokko` (lo valida el servicio).
+- **Reglas entre tablas** (servicio, R-32): un producto `Sokko` apunta a la marca propia (`Brands.IsOwnBrand = 1`) y solo usa colores con `IsSokkoTone = 1`; un producto de otra línea no usa tonos Kyoto.
 
-### 3.6 `ProductVariants` — SKU vendible (pieza × tono × talla)
+### 3.5a `Brands` — marcas · v0.4
 
-**Para qué sirve:** la unidad de inventario y de venta. Cada fila es un SKU con su stock y sus pares apartados.
+**Para qué sirve:** la marca de cada producto (T-02): SOKKO (propia), las que se revenden (Nike, Puma, Under Armour…), las **licencias** de los productos licenciados (Marvel, Pokémon…) y "Sin marca" para los genéricos (P-15). Alimenta el filtro "por marca" de la línea Marcas, el menú (`GET /api/catalog/nav`) y los reportes de ventas y margen por marca.
+
+| Columna | Tipo | N | Default | Notas |
+|---|---|---|---|---|
+| `Id` | `INT IDENTITY` | | | **PK** |
+| `Name` | `NVARCHAR(60)` | | | **UQ**. "Nike", "SOKKO" |
+| `Slug` | `VARCHAR(60)` | | | **UQ**. Código de API y de URL: `nike`, `under-armour`, `pokemon`, `sin-marca`. `CK`: `Slug NOT LIKE '%[^a-z0-9-]%'` |
+| `IsOwnBrand` | `BIT` | | `0` | `1` solo en SOKKO |
+| `ShowInFilters` | `BIT` | | `1` | v0.4.2. `0` = no aparece en el filtro de marcas ni en `/api/catalog/nav`, aunque tenga productos visibles. Solo "Sin marca" va en `0` |
+| `IsActive` | `BIT` | | `1` | Baja lógica; una marca con productos no se borra |
+| `CreatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
+
+- `UQ_Brands_OwnBrand`: índice único filtrado sobre (`IsOwnBrand`) `WHERE IsOwnBrand = 1` → como máximo una marca propia.
+- **Licencias como marca (P-15):** una calceta de Pokémon o de Marvel es mercancía con licencia oficial comprada a distribuidor; su marca es la licencia, así el filtro y el reporte "ventas por marca" la muestran. El distribuidor no se modela en v1.
+- **Índices:** los `UQ` de `Name` y `Slug` cubren el filtro y el menú.
+
+### 3.5b `ProductTypes` — tipos de producto · v0.4
+
+**Para qué sirve:** qué es el producto (T-03): calcetas, gorras, gorros, guantes, bufandas, mangas o lentes. El tipo define el **sistema de tallas** que aplica y cómo se cuenta (`par` o `pieza`).
+
+| Columna | Tipo | N | Default | Notas |
+|---|---|---|---|---|
+| `Id` | `INT IDENTITY` | | | **PK** |
+| `Code` | `VARCHAR(20)` | | | **UQ**. Código de API: `calcetas`, `gorras`, `gorros`, `guantes`, `bufandas`, `mangas`, `lentes`. `CK`: `Code NOT LIKE '%[^a-z0-9-]%'` |
+| `Name` | `NVARCHAR(40)` | | | **UQ**. "Calcetas", "Guantes" |
+| `SizeSystem` | `VARCHAR(10)` | | | `CK_ProductTypes_SizeSystem`: `IN ('Calceta','Guante','Unitalla')` |
+| `UnitLabel` | `VARCHAR(6)` | | `'Pieza'` | `CK_ProductTypes_UnitLabel`: `IN ('Par','Pieza')`. La tienda arma "par", "paquete de 3 pares" o "pieza" con esto y `Products.UnitsPerPack` |
+| `SortOrder` | `TINYINT` | | `0` | Orden en menús y filtros |
+| `IsActive` | `BIT` | | `1` | |
+
+- **Índices:** los `UQ` de `Code` y `Name`.
+- Cambiar el `SizeSystem` de un tipo que ya tiene productos rompería R-32: el servicio lo rechaza.
+
+### 3.5c `Collections` — colecciones de temporada y temáticas · v0.4
+
+**Para qué sirve:** agrupa productos de **temporada** (Navidad, Halloween…), con una **ventana anual que se repite cada año** y descuento fuera de temporada, y **temáticos** (Anime, Superhéroes…), siempre visibles (T-06). Alimenta R-28 (visibilidad) y R-29 (precio).
+
+| Columna | Tipo | N | Default | Notas |
+|---|---|---|---|---|
+| `Id` | `INT IDENTITY` | | | **PK** |
+| `Name` | `NVARCHAR(80)` | | | **UQ**. "Navidad" (sin año: la colección se repite cada año) |
+| `Slug` | `VARCHAR(80)` | | | **UQ**. Código de API: `navidad`. `CK`: `Slug NOT LIKE '%[^a-z0-9-]%'` |
+| `Kind` | `VARCHAR(10)` | | | `CK_Collections_Kind`: `IN ('Temporada','Tematica')` |
+| `StartMonth` | `TINYINT` | N | | v0.4.2. Mes de inicio (1–12). `CK_Collections_StartMonth`: `StartMonth IS NULL OR StartMonth BETWEEN 1 AND 12` |
+| `StartDay` | `TINYINT` | N | | Día de inicio, **inclusivo**. `CK_Collections_StartDay`: día válido para `StartMonth` (abajo) |
+| `EndMonth` | `TINYINT` | N | | Mes de fin (1–12). `CK_Collections_EndMonth`: `EndMonth IS NULL OR EndMonth BETWEEN 1 AND 12` |
+| `EndDay` | `TINYINT` | N | | Día de fin, **inclusivo**. `CK_Collections_EndDay`: día válido para `EndMonth` |
+| `StartKey` | `AS (StartMonth * 100 + StartDay) PERSISTED` | N | | Calculada: `1101` = 1-nov. Simplifica la consulta de R-28 |
+| `EndKey` | `AS (EndMonth * 100 + EndDay) PERSISTED` | N | | Calculada: `106` = 6-ene |
+| `OffSeasonDiscountPct` | `DECIMAL(5,4)` | | `0.3000` | Descuento fuera de temporada (T-08, P-12). `CK_Collections_Discount`: `OffSeasonDiscountPct >= 0 AND OffSeasonDiscountPct < 1` |
+| `IsActive` | `BIT` | | `1` | Baja lógica |
+| `CreatedAt` / `UpdatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
+
+- `CK_Collections_Window`: `(Kind = 'Tematica' AND StartMonth IS NULL AND StartDay IS NULL AND EndMonth IS NULL AND EndDay IS NULL) OR (Kind = 'Temporada' AND StartMonth IS NOT NULL AND StartDay IS NOT NULL AND EndMonth IS NOT NULL AND EndDay IS NOT NULL)`. Una temática no tiene ventana; una de temporada tiene los 4 valores.
+- `CK_Collections_StartDay` (y `CK_Collections_EndDay`, igual con `EndMonth`/`EndDay`): `StartDay IS NULL OR (StartDay >= 1 AND ((StartMonth IN (1,3,5,7,8,10,12) AND StartDay <= 31) OR (StartMonth IN (4,6,9,11) AND StartDay <= 30) OR (StartMonth = 2 AND StartDay <= 28)))`. El 29 de febrero no se acepta, para que la ventana exista todos los años.
+- **Ventana anual recurrente (v0.4.2):** la colección se captura una sola vez ("Navidad: 1-nov → 6-ene") y vale cada año; no hay que darla de alta de nuevo. Los dos extremos son **inclusivos** y se interpretan en la hora local del negocio.
+- **Algoritmo "¿está en temporada hoy?"** (`CatalogService.IsInSeason`, R-28):
+  1. `hoy` = fecha local en `America/Mazatlan` (UTC−7, sin horario de verano), obtenida con `Clock` a partir de la hora UTC del servidor.
+  2. `t = mes(hoy) × 100 + día(hoy)`; `s = StartKey`; `e = EndKey`.
+  3. Si `s <= e` (no cruza de año): en temporada si `s <= t <= e`.
+  4. Si `s > e` (cruza de año, por ejemplo 1-dic → 6-ene): en temporada si `t >= s` **o** `t <= e`.
+  5. Una temática siempre está "en temporada".
+- **Casos de ejemplo** con una ventana que cruza de año, 1-dic → 6-ene (`s = 1201`, `e = 106`):
+
+  | Fecha local | `t` | ¿En temporada? | Motivo |
+  |---|---|---|---|
+  | 30-nov | `1130` | No | `1130 < 1201` y `1130 > 106`: pretemporada (P-14) |
+  | 31-dic | `1231` | Sí | `1231 >= 1201` |
+  | 3-ene | `103` | Sí | `103 <= 106` |
+  | 7-ene | `107` | No | `107 > 106` y `107 < 1201`: ya terminó |
+
+  Con la Navidad de la semilla (1-nov → 6-ene, `s = 1101`), el 30-nov sí está en temporada (`1130 >= 1101`).
+- La misma regla en SQL, para filtrar en la consulta con `@t` calculado en .NET: `Kind = 'Tematica' OR (StartKey <= EndKey AND @t BETWEEN StartKey AND EndKey) OR (StartKey > EndKey AND (@t >= StartKey OR @t <= EndKey))`.
+- En una temática `OffSeasonDiscountPct` no se usa, porque nunca está fuera de temporada.
+- **Índices:** `UQ_Collections_Slug` · `UQ_Collections_Name` · `IX_Collections_Kind_Window` (`Kind`, `StartKey`, `EndKey`) `INCLUDE (OffSeasonDiscountPct)` filtrado `WHERE IsActive = 1`: colecciones en temporada para el menú y para R-28. Con pocas colecciones basta un recorrido; el índice evita leer la tabla completa en cada listado.
+
+### 3.6 `ProductVariants` — SKU vendible (producto × color × talla)
+
+**Para qué sirve:** la unidad de inventario y de venta. Cada fila es un SKU con su stock, sus unidades apartadas y, desde v0.4, su costo y su código de barras.
 
 | Columna | Tipo | N | Default | Notas |
 |---|---|---|---|---|
 | `Id` | `INT IDENTITY` | | | **PK** |
 | `ProductId` | `INT` | | | **FK** → `Products(Id)` `ON DELETE NO ACTION` |
-| `ToneCode` | `VARCHAR(20)` | | | **FK** → `Tones(Code)` `ON DELETE NO ACTION` |
-| `SizeCode` | `VARCHAR(3)` | | | **FK** → `Sizes(Code)` `ON DELETE NO ACTION` |
-| `Sku` | `VARCHAR(20)` | | | **UQ**. `SKK-{PieceNumber 3 dígitos}-{Tones.SkuCode}-{SizeCode}` → `SKK-007-SUM-M`. `CK_ProductVariants_SkuFormat`: `Sku COLLATE Latin1_General_100_BIN2 LIKE 'SKK-[0-9][0-9][0-9]-[A-Z][A-Z][A-Z]-' + SizeCode`. Patrón exacto, sin `%` abierto: el sufijo es la talla de la propia fila (válida por la FK a `Sizes`) y `BIN2` exige mayúsculas aunque la BD sea *CI* |
-| `Stock` | `INT` | | `0` | Pares físicos en almacén. `CK_ProductVariants_Stock`: `Stock >= 0` |
-| `Reserved` | `INT` | | `0` | Pares apartados por pedidos sin enviar. `CK_ProductVariants_Reserved`: `Reserved >= 0` |
+| `ColorCode` | `CHAR(3)` | | | v0.4 (antes `ToneCode`). **FK** → `Colors(Code)` `ON DELETE NO ACTION` |
+| `SizeId` | `INT` | | | v0.4 (antes `SizeCode`). **FK** → `Sizes(Id)` `ON DELETE NO ACTION`. Debe ser del sistema de tallas del tipo del producto (R-32) |
+| `Sku` | `VARCHAR(20)` | | | **UQ**. `{LÍNEA}-{PieceNumber 3 dígitos}-{Colors.Code}-{Sizes.Code}` (T-11) → `SKK-007-SUM-M`, `MRC-001-NEG-L`, `ACC-001-NEG-U`. Ver `CK_ProductVariants_SkuFormat` abajo |
+| `Barcode` | `VARCHAR(32)` | N | | v0.4 (T-12). Código de barras o UPC del proveedor. Único entre los que no son `NULL` (índice filtrado, abajo). `CK`: `Barcode IS NULL OR Barcode NOT LIKE '%[^0-9A-Za-z]%'` |
+| `UnitCost` | `DECIMAL(10,2)` | N | | v0.4 (T-09, R-30). Costo de compra por unidad vendible. `CK_ProductVariants_UnitCost`: `UnitCost IS NULL OR UnitCost >= 0`. **Solo el Dueño** lo recibe en la API |
+| `Stock` | `INT` | | `0` | Unidades físicas en almacén (pares, paquetes o piezas). `CK_ProductVariants_Stock`: `Stock >= 0` |
+| `Reserved` | `INT` | | `0` | Unidades apartadas por pedidos sin enviar. `CK_ProductVariants_Reserved`: `Reserved >= 0` |
 | `IsActive` | `BIT` | | `1` | |
 | `RowVersion` | `ROWVERSION` | | | Concurrencia optimista solo para ediciones del panel (catálogo, ajuste manual). El checkout y la salida usan `UPDATE` atómico (§4.1) |
 
@@ -430,8 +585,15 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
   - **Conteo físico** o **importación** (`InventarioInicial`) con un número menor que `Reserved` se rechaza: "El conteo ({n}) es menor que los {apartados} pares apartados. Cancele o surta esos pedidos antes de ajustar."
   - La API responde **409** (conflicto con pedidos apartados) o **422** (cantidad inválida) con ese mensaje; nunca deja que salte el CHECK. En la importación, la fila se marca con error en la vista previa y no se aplica.
   - El dominio del panel (`apps/admin-panel/src/domain/inventory.js`, que hoy valida la Merma contra `stock`) se alinea en un **PR aparte del frontend**; este documento no lo modifica.
-- `UQ_ProductVariants_Product_Tone_Size`: (`ProductId`, `ToneCode`, `SizeCode`) → no hay dos SKU para la misma combinación.
-- **Índices:** `UQ_ProductVariants_Sku` (búsqueda del panel, importación CSV) · `IX_ProductVariants_ToneCode` (filtro por tono).
+- `CK_ProductVariants_SkuFormat` (v0.4, T-11):
+  `LEFT(Sku, 4) IN ('SKK-','MRC-','ESP-','ACC-') AND (Sku COLLATE Latin1_General_100_BIN2 LIKE '[A-Z][A-Z][A-Z]-[0-9][0-9][0-9]-[A-Z][A-Z][A-Z]-[A-Z0-9]' OR Sku COLLATE Latin1_General_100_BIN2 LIKE '[A-Z][A-Z][A-Z]-[0-9][0-9][0-9]-[A-Z][A-Z][A-Z]-[A-Z0-9][A-Z0-9]' OR Sku COLLATE Latin1_General_100_BIN2 LIKE '[A-Z][A-Z][A-Z]-[0-9][0-9][0-9]-[A-Z][A-Z][A-Z]-[A-Z0-9][A-Z0-9][A-Z0-9]')`.
+  Acepta los 4 prefijos y tallas de 1 a 3 caracteres, en mayúsculas y sin `%` abierto. **Los SKU de SOKKO no cambian.** En v0.3 el sufijo se comparaba con `SizeCode` de la misma fila; con `SizeId` la talla ya no está en la fila, así que el servicio garantiza que el prefijo corresponda a `Products.Line`, el número a `PieceNumber`, el color a `ColorCode` y el sufijo a `Sizes.Code` (R-06).
+- `UQ_ProductVariants_Product_Color_Size`: (`ProductId`, `ColorCode`, `SizeId`) → no hay dos SKU para la misma combinación.
+- `UQ_ProductVariants_Barcode`: índice **único filtrado** sobre `Barcode` `WHERE Barcode IS NOT NULL`. Un `UNIQUE` normal de SQL Server solo admite **un** `NULL`, y la mayoría de las variantes (todas las de SOKKO) no tienen código de barras.
+- **Índices:** `UQ_ProductVariants_Sku` (búsqueda del panel, importación CSV) · `IX_ProductVariants_ColorCode` (filtro por color) · `IX_ProductVariants_SizeId` · `UQ_ProductVariants_Barcode` (búsqueda por escáner).
+- **R-32 · la talla pertenece al sistema del tipo:** `Sizes.SizeSystem` de la variante debe ser igual a `ProductTypes.SizeSystem` del producto. Cruza tres tablas, así que un `CHECK` no lo puede expresar. Se valida en el **servicio** (`CatalogService` al crear o editar variantes, y al cambiar el tipo de un producto) con mensaje claro. Alternativas consideradas:
+  - **Trigger** `AFTER INSERT, UPDATE` en `ProductVariants` (y otro en `Products` al cambiar `ProductTypeId`): cierra el hueco aunque alguien escriba por SQL directo, pero EF Core 7+ necesita `HasTrigger()` en el modelo (desactiva el `OUTPUT` en los `INSERT`), la lógica queda repartida entre C# y T-SQL, y el catálogo lo edita solo el Dueño, con poco volumen. **No en v1**; se reconsidera si aparece importación masiva por SQL.
+  - **FK compuestas** (`SizeSystem` copiado en `Products` y `ProductVariants`): lo garantiza la BD sin trigger, pero obliga a llaves alternas, que en EF Core son inmutables (el mismo problema que se evitó en `Shipments`, D-13). Descartado.
 - "Disponible" (`Stock − Reserved`) y el estado `agotado/pocos/ok` **no** se guardan: se calculan en consulta, porque el umbral vive en `Settings` y cambia.
 
 ### 3.7 `InventoryMovements` — kárdex
@@ -529,10 +691,10 @@ CHECK de pago antes de surtir (OXXO Pay):
 | `VariantId` | `INT` | | | **FK** → `ProductVariants(Id)` `ON DELETE NO ACTION` |
 | `SkuSnapshot` | `VARCHAR(20)` | | | Copia del SKU |
 | `ProductNameSnapshot` | `NVARCHAR(120)` | | | Copia del nombre de la pieza |
-| `ToneNameSnapshot` | `NVARCHAR(40)` | | | "Tinta Sumi" |
+| `ToneNameSnapshot` | `NVARCHAR(40)` | | | "Tinta Sumi", "Negro". Desde v0.4 copia `Colors.Name`; se conserva el nombre de columna porque `OrderItems` no cambia (`DECISIONES_CATALOGO` §5) |
 | `SizeCodeSnapshot` | `VARCHAR(3)` | | | |
 | `Quantity` | `INT` | | | `CK_OrderItems_Quantity`: `> 0` |
-| `UnitPrice` | `DECIMAL(10,2)` | | | **Precio histórico** (`UnitPriceAtPurchase` en `DESIGN` §9). `CK`: `>= 0` |
+| `UnitPrice` | `DECIMAL(10,2)` | | | **Precio histórico** (`UnitPriceAtPurchase` en `DESIGN` §9): el precio **cobrado**, con el descuento de R-29 si aplicaba al comprar. `CK`: `>= 0` |
 | `LineTotal` | `AS (CAST(Quantity * UnitPrice AS DECIMAL(10,2))) PERSISTED` | | | |
 
 - `UQ_OrderItems_Order_Variant` (`OrderId`, `VariantId`): una línea por SKU por pedido; repetir un SKU suma cantidad, igual que el carrito (`DESIGN` §4.4) y el seed.
@@ -612,6 +774,52 @@ CHECK de pago antes de surtir (OXXO Pay):
 
 Las zonas locales no viajan en `/api/config`: la tienda cotiza por CP con `POST /api/shipping/quote` y el checkout recalcula en el servidor. `web-store` (`config/commerce.js`, hoy con `SHIPPING_COST`) y `admin-panel` se adaptan a este contrato en la **rama de integración** con la API, no en este PR.
 
+**Contratos de catálogo (v0.4).** Sustituyen a `GET /api/products?section=home` de `DESIGN` §9, que queda como un caso particular (`?line=sokko&section=home`). Todos los códigos son los de API de §1.6 y los *slugs* de cada tabla; la API **nunca** expone `UnitCost` en estas rutas públicas (R-30).
+
+`GET /api/products` — listado de la tienda.
+
+| Parámetro | Ejemplo | Efecto |
+|---|---|---|
+| `line` | `sokko`, `marcas`, `especiales`, `accesorios` | Filtra por `Products.Line` |
+| `brand` | `nike` | Filtra por `Brands.Slug` |
+| `type` | `guantes` | Filtra por `ProductTypes.Code` |
+| `collection` | `halloween` | Filtra por `Collections.Slug` |
+| `section` | `home` | Selección del Home: hero SOKKO (`Settings.FeaturedProductId`), "Temporada" (solo con colección activa), "Marcas favoritas", "Completa tu look" |
+| `q` | `navidad` | Búsqueda por nombre, material, marca y colección (sin distinguir acentos, §1.2) |
+| `page`, `pageSize` | `1`, `24` | Paginación; `pageSize` máximo 48 |
+
+- **Sin `q`**: aplica R-28 y excluye los productos de colecciones de temporada fuera de fecha, además de los inactivos.
+- **Con `q`**: incluye la temporada inactiva, marcada con `offSeason: true` y con el precio de R-29 (`C-02`).
+
+Cada producto de la respuesta:
+
+| Campo | Ejemplo | Origen |
+|---|---|---|
+| `id`, `slug` | `202`, `"calceta-calabaza"` | `Products` |
+| `line` | `"especiales"` | `Products.Line` (§1.6) |
+| `brand` | `{ "slug": "sin-marca", "name": "Sin marca" }` | `Brands` |
+| `type` | `{ "code": "calcetas", "unitLabel": "par", "sizeSystem": "calceta" }` | `ProductTypes` |
+| `collection` | `{ "slug": "halloween", "name": "Halloween", "kind": "temporada" }` o `null` | `Collections` |
+| `name`, `nameJp`, `material`, `imageUrl`, `editionSize` | | `Products` (`nameJp` es `null` fuera de SOKKO) |
+| `unitsPerPack` | `3` | `Products.UnitsPerPack` ("paquete de 3 pares") |
+| `price` | `179.00` | Precio de lista |
+| `finalPrice` | `125.30` | Precio a cobrar: igual a `price`, o con descuento si `offSeason` (R-29) |
+| `offSeason`, `discountPct` | `true`, `0.30` | R-28 / R-29. La tienda muestra "Fuera de temporada · −30 %" y `price` tachado |
+| `variants` | `[{ "sku": "ESP-002-MUL-M", "color": "multicolor", "size": "M", "stock": 6 }]` | `ProductVariants` (`color` = `Colors.Slug`, `size` = `Sizes.Code`, `stock` = disponible) |
+
+`GET /api/products/{slug}` — ficha por URL directa: mismo objeto, **también** para temporada inactiva (R-28), con su tabla de tallas según `type.sizeSystem`. `404` si el producto no existe o está inactivo.
+
+`GET /api/catalog/nav` — datos para armar el menú de la tienda:
+
+| Campo | Contenido |
+|---|---|
+| `lines` | Las 4 líneas en orden de menú: `[{ "code": "sokko", "label": "SOKKO Japón" }, …]` (SOKKO primero, T-01) |
+| `brands` | Marcas con `ShowInFilters = 1` y al menos un producto **visible** (R-28): `[{ "slug": "nike", "name": "Nike" }]`. "Sin marca" nunca aparece |
+| `collections` | Colecciones activas: temáticas y de temporada dentro de su ventana hoy (R-28): `[{ "slug": "halloween", "name": "Halloween", "kind": "temporada" }]` |
+| `types` | Tipos con productos visibles, para el filtro de Accesorios: `[{ "code": "guantes", "name": "Guantes" }]` |
+
+Rutas de administración (solo Dueño, `[Authorize(Roles = "Owner")]`): CRUD de `/api/admin/brands`, `/api/admin/collections` y `/api/admin/product-types`. El DTO de variante del panel tiene dos formas: con `unitCost` (Dueño) y sin él (Operaciones).
+
 ### 3.13 `LocalDeliveryZones` — zona de entrega local
 
 **Para qué sirve:** los CP o rangos de CP donde aplica la entrega local con repartidor (Los Mochis y ejidos de Ahome).
@@ -644,6 +852,8 @@ Las zonas locales no viajan en `/api/config`: la tienda cotiza por CP con `POST 
 | `AuditLogs` | ⏳ P2 | `DESIGN_ADMIN` §9 la marca como P2. `OrderStatusHistory` y `InventoryMovements` ya cubren lo crítico |
 | `Payments` | ⏳ Al integrar pasarela | En v1 el pago es simulado y cabe en 4 columnas de `Orders`. Con pagos parciales o reintentos se separa |
 | `Carts` / `CartItems` | ❌ | Sin tabla de carrito: vive en el navegador (`localStorage` `sokko.cart.v1`, `DESIGN` §4.4); el checkout recalcula precios y envío en el servidor |
+| `Bundles` (paquetes armados) | ❌ v1 · v0.4 | Gorro + bufanda + calcetas como un solo artículo: el cliente no lo pidió (T-13). Un paquete del proveedor, como el Nike de 3 pares, **no** es un bundle: es un producto con `UnitsPerPack = 3` |
+| `Lines` (tabla de líneas) | ❌ · v0.4 | Las 4 líneas son fijas y cambian la tienda: enum con `CHECK` (T-01, §1.3) |
 
 ### 3.15 Índices (resumen)
 
@@ -653,16 +863,22 @@ SQL Server **no** indexa las FK por sí solo; EF Core sí crea por convención u
 |---|---|---|---|
 | `Users` | `UQ_Users_Email` | `Email` | Login, R-01 |
 | | `IX_Users_Role` (filtrado `Role <> 'Customer'`) | `Role` | Usuarios internos en Configuración |
-| | `IX_Users_PreferredSizeCode` | `PreferredSizeCode` | FK (convención EF) |
+| | `IX_Users_PreferredSizeId` | `PreferredSizeId` | FK (convención EF) |
 | `PasswordResetTokens` | `UQ_PasswordResetTokens_TokenHash` | `TokenHash` | `reset-password` |
 | | `IX_PasswordResetTokens_UserId_ExpiresAt` | `UserId`, `ExpiresAt` | Cubre la FK `UserId`; invalidar y depurar |
-| `Tones` | `UQ_Tones_Name`, `UQ_Tones_SkuCode` | | Unicidad |
-| `Sizes` | `UQ_Sizes_SortOrder` | | Unicidad |
-| `Products` | `UQ_Products_PieceNumber` · `IX_Products_IsActive` | | SKU y listado de la tienda |
+| `Colors` | `UQ_Colors_Slug`, `UQ_Colors_Name` · `IX_Colors_IsSokkoTone` | | Unicidad; filtro de SOKKO Japón |
+| `Sizes` | `UQ_Sizes_System_Code` · `UQ_Sizes_System_SortOrder` | `SizeSystem`, `Code` / `SortOrder` | Unicidad por sistema |
+| `Brands` | `UQ_Brands_Name`, `UQ_Brands_Slug` · `UQ_Brands_OwnBrand` (filtrado `IsOwnBrand = 1`) | | Unicidad; una sola marca propia |
+| `ProductTypes` | `UQ_ProductTypes_Code`, `UQ_ProductTypes_Name` | | Unicidad |
+| `Collections` | `UQ_Collections_Slug`, `UQ_Collections_Name` · `IX_Collections_Kind_Window` (filtrado `IsActive = 1`) | `Kind`, `StartKey`, `EndKey` + `INCLUDE (OffSeasonDiscountPct)` | Unicidad; colecciones en temporada (R-28) |
+| `Products` | `UQ_Products_Line_PieceNumber` · `UQ_Products_Slug` | `Line`, `PieceNumber` / `Slug` | SKU por línea; URL directa |
+| | `IX_Products_Line_IsActive` | `Line`, `IsActive` + `INCLUDE (BrandId, ProductTypeId, CollectionId, Price)` | Listados por línea |
+| | `IX_Products_BrandId` · `IX_Products_ProductTypeId` · `IX_Products_CollectionId` (filtrado) | | FK; filtros `brand`, `type`, `collection` |
 | `ProductVariants` | `UQ_ProductVariants_Sku` | `Sku` | Búsqueda, importación CSV |
-| | `UQ_ProductVariants_Product_Tone_Size` | `ProductId`, `ToneCode`, `SizeCode` | R-05; cubre la FK `ProductId` |
-| | `IX_ProductVariants_ToneCode` | `ToneCode` | FK; filtro por tono |
-| | `IX_ProductVariants_SizeCode` | `SizeCode` | FK (convención EF); ventas por talla |
+| | `UQ_ProductVariants_Product_Color_Size` | `ProductId`, `ColorCode`, `SizeId` | R-05; cubre la FK `ProductId` |
+| | `IX_ProductVariants_ColorCode` | `ColorCode` | FK; filtro por color |
+| | `IX_ProductVariants_SizeId` | `SizeId` | FK (convención EF); ventas por talla |
+| | `UQ_ProductVariants_Barcode` (filtrado `Barcode IS NOT NULL`) | `Barcode` | Búsqueda por escáner (T-12) |
 | `InventoryMovements` | `IX_InventoryMovements_VariantId_CreatedAt` | `VariantId`, `CreatedAt DESC` + `INCLUDE` | Kárdex; cubre la FK `VariantId` |
 | | `IX_InventoryMovements_OrderId` (filtrado `OrderId IS NOT NULL`) | `OrderId` | FK; ventas y devoluciones de un pedido |
 | | `IX_InventoryMovements_CreatedByUserId` | `CreatedByUserId` | FK (convención EF) |
@@ -693,8 +909,8 @@ SQL Server **no** indexa las FK por sí solo; EF Core sí crea por convención u
 | R-02 | Contraseña: ≥ 8, mayúsculas, minúsculas, número | AUTH §5.2 | — (solo ve el hash) | Valida y hashea con `PasswordHasher` |
 | R-03 | Rol válido | ADMIN §3 | `CK_Users_Role` | `[Authorize(Roles = …)]` y *claim* en el JWT |
 | R-04 | Token de restablecimiento: 30 min y un solo uso | AUTH §4.4 | `CK` `ExpiresAt > CreatedAt`, `UQ` del hash | Fija `ExpiresAt = now + 30 min`, compara hash, marca `UsedAt`, responde `202` siempre |
-| R-05 | Un SKU por combinación pieza-tono-talla | DESIGN §9 | `UQ_ProductVariants_Product_Tone_Size`, `UQ` de `Sku` | Genera el SKU con el formato |
-| R-06 | Formato de SKU `SKK-###-XXX-T` | ADMIN §6.1 | `CK_ProductVariants_SkuFormat` (forma) | Garantiza que corresponda a la pieza, el tono y la talla |
+| R-05 | Un SKU por combinación producto-color-talla | DESIGN §9 | `UQ_ProductVariants_Product_Color_Size`, `UQ` de `Sku` | Genera el SKU con el formato |
+| R-06 | Formato de SKU `{SKK·MRC·ESP·ACC}-###-XXX-T` (v0.4, T-11) | ADMIN §6.1, CATALOGO T-11 | `CK_ProductVariants_SkuFormat` (prefijo y forma) | Garantiza que el prefijo corresponda a la línea y el resto al producto, el color y la talla |
 | R-07 | Stock y apartados nunca negativos; apartado ≤ stock | ADMIN §5.1, §5.3 | `CK` `Stock >= 0`, `Reserved >= 0`, `Reserved <= Stock` | Valida disponible antes de apartar ("No hay pares suficientes") |
 | R-08 | Pedido pagado aparta pares | ADMIN §5.1 | `CK_ProductVariants_ReservedLeStock` (red de seguridad) | `UPDATE` atómico condicionado por línea en la transacción del checkout (§4.1) |
 | R-09 | Enviar / salir a ruta descuenta stock y escribe "Venta" | ADMIN §5.1 | `CK_InventoryMovements_OrderRequired`, `CK` de signo | `Stock -= qty`, `Reserved -= qty` con `OUTPUT inserted.Stock` como `Balance`, inserta movimiento, todo en **una transacción** (§4.1) |
@@ -708,7 +924,7 @@ SQL Server **no** indexa las FK por sí solo; EF Core sí crea por convención u
 | R-17 | Atrasado = en bodega +48 h | ADMIN §5.1 | `IX_Orders_Status_CreatedAt` (rendimiento) | Calcula con `CreatedAt` y la hora del servidor |
 | R-18 | Kárdex: saldo nunca negativo; motivo obligatorio en Merma y Devolución; Venta y Devolución ligadas a su pedido | ADMIN §5.3 | `CK_InventoryMovements_Balance`, `CK_..._NoteRequired`, `CK_..._Sign`, `CK_..._OrderRequired` | Valida cantidades y mensajes ("No puede sacar más de {n} pares.") |
 | R-19 | Último saldo del kárdex = stock del SKU | ADMIN §6.1 | — (cruza filas) | Movimiento y stock en la misma transacción; prueba de integración que lo verifica |
-| R-20 | Importación CSV: SKU existente, stock entero ≥ 0, duplicados | ADMIN §5.4 | FK/`UQ` de SKU, `CK` de stock | `previewCsv` en C#; aplica solo filas válidas como `InventarioInicial` |
+| R-20 | Importación CSV: SKU existente, stock entero ≥ 0, duplicados | ADMIN §5.4 | FK/`UQ` de SKU, `CK` de stock | `previewCsv` en C#; aplica solo filas válidas como `InventarioInicial`. v0.4: columnas nuevas `line`, `brand`, `type`, `collection`, `unit_cost`, `barcode` (`DECISIONES_CATALOGO` §5) |
 | R-21 | CP de 5 dígitos; rango con inicio ≤ fin | ADMIN §5.2 | `CK` de formato y `From <= To` | Valida y además evita rangos encimados |
 | R-22 | Configuración: montos enteros ≥ 0, umbral > 0, al menos una zona | ADMIN §7 | `CK` de `Settings` | "Al menos un CP" y enteros (la BD admite centavos) |
 | R-23 | Una sola fila de configuración | — | `CK_Settings_Singleton` | — |
@@ -716,6 +932,11 @@ SQL Server **no** indexa las FK por sí solo; EF Core sí crea por convención u
 | R-25 | Concurrencia: dos operadores sobre el mismo pedido o SKU desde el panel | — | `ROWVERSION` | Captura `DbUpdateConcurrencyException` → `409` con mensaje. El checkout y la salida no usan este mecanismo (§4.1) |
 | R-26 | Cliente registrado acepta términos | AUTH §4.3 | `CK_Users_CustomerAcceptedTerms` | Rechaza el registro sin `acceptedTerms` |
 | R-27 | Merma ≤ `Stock − Reserved`; Conteo físico o importación por debajo de `Reserved` se rechaza | ADMIN §5.3, §5.4 | `CK_ProductVariants_ReservedLeStock` (red de seguridad) | Valida antes de escribir y responde `409`/`422` con mensaje claro, **nunca 500** (§3.6). El panel se alinea en un PR aparte del frontend |
+| R-28 | Visibilidad por temporada: un producto de una colección `Temporada` fuera de su ventana anual `[inicio, fin]` (inclusiva, hora de `America/Mazatlan`, puede cruzar de año), **antes o después** de la temporada (P-14), no aparece en listados, Home ni menú, pero sí en la búsqueda `q` y por URL directa | CATALOGO C-02, T-07 | `CK_Collections_Window` y `CK_Collections_StartDay`/`EndDay` (ventana coherente); `IX_Collections_Kind_Window` (rendimiento); la visibilidad **no** se guarda | `CatalogService.IsInSeason(collection, hoy)` con el algoritmo de §3.5c; filtra listados, `section=home` y `/api/catalog/nav`, y la incluye con `q` y `/{slug}` |
+| R-29 | Precio fuera de temporada = `Price × (1 − OffSeasonDiscountPct)`, a 2 decimales; la tienda tacha el original | CATALOGO C-02, T-08 | `CK_Collections_Discount` (`0 ≤ pct < 1`); `OrderItems.UnitPrice` guarda el precio cobrado | `CatalogService.GetEffectivePrice(product, hoy)`: precio base, o con descuento si `IsInSeason` es falso (`Math.Round(…, 2, MidpointRounding.AwayFromZero)`). `CheckoutOrder` cobra ese precio; nunca se confía en el precio del navegador |
+| R-30 | Costo por variante, solo para el Dueño; margen calculado, no guardado | CATALOGO C-03, T-09 | `CK_ProductVariants_UnitCost` (`NULL` o `≥ 0`) | DTO con `unitCost` solo para `Owner`; Operaciones y la tienda no reciben el campo; edición con `[Authorize(Roles = "Owner")]`; margen = `UnitPrice − UnitCost` en reportes |
+| R-31 | Un producto de Especiales pertenece a una colección; una temática no tiene ventana y una de temporada tiene los 4 valores con días válidos | CATALOGO T-06 | `CK_Products_CollectionRequired`, `CK_Collections_Window`, `CK_Collections_StartDay`/`EndDay` | Mensajes del formulario del panel |
+| R-32 | Coherencia del catálogo: la talla de la variante es del sistema de su tipo; los tonos Kyoto y la marca propia son solo de SOKKO; el prefijo del SKU corresponde a la línea | CATALOGO T-04, T-05, T-11 | — (cruza tablas; trigger opcional, ver §3.6) | `CatalogService` / `InventoryService` validan al crear o editar productos y variantes, y al cambiar el tipo de un producto |
 
 ### 4.1 Transacciones de inventario y concurrencia
 
@@ -732,6 +953,7 @@ Las operaciones que tocan `Stock`/`Reserved` desde la tienda o al surtir **no** 
 - **Balance del kárdex:** siempre sale de `OUTPUT inserted.Stock` del mismo `UPDATE`, nunca de una lectura previa; con eso R-19 (último saldo = stock) se mantiene aunque haya ventas y ajustes simultáneos.
 - **`RowVersion`** queda solo para ediciones desde el panel (catálogo, ajustes manuales, transiciones de pedido, configuración). Un `UPDATE` atómico de checkout también cambia el `RowVersion` de la variante, de modo que un ajuste manual abierto sobre ese SKU recibe `409` y se recarga.
 - **EF Core:** estos `UPDATE` se ejecutan con SQL parametrizado dentro de la transacción del `DbContext` (no con el seguimiento de cambios), porque `ExecuteUpdate` no devuelve `OUTPUT`.
+- **Precio cobrado (v0.4):** al apartar, `CheckoutOrder` pide a `CatalogService.GetEffectivePrice` el precio vigente de cada línea en ese instante (R-29) y lo guarda en `OrderItems.UnitPrice`. Si el precio cambia entre el carrito y el pago, manda el del servidor.
 
 ---
 
@@ -739,60 +961,146 @@ Las operaciones que tocan `Stock`/`Reserved` desde la tienda o al surtir **no** 
 
 La semilla corre en la fase de EF Core (idempotente, solo en Development salvo catálogos y configuración). Fechas de semilla en UTC.
 
-### 5.1 `Tones` (4)
+### 5.1 `Colors` (8)
 
-| Code | Name | Hex | LineHex | SkuCode | SortOrder |
+Los 4 tonos Kyoto conservan sus valores; los 4 genéricos son para las demás líneas (T-05).
+
+| Code | Slug | Name | Hex | LineHex | IsSokkoTone | SortOrder |
+|---|---|---|---|---|---|---|
+| `SUM` | `sumi` | Tinta Sumi | `#2C2925` | `#F4F0EB` | 1 | 1 |
+| `WAS` | `washi` | Blanco Washi | `#EFE8DC` | `#23211E` | 1 | 2 |
+| `LAC` | `laca` | Rojo Laca | `#9E2F2C` | `#F4F0EB` | 1 | 3 |
+| `MAT` | `matcha` | Oliva Matcha | `#6E7A5E` | `#F4F0EB` | 1 | 4 |
+| `NEG` | `negro` | Negro | `#1C1C1C` | `#F4F0EB` | 0 | 5 |
+| `BLA` | `blanco` | Blanco | `#FFFFFF` | `#23211E` | 0 | 6 |
+| `GRI` | `gris` | Gris | `#8A8A8A` | `#F4F0EB` | 0 | 7 |
+| `MUL` | `multicolor` | Multicolor | NULL | NULL | 0 | 8 |
+
+### 5.2 `Sizes` (7)
+
+| Id | SizeSystem | Code | Label | SortOrder |
+|---|---|---|---|---|
+| 1 | Calceta | `S` | 22–24 cm | 1 |
+| 2 | Calceta | `M` | 25–27 cm | 2 |
+| 3 | Calceta | `L` | 28–30 cm | 3 |
+| 4 | Guante | `S` | Chica | 1 |
+| 5 | Guante | `M` | Mediana | 2 |
+| 6 | Guante | `L` | Grande | 3 |
+| 7 | Unitalla | `U` | Unitalla | 1 |
+
+Las tallas de guante y las de calcetas de marca siguen pendientes con el cliente (**P-13**).
+
+### 5.3 `Brands` (6), `ProductTypes` (7) y `Collections` (3)
+
+| Id | Brand | Slug | IsOwnBrand | ShowInFilters |
+|---|---|---|---|---|
+| 1 | SOKKO | `sokko` | 1 | 1 |
+| 2 | Nike | `nike` | 0 | 1 |
+| 3 | Puma | `puma` | 0 | 1 |
+| 4 | Under Armour | `under-armour` | 0 | 1 |
+| 5 | Pokémon | `pokemon` | 0 | 1 |
+| 6 | Sin marca | `sin-marca` | 0 | **0** |
+
+Under Armour no tiene productos en la semilla, así que no aparece en `/api/catalog/nav`. Pokémon es una licencia (P-15). "Sin marca" agrupa los genéricos (temporada sin licencia y accesorios) y nunca sale en el filtro de marcas.
+
+| Id | Code | Name | SizeSystem | UnitLabel | SortOrder |
 |---|---|---|---|---|---|
-| `sumi` | Tinta Sumi | `#2C2925` | `#F4F0EB` | `SUM` | 1 |
-| `washi` | Blanco Washi | `#EFE8DC` | `#23211E` | `WAS` | 2 |
-| `laca` | Rojo Laca | `#9E2F2C` | `#F4F0EB` | `LAC` | 3 |
-| `matcha` | Oliva Matcha | `#6E7A5E` | `#F4F0EB` | `MAT` | 4 |
+| 1 | `calcetas` | Calcetas | Calceta | Par | 1 |
+| 2 | `gorras` | Gorras | Unitalla | Pieza | 2 |
+| 3 | `gorros` | Gorros | Unitalla | Pieza | 3 |
+| 4 | `guantes` | Guantes | Guante | Par | 4 |
+| 5 | `bufandas` | Bufandas | Unitalla | Pieza | 5 |
+| 6 | `mangas` | Mangas | Unitalla | Par | 6 |
+| 7 | `lentes` | Lentes | Unitalla | Pieza | 7 |
 
-### 5.2 `Sizes` (3)
+Ventanas anuales, inclusivas y en hora local de Los Mochis; se repiten cada año (§3.5c).
 
-| Code | Label | SortOrder |
-|---|---|---|
-| `S` | 22–24 cm | 1 |
-| `M` | 25–27 cm | 2 |
-| `L` | 28–30 cm | 3 |
+| Id | Name | Slug | Kind | StartMonth / StartDay | EndMonth / EndDay | `StartKey`–`EndKey` | Ventana | OffSeasonDiscountPct |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Navidad | `navidad` | Temporada | 11 / 1 | 1 / 6 | `1101`–`106` | 1-nov → 6-ene (cruza de año) | 0.3000 |
+| 2 | Halloween | `halloween` | Temporada | 10 / 1 | 11 / 2 | `1001`–`1102` | 1-oct → 2-nov | 0.3000 |
+| 3 | Anime | `anime` | Tematica | NULL / NULL | NULL / NULL | — | Siempre visible | 0.3000 (no se usa) |
 
-### 5.3 `Products` (6)
+Al 26-oct-2026, Halloween está en temporada y Navidad todavía no: sus productos solo salen en la búsqueda y por URL, con −30 %. Es lo que se espera: la pretemporada cuenta como fuera de temporada, y el Dueño decide cuándo arranca la Navidad con su fecha de inicio (P-14).
 
-`Id = PieceNumber` para que coincida con `catalog.mock.js` y `seed.js`.
+### 5.4 `Products` (14)
 
-| Id / PieceNumber | Name | NameJp | Material | Price | EditionSize |
-|---|---|---|---|---|---|
-| 7 | Tabi Origami Noche | 折紙・夜 | Algodón peinado D-200 · pliegue en empeine | 420.00 | 120 |
-| 12 | Lino Komorebi | 木漏れ日 | Lino y algodón · tinte de té verde | 380.00 | NULL |
-| 3 | Kintsugi Washi | 金継ぎ | Algodón peinado · costura dorada visible | 460.00 | 80 |
-| 21 | Hanami Laca | 花見 | Algodón peinado · pigmento mineral rojo | 395.00 | NULL |
-| 15 | Tsuchi Raíz | 土 | Algodón y bambú · teñido con tierra ocre | 360.00 | NULL |
-| 9 | Mizu Calma | 水 | Algodón peinado · punto tubular sin costura | 340.00 | NULL |
+Los 6 de SOKKO no cambian (`Id = PieceNumber`, para que coincidan con `catalog.mock.js` y `seed.js`); se agregan 8 de ejemplo de `DECISIONES_CATALOGO` §5. `ImageUrl = NULL` e `IsActive = 1` en todos; `EditionSize` solo en SOKKO 7 (120) y 3 (80).
 
-`Cost = NULL`, `ImageUrl = NULL`, `IsActive = 1` en todas.
+| Id | Line | PieceNumber | Slug | Name | NameJp | Brand | Type | Collection | Price | UnitsPerPack |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | Sokko | 7 | `tabi-origami-noche` | Tabi Origami Noche | 折紙・夜 | SOKKO | calcetas | — | 420.00 | 1 |
+| 12 | Sokko | 12 | `lino-komorebi` | Lino Komorebi | 木漏れ日 | SOKKO | calcetas | — | 380.00 | 1 |
+| 3 | Sokko | 3 | `kintsugi-washi` | Kintsugi Washi | 金継ぎ | SOKKO | calcetas | — | 460.00 | 1 |
+| 21 | Sokko | 21 | `hanami-laca` | Hanami Laca | 花見 | SOKKO | calcetas | — | 395.00 | 1 |
+| 15 | Sokko | 15 | `tsuchi-raiz` | Tsuchi Raíz | 土 | SOKKO | calcetas | — | 360.00 | 1 |
+| 9 | Sokko | 9 | `mizu-calma` | Mizu Calma | 水 | SOKKO | calcetas | — | 340.00 | 1 |
+| 101 | Marcas | 1 | `nike-everyday-paquete-3` | Nike Everyday · paquete de 3 pares | NULL | Nike | calcetas | — | 449.00 | 3 |
+| 102 | Marcas | 2 | `puma-deportiva-tobillera` | Puma Deportiva tobillera | NULL | Puma | calcetas | — | 189.00 | 1 |
+| 201 | Especiales | 1 | `calceta-navidena-copo` | Calceta navideña Copo | NULL | Sin marca | calcetas | Navidad | 199.00 | 1 |
+| 202 | Especiales | 2 | `calceta-calabaza` | Calceta Calabaza | NULL | Sin marca | calcetas | Halloween | 179.00 | 1 |
+| 203 | Especiales | 3 | `calceta-pokemon-pikachu` | Calceta Pokémon Pikachu (licencia oficial) | NULL | Pokémon | calcetas | Anime | 229.00 | 1 |
+| 301 | Accesorios | 1 | `gorro-tejido` | Gorro tejido | NULL | Sin marca | gorros | — | 249.00 | 1 |
+| 302 | Accesorios | 2 | `guantes-termicos` | Guantes térmicos | NULL | Sin marca | guantes | — | 279.00 | 1 |
+| 303 | Accesorios | 3 | `lentes-de-sol` | Lentes de sol | NULL | Sin marca | lentes | — | 299.00 | 1 |
 
-### 5.4 `ProductVariants` (42 SKU) y stock inicial
+`Material` de los 6 de SOKKO sin cambios (v0.3); en los de ejemplo, la composición del proveedor. La calceta de Pokémon es mercancía **con licencia oficial** comprada a distribuidor (`DECISIONES_CATALOGO` §6); su marca es la licencia (P-15).
 
-Combinaciones = tonos de cada pieza × 3 tallas (14 tonos-pieza × 3 = **42 SKU**). El mock de la tienda da stock **por tono**, no por talla. La propuesta reparte ese número entre S/M/L en partes iguales y el sobrante va primero a M y luego a L (las tallas más vendidas), para que la suma por tono sea igual al mock (ver **P-07**). `Reserved = 0`.
+### 5.4a `ProductVariants` (64 SKU) y stock inicial
+
+**SOKKO (42 SKU, sin cambios):** tonos de cada pieza × 3 tallas de `Calceta` (14 tonos-pieza × 3). El mock de la tienda da stock **por tono**, no por talla: se reparte entre S/M/L en partes iguales y el sobrante va primero a M y luego a L (ver **P-07**). `Reserved = 0`, `UnitCost = NULL` (por capturar, C-03), `Barcode = NULL`.
 
 | Pieza | Tono | Stock mock | SKU S | SKU M | SKU L | S / M / L |
 |---|---|---|---|---|---|---|
-| 7 | sumi | 3 | `SKK-007-SUM-S` | `SKK-007-SUM-M` | `SKK-007-SUM-L` | 1 / 1 / 1 |
-| 7 | washi | 12 | `SKK-007-WAS-S` | `SKK-007-WAS-M` | `SKK-007-WAS-L` | 4 / 4 / 4 |
-| 12 | matcha | 9 | `SKK-012-MAT-S` | `SKK-012-MAT-M` | `SKK-012-MAT-L` | 3 / 3 / 3 |
-| 12 | washi | 4 | `SKK-012-WAS-S` | `SKK-012-WAS-M` | `SKK-012-WAS-L` | 1 / 2 / 1 |
-| 3 | washi | 2 | `SKK-003-WAS-S` | `SKK-003-WAS-M` | `SKK-003-WAS-L` | 0 / 1 / 1 |
-| 3 | sumi | 8 | `SKK-003-SUM-S` | `SKK-003-SUM-M` | `SKK-003-SUM-L` | 2 / 3 / 3 |
-| 3 | laca | 6 | `SKK-003-LAC-S` | `SKK-003-LAC-M` | `SKK-003-LAC-L` | 2 / 2 / 2 |
-| 21 | laca | 11 | `SKK-021-LAC-S` | `SKK-021-LAC-M` | `SKK-021-LAC-L` | 3 / 4 / 4 |
-| 21 | washi | 15 | `SKK-021-WAS-S` | `SKK-021-WAS-M` | `SKK-021-WAS-L` | 5 / 5 / 5 |
-| 15 | matcha | 14 | `SKK-015-MAT-S` | `SKK-015-MAT-M` | `SKK-015-MAT-L` | 4 / 5 / 5 |
-| 15 | sumi | 3 | `SKK-015-SUM-S` | `SKK-015-SUM-M` | `SKK-015-SUM-L` | 1 / 1 / 1 |
-| 9 | washi | 20 | `SKK-009-WAS-S` | `SKK-009-WAS-M` | `SKK-009-WAS-L` | 6 / 7 / 7 |
-| 9 | matcha | 7 | `SKK-009-MAT-S` | `SKK-009-MAT-M` | `SKK-009-MAT-L` | 2 / 3 / 2 |
-| 9 | sumi | 10 | `SKK-009-SUM-S` | `SKK-009-SUM-M` | `SKK-009-SUM-L` | 3 / 4 / 3 |
+| 7 | SUM | 3 | `SKK-007-SUM-S` | `SKK-007-SUM-M` | `SKK-007-SUM-L` | 1 / 1 / 1 |
+| 7 | WAS | 12 | `SKK-007-WAS-S` | `SKK-007-WAS-M` | `SKK-007-WAS-L` | 4 / 4 / 4 |
+| 12 | MAT | 9 | `SKK-012-MAT-S` | `SKK-012-MAT-M` | `SKK-012-MAT-L` | 3 / 3 / 3 |
+| 12 | WAS | 4 | `SKK-012-WAS-S` | `SKK-012-WAS-M` | `SKK-012-WAS-L` | 1 / 2 / 1 |
+| 3 | WAS | 2 | `SKK-003-WAS-S` | `SKK-003-WAS-M` | `SKK-003-WAS-L` | 0 / 1 / 1 |
+| 3 | SUM | 8 | `SKK-003-SUM-S` | `SKK-003-SUM-M` | `SKK-003-SUM-L` | 2 / 3 / 3 |
+| 3 | LAC | 6 | `SKK-003-LAC-S` | `SKK-003-LAC-M` | `SKK-003-LAC-L` | 2 / 2 / 2 |
+| 21 | LAC | 11 | `SKK-021-LAC-S` | `SKK-021-LAC-M` | `SKK-021-LAC-L` | 3 / 4 / 4 |
+| 21 | WAS | 15 | `SKK-021-WAS-S` | `SKK-021-WAS-M` | `SKK-021-WAS-L` | 5 / 5 / 5 |
+| 15 | MAT | 14 | `SKK-015-MAT-S` | `SKK-015-MAT-M` | `SKK-015-MAT-L` | 4 / 5 / 5 |
+| 15 | SUM | 3 | `SKK-015-SUM-S` | `SKK-015-SUM-M` | `SKK-015-SUM-L` | 1 / 1 / 1 |
+| 9 | WAS | 20 | `SKK-009-WAS-S` | `SKK-009-WAS-M` | `SKK-009-WAS-L` | 6 / 7 / 7 |
+| 9 | MAT | 7 | `SKK-009-MAT-S` | `SKK-009-MAT-M` | `SKK-009-MAT-L` | 2 / 3 / 2 |
+| 9 | SUM | 10 | `SKK-009-SUM-S` | `SKK-009-SUM-M` | `SKK-009-SUM-L` | 3 / 4 / 3 |
 
-Total: **124 pares**. Cada SKU con stock > 0 recibe un movimiento `InventarioInicial` (`Quantity = Balance = stock`, `CreatedByName = 'Semilla'`, `Note = 'Inventario inicial de semilla'`), de modo que el kárdex cumple R-19 desde el día uno. `SKK-003-WAS-S` (stock 0) no lleva movimiento.
+Subtotal SOKKO: **124 pares**.
+
+**Ejemplos de las otras líneas (22 SKU):** `Reserved = 0`, `Barcode = NULL` (se captura al importar, T-12). El costo es de ejemplo.
+
+| SKU | Producto | Color | Talla (sistema) | Stock | UnitCost |
+|---|---|---|---|---|---|
+| `MRC-001-NEG-M` | 101 Nike paquete de 3 | NEG | M (Calceta) | 6 | 290.00 |
+| `MRC-001-NEG-L` | 101 | NEG | L (Calceta) | 6 | 290.00 |
+| `MRC-001-BLA-M` | 101 | BLA | M (Calceta) | 4 | 290.00 |
+| `MRC-001-BLA-L` | 101 | BLA | L (Calceta) | 4 | 290.00 |
+| `MRC-002-NEG-S` | 102 Puma tobillera | NEG | S (Calceta) | 5 | 110.00 |
+| `MRC-002-NEG-M` | 102 | NEG | M (Calceta) | 8 | 110.00 |
+| `MRC-002-NEG-L` | 102 | NEG | L (Calceta) | 7 | 110.00 |
+| `ESP-001-MUL-S` | 201 Navideña Copo | MUL | S (Calceta) | 6 | 95.00 |
+| `ESP-001-MUL-M` | 201 | MUL | M (Calceta) | 8 | 95.00 |
+| `ESP-001-MUL-L` | 201 | MUL | L (Calceta) | 6 | 95.00 |
+| `ESP-002-MUL-S` | 202 Calabaza | MUL | S (Calceta) | 4 | 90.00 |
+| `ESP-002-MUL-M` | 202 | MUL | M (Calceta) | 6 | 90.00 |
+| `ESP-002-MUL-L` | 202 | MUL | L (Calceta) | 5 | 90.00 |
+| `ESP-003-MUL-S` | 203 Pokémon Pikachu | MUL | S (Calceta) | 3 | 120.00 |
+| `ESP-003-MUL-M` | 203 | MUL | M (Calceta) | 5 | 120.00 |
+| `ESP-003-MUL-L` | 203 | MUL | L (Calceta) | 4 | 120.00 |
+| `ACC-001-NEG-U` | 301 Gorro tejido | NEG | U (Unitalla) | 10 | 120.00 |
+| `ACC-001-GRI-U` | 301 | GRI | U (Unitalla) | 8 | 120.00 |
+| `ACC-002-NEG-S` | 302 Guantes térmicos | NEG | S (Guante) | 4 | 140.00 |
+| `ACC-002-NEG-M` | 302 | NEG | M (Guante) | 6 | 140.00 |
+| `ACC-002-NEG-L` | 302 | NEG | L (Guante) | 5 | 140.00 |
+| `ACC-003-NEG-U` | 303 Lentes de sol | NEG | U (Unitalla) | 12 | 130.00 |
+
+Subtotal de ejemplo: **132 unidades** (Marcas 40, de las cuales 20 son paquetes de 3 pares; Especiales 47; Accesorios 45).
+
+**Totales:** 14 productos · **64 SKU** · **256 unidades vendibles** (124 SOKKO + 132 de ejemplo; en pares de calceta son 296, porque los 20 paquetes Nike suman 60 pares). Cada SKU con stock > 0 recibe un movimiento `InventarioInicial` (`Quantity = Balance = stock`, `CreatedByName = 'Semilla'`, `Note = 'Inventario inicial de semilla'`): **63 movimientos** (`SKK-003-WAS-S`, con stock 0, no lleva).
+
+Visibilidad de la semilla al 26-oct-2026 (R-28, hoy = `1026`): Halloween (`1001`–`1102`) está en temporada y Navidad (`1101`–`106`) no; se listan 13 productos; `calceta-navidena-copo` solo aparece en la búsqueda y por URL, a 139.30 (199.00 × 0.70).
 
 ### 5.5 `Settings` (1 fila)
 
@@ -803,7 +1111,7 @@ Total: **124 pares**. Cada SKU con stock > 0 recibe un movimiento `InventarioIni
 | `ParcelShippingCost` | 99.00 |
 | `LocalShippingCost` | 49.00 |
 | `LocalFreeShipping` | 1 (local gratis desde el umbral) |
-| `FewUnitsThreshold` | 4 |
+| `FewUnitsThreshold` | 4 ("pocas unidades", T-10) |
 | `IvaRate` | 0.1600 |
 | `FeaturedProductId` | 7 (Tabi Origami Noche) |
 
@@ -820,7 +1128,7 @@ Contraseñas hasheadas con `PasswordHasher<User>` en la semilla; **nunca** en te
 
 | Nombre | Correo | Rol | Contraseña demo | PreferredSize | MarketingOptIn | Origen |
 |---|---|---|---|---|---|---|
-| Aiko Morales | `hola@sokko.mx` | **Owner** | `Kyoto2026` | M | 1 | AUTH §4.2 (cliente demo) **y** ADMIN §4 (Dueño) → ver **P-01** |
+| Aiko Morales | `hola@sokko.mx` | **Owner** | `Kyoto2026` | M (`Sizes.Id` 2, sistema Calceta) | 1 | AUTH §4.2 (cliente demo) **y** ADMIN §4 (Dueño) → ver **P-01** |
 | Daniel Ruiz | `daniel@sokko.mx` | Operations | `Operaciones2026` | NULL | 0 | ADMIN §4 |
 | Kevin Armenta | `kevin@sokko.mx` | Operations | `Operaciones2026` | NULL | 0 | ADMIN §4 |
 | Nexus Code | `nexus@sokko.mx` | **Customer** | `NexusCode2026` | NULL | 0 | `authService.js` (correo ocupado para probar `409`) |
@@ -841,13 +1149,16 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 
 | Servicio | Tipo Erl | Tablas que **escribe** | Tablas que **lee** | Consumidores |
 |---|---|---|---|---|
-| `CatalogService` (Productos) | Entidad | `Products`, `Tones`, `Sizes` (el alta de SKU la pide a `InventoryService`) | `ProductVariants`, `Settings` (pieza destacada) | web-store (`GET /api/products`), admin |
+| `CatalogService` (Productos) | Entidad | `Products`, `Colors`, `Sizes` (el alta de SKU la pide a `InventoryService`) | `ProductVariants`, `Brands`, `ProductTypes`, `Collections`, `Settings` (pieza destacada). Capacidades de precio y visibilidad: `GetEffectivePrice` (precio base + R-29) e `IsInSeason` (R-28) | web-store (`GET /api/products`, `/api/catalog/nav`), `CheckoutOrder`, `ExportService`, admin |
+| `BrandService` (Marcas) · v0.4 | Entidad | `Brands` | — | Catálogo, admin `/brands` (solo Dueño) |
+| `ProductTypeService` (Tipos) · v0.4 | Entidad | `ProductTypes` | `Sizes` | Catálogo, admin `/product-types` (solo Dueño) |
+| `CollectionService` (Colecciones) · v0.4 | Entidad | `Collections` | — | `CatalogService` (ventana y descuento para R-28/R-29), admin `/collections` (solo Dueño) |
 | `UserService` (Usuarios) | Entidad | `Users` | `Sizes` | Auth, admin (`/users`) |
 | `OrderService` (Pedidos) | Entidad | `Orders`, `OrderItems`, `OrderStatusHistory`, `Shipments` | — | Checkout, Fulfill, admin |
 | `InventoryService` (Inventario) | Entidad | **Único escritor** de `ProductVariants` (alta de SKU, `Stock`, `Reserved`, `IsActive`) e `InventoryMovements` | `Settings.FewUnitsThreshold` | Catálogo, Checkout, Fulfill, Adjust, Import |
 | `SettingsService` (Configuración) | Entidad | `Settings`, `LocalDeliveryZones` | — | web-store (`GET /api/config`), admin |
 | `QuoteShipping` (cotización de envío) | **Tarea** | — (no tiene tabla) | `Settings`, `LocalDeliveryZones` vía `SettingsService` | Checkout, `POST /api/shipping/quote` |
-| `CheckoutOrder` | **Tarea** | (vía entidades) `Orders`, `OrderItems`, `OrderStatusHistory`, `ProductVariants.Reserved` | `Products`, `Settings`, `LocalDeliveryZones` | web-store `POST /api/orders` |
+| `CheckoutOrder` | **Tarea** | (vía entidades) `Orders`, `OrderItems`, `OrderStatusHistory`, `ProductVariants.Reserved` | `Products` (precio con `CatalogService.GetEffectivePrice`), `Settings`, `LocalDeliveryZones` | web-store `POST /api/orders` |
 | `FulfillOrder` | **Tarea** | (vía entidades) `Orders.Status`, `OrderStatusHistory`, `Shipments`, `ProductVariants`, `InventoryMovements` | `Users` (repartidores) | admin `/orders/{folio}/transitions`, `/cancel` |
 | `AdjustInventory` | **Tarea** | (vía entidades) `ProductVariants.Stock`, `InventoryMovements` | — | admin `/inventory/{sku}/movements` |
 | `ImportInventory` | **Tarea** | (vía entidades) `ProductVariants.Stock`, `InventoryMovements` (`InventarioInicial`) | `ProductVariants` (SKU) | admin `/inventory/import` |
@@ -863,8 +1174,11 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 |---|---|---|---|
 | `Users` | UserService | RegisterCustomer, ResetPassword | AuthService |
 | `PasswordResetTokens` | UserService | ResetPassword | AuthService (hash del token) |
-| `Tones`, `Sizes` | CatalogService | — | — |
-| `Products` | CatalogService | CheckoutOrder (precio) | — |
+| `Colors`, `Sizes` | CatalogService | — | — |
+| `Brands` | BrandService | — | ExportService (ventas y margen por marca) |
+| `ProductTypes` | ProductTypeService | — | — |
+| `Collections` | CollectionService | CheckoutOrder (lectura, vía `CatalogService`) | — |
+| `Products` | CatalogService (incluye `GetEffectivePrice` e `IsInSeason`) | CheckoutOrder (precio cobrado) | ExportService (margen) |
 | `ProductVariants` | InventoryService (único escritor; CatalogService le pide el alta) | CheckoutOrder, FulfillOrder, AdjustInventory, ImportInventory | ExportService |
 | `InventoryMovements` | InventoryService | FulfillOrder, AdjustInventory, ImportInventory | ExportService |
 | `Orders`, `OrderItems` | OrderService | CheckoutOrder, FulfillOrder | ExportService |
@@ -875,6 +1189,8 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 **Regla de capas:** una tabla tiene **un solo** servicio de entidad que la escribe; los de tarea nunca escriben directo en el `DbContext`, sino que llaman a los servicios de entidad dentro de una transacción compartida (`IDbContextTransaction` / unidad de trabajo). Así se cumple el principio de **abstracción** de `CONTEXTO_MAESTRO` §3.
 
 **Cotización de envío como tarea:** `QuoteShipping` no es dueña de ninguna tabla (por eso no es de entidad) y aplica una regla de negocio (CP en zona, umbral, `LocalFreeShipping`), por eso tampoco es de utilidad, que en Erl es transversal y agnóstica del negocio. Es una tarea pequeña y reutilizable: la llaman el carrito (`POST /api/shipping/quote`) y `CheckoutOrder`.
+
+**Precio efectivo como capacidad del catálogo, no como utilidad (v0.4.2, P-17):** en Erl, un servicio de **utilidad** es transversal y **no tiene lógica de negocio** (hora, autenticación, auditoría, exportación). El precio fuera de temporada sí es lógica de negocio: depende de la colección, de su ventana y del % que fija el Dueño. Por eso no es utilidad. Tampoco es una tarea: no orquesta un proceso ni cruza entidades por su cuenta, sino que responde una pregunta sobre **un producto** ("¿cuánto cuesta hoy?", "¿está en temporada?"). Es una capacidad agnóstica del servicio de **entidad** del catálogo: `CatalogService.GetEffectivePrice` (precio base + R-29) y `CatalogService.IsInSeason` (R-28), que leen la colección a través de `CollectionService`. La consumen `CatalogService` mismo (listados, búsqueda, ficha), la tarea `CheckoutOrder` (precio cobrado) y la utilidad `ExportService` (margen). **Diferencia con `QuoteShipping`:** la cotización de envío no pertenece a ninguna entidad; **orquesta** varias (zonas locales y `Settings` de `SettingsService`, más el CP y el subtotal del carrito) para un paso del proceso de compra. Por eso es una tarea.
 
 ---
 
@@ -893,6 +1209,12 @@ Según Thomas Erl, un **servicio de entidad** expone operaciones agnósticas sob
 | **P-09** | El costo cobrado de envío, ¿también en `Shipments` como sugiere ADMIN §9? | Solo en `Orders.ShippingCost` (una fuente) | Duplicarlo |
 | **P-10** | Inicio del folio | `SKK-1001` en producción; 1061 si se cargan los pedidos demo | Otro número |
 | **P-11** | Usuarios: baja lógica sin borrado físico. ¿Y una solicitud de borrado de datos personales (derechos ARCO)? | Anonimizar (`FirstName = 'Cliente'`, correo sustituto) sin borrar la fila | Borrado físico (rompe pedidos) |
+| **P-12** · v0.4 | Descuento fuera de temporada (`DECISIONES_CATALOGO` P-04) | 30 % por omisión, editable por el Dueño en cada colección (`OffSeasonDiscountPct`) | Un solo % global en `Settings` |
+| **P-13** · v0.4 | Tallas reales de las calcetas de marca y de los guantes (`DECISIONES_CATALOGO` P-05): ¿S/M/L o rango de número de calzado? | Semilla con S/M/L en ambos sistemas; si el cliente usa números, se agregan tallas al sistema (`Code` admite 3 caracteres, por ejemplo `25`) sin cambiar el esquema | Un sistema nuevo `CalcetaNumero` |
+| **P-14** · v0.4 | Pretemporada: T-07 oculta y descuenta **fuera** de la ventana de la colección, también **antes** de que empiece. ¿Se quiere vender Navidad con −30 % en octubre? | ✅ **Resuelto (Said, 26-oct-2026; v0.4.2):** pretemporada = fuera de temporada, tal cual T-07. Fuera de la ventana anual, **antes o después**, el producto se oculta de listados, Home y menú, y en la búsqueda y la URL directa sale con el descuento. El Dueño controla cuándo arranca la temporada con su fecha de inicio (`StartMonth`/`StartDay`) | Descartada: antes del inicio, oculto y **sin** descuento |
+| **P-15** · v0.4 | Marca de los productos sin marca comercial y de los licenciados (anime, superhéroes) | ✅ **Resuelto (Said, v0.4.2):** los licenciados usan como marca la **licencia** (Marvel, Pokémon…); los genéricos usan "Sin marca", con `Brands.ShowInFilters = 0` para que no salga en el filtro ni en el menú | Descartadas: una marca "Genérica" para todo; registrar al distribuidor como marca |
+| **P-16** · v0.4 | `DECISIONES_CATALOGO` §5 decía que `Users` no cambia, pero `Sizes` deja de tener `Code` único | ✅ **Resuelto (Said, v0.4.2):** se acepta `Users.PreferredSizeCode` → `PreferredSizeId` (la API sigue igual, `preferredSize: "M"`). `DECISIONES_CATALOGO` §5 se corrigió: `Users` ya no está en "Sin cambios" | Descartada: FK compuesta a (`SizeSystem`, `Code`) con una columna calculada `'Calceta'` |
+| **P-17** · v0.4 | `PricingService` como utilidad o como tarea (ver §6) | ✅ **Resuelto (Said, v0.4.2):** ni utilidad ni tarea. El precio efectivo y la temporada son capacidades del servicio de **entidad** del catálogo (`CatalogService.GetEffectivePrice` e `IsInSeason`), consumidas por `CheckoutOrder` y `ExportService`. Justificación en §6 | Descartadas: `PricingService` como utilidad (tiene lógica de negocio) o como tarea `PriceProduct` (no orquesta) |
 
 ---
 
@@ -907,7 +1229,7 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-01 | 2026-10-21 | Tablas y columnas en inglés, PascalCase, tablas en plural | Coherencia con `DESIGN` §9 y `DESIGN_AUTH` §8, que ya nombran `Products`, `PasswordHash`, etc.; mapeo 1:1 con C# | Español (`Pedidos`): rompe la coherencia con los contratos ya escritos | Propuesta |
 | D-02 | 2026-10-21 | Dinero en `DECIMAL(10,2)` | Exactitud decimal; `FLOAT` introduce error binario y `MONEY` redondea en divisiones y es exclusivo de SQL Server | `FLOAT`, `MONEY`, centavos en `INT` (obliga a convertir en todas las capas) | Propuesta |
 | D-03 | 2026-10-21 | Fechas `DATETIME2(3)` en UTC con `SYSUTCDATETIME()`; zona del negocio `America/Mazatlan` en .NET | Sin ambigüedad ni horario de verano; los rangos "Hoy/7d/30d" se calculan en la zona del cliente | `DATETIME` (precisión 3.33 ms, rango menor), `DATETIMEOFFSET` (más bytes; el offset no aporta con un solo negocio), hora local | Propuesta |
-| D-04 | 2026-10-21 | Enums de flujo como `VARCHAR + CHECK`; `Tones` y `Sizes` como tablas catálogo | Los enums dependen de código; tonos y tallas los administra el negocio y tienen atributos | Todo como tablas catálogo (JOINs sin beneficio) o todo como `CHECK` (no cumple `DESIGN` §9) | Propuesta |
+| D-04 | 2026-10-21 | Enums de flujo como `VARCHAR + CHECK`; `Tones` y `Sizes` como tablas catálogo | Los enums dependen de código; tonos y tallas los administra el negocio y tienen atributos | Todo como tablas catálogo (JOINs sin beneficio) o todo como `CHECK` (no cumple `DESIGN` §9) | **Cambiada** (v0.4: `Colors`, `Sizes` por sistema, `Brands`, `ProductTypes`, `Collections`; D-26 a D-29) |
 | D-05 | 2026-10-21 | Valores de enums en español ASCII PascalCase sin espacios; roles en inglés; tabla de equivalencias BD ↔ API ↔ UI (§1.6) | Vocabulario del cliente y del contrato de autorización; sin acentos ni espacios para evitar problemas de intercalación y de mapeo (`DHL Express` → `DHLExpress`) | Ver P-02 | **Cambiada** (rev. 0.2: §1.6 y `DHLExpress`) |
 | D-06 | 2026-10-21 | `Users.Role` (columna) en lugar de `Roles` + `UserRoles` | Un rol por persona en v1; menos tablas y JOINs en el login | `UserRoles` (queda como evolución para P2) | Por validar (P-01) |
 | D-07 | 2026-10-21 | Borrado lógico (`IsActive`) y **todas** las FK `NO ACTION`; `CASCADE` solo en `PasswordResetTokens`; `OnDelete(DeleteBehavior.NoAction)` explícito en EF | Historia contable intacta: un `DELETE` accidental falla en lugar de borrar líneas, historial o envío; sin rutas de cascada múltiples | `CASCADE` en dependientes de `Orders` (versión 0.1) | **Cambiada** (rev. 0.2) |
@@ -923,12 +1245,25 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-17 | 2026-10-21 | Zonas locales como rangos `CHAR(5)` (`From`, `To`) con `IsConfirmed` | Consulta con `BETWEEN`, CP con cero inicial, marca de "por confirmar" | Texto `"81200–81299"` (no consultable), `INT` (pierde el cero inicial) | Propuesta |
 | D-18 | 2026-10-21 | `ROWVERSION` en `ProductVariants`, `Orders` y `Settings` solo para ediciones del panel; apartar, surtir y cancelar con `UPDATE` atómico condicionado, orden ascendente de `VariantId` y `OUTPUT inserted.Stock` (§4.1) | Sin sobreventa ni *deadlocks* en el checkout y sin `409` por contención; el saldo del kárdex sale del mismo `UPDATE` | `RowVersion` en el checkout (409 con SKU muy pedidos), bloqueo pesimista con lectura previa | **Cambiada** (rev. 0.2) |
 | D-19 | 2026-10-21 | `TaxRate` copiado y `TaxIncluded` calculado en `Orders` | El reporte de IVA del contador no cambia si cambia la tasa | Recalcular con la tasa vigente | Propuesta |
-| D-20 | 2026-10-21 | `Tones.SkuCode` explícito en lugar de derivar las 3 letras del código | El SKU sigue siendo único aunque llegue un tono con el mismo prefijo | Derivar con `LEFT(Code,3)` (como `skuOf` del panel hoy) | Propuesta |
+| D-20 | 2026-10-21 | `Tones.SkuCode` explícito en lugar de derivar las 3 letras del código | El SKU sigue siendo único aunque llegue un tono con el mismo prefijo | Derivar con `LEFT(Code,3)` (como `skuOf` del panel hoy) | **Sustituida** por D-27 (v0.4) |
 | D-21 | 2026-10-21 | Semilla con `Products.Id = PieceNumber` y stock por talla repartido desde el mock | Coincidencia con los datos que ya ven la tienda y el panel | Ids nuevos (rompe enlaces y pruebas) | Por validar (P-07) |
 | D-22 | 2026-10-21 | Tablas descartadas o pospuestas: `UserRoles`, `Customers`, `Addresses`, `Carriers`, `DailySales`, `AuditLogs`, `Payments`, `Carts` | Sin pantalla ni regla que las necesite en v1 (§3.14) | Crearlas desde ahora (complejidad sin uso) | Propuesta |
 | D-23 | 2026-10-22 | Intercalación explícita de la BD `Modern_Spanish_100_CI_AI` | Búsqueda del panel sin distinguir mayúsculas ni acentos con un `LIKE` normal; mismo resultado en cualquier instancia; `UQ_Users_Email` sigue siendo *case-insensitive* | Predeterminada de la instancia (`*_CI_AS`, distingue acentos) | Propuesta (rev. 0.3) |
 | D-24 | 2026-10-22 | `InventoryMovements.OrderId` obligatorio en `Venta` y `Devolucion` | Una devolución se rastrea hasta el pedido que la originó | Solo en `Venta` (versión 0.1) | Propuesta (rev. 0.3) |
 | D-25 | 2026-10-22 | Un solo escritor de `ProductVariants` (`InventoryService`) y cotización de envío como tarea (`QuoteShipping`) | Cumple la regla de capas de §6 y la taxonomía de Erl (sin servicio de entidad sin tabla) | `CatalogService` e `InventoryService` escribiendo la misma tabla; `ShippingService` como entidad | Propuesta (rev. 0.3) |
+| D-26 | 2026-10-26 | Línea como enum `Products.Line` `VARCHAR + CHECK` (`Sokko`, `Marcas`, `Especiales`, `Accesorios`; API en minúsculas) | Son 4 fijas y cada una cambia la tienda (T-01) | Tabla `Lines` | Propuesta (v0.4) |
+| D-27 | 2026-10-26 | `Tones` → `Colors` con `Code CHAR(3)` como PK y código de SKU, `Slug` como código de API e `IsSokkoTone` | Una sola tabla de color para todas las líneas; el JSON de la tienda no cambia (T-05) | Mantener `Tones` y una tabla aparte para las demás líneas | Propuesta (v0.4), sustituye a D-20 |
+| D-28 | 2026-10-26 | `Sizes` por sistema con `Id` como PK y `UNIQUE (SizeSystem, Code)`; `Users.PreferredSizeId` | Accesorios necesitan unitalla y tallas de guante (T-04) | `Code` como PK con prefijos (`G-M`), que ensucian el SKU | Propuesta (v0.4); P-16 resuelto (v0.4.2) |
+| D-29 | 2026-10-26 | Tablas `Brands`, `ProductTypes` y `Collections`; `Products.BrandId` y `ProductTypeId` obligatorios, `CollectionId` obligatorio en Especiales | Filtros de tienda, reglas por tipo y temporadas con fechas (T-02, T-03, T-06) | Columnas de texto libre en `Products` | Propuesta (v0.4) |
+| D-30 | 2026-10-26 | Visibilidad (R-28) y precio fuera de temporada (R-29) **calculados**, no guardados | Dependen de la fecha; guardarlos exigiría un trabajo programado y podría desincronizarse | Columnas `IsVisible` / `SalePrice` actualizadas por un *job* | **Cambiada** (v0.4.2): se calculan en `CatalogService` (D-38), ya no en `PricingService` |
+| D-31 | 2026-10-26 | Costo en `ProductVariants.UnitCost` (sin `Products.Cost`), visible solo para el Dueño | Una talla o un color pueden costar distinto; "Operaciones sin dinero" (T-09) | Costo por producto | Propuesta (v0.4) |
+| D-32 | 2026-10-26 | SKU `{SKK·MRC·ESP·ACC}-###-XXX-T` con CHECK de prefijo y forma; la correspondencia con línea, color y talla la garantiza el servicio | Los SKU de SOKKO no cambian y la línea se lee a simple vista (T-11) | CHECK atado a columnas de la fila (ya no es posible con `SizeId`) | Propuesta (v0.4) |
+| D-33 | 2026-10-26 | `ProductVariants.Barcode` con índice único **filtrado** `WHERE Barcode IS NOT NULL` | Un `UNIQUE` normal admite un solo `NULL` (T-12) | Constraint `UNIQUE` | Propuesta (v0.4) |
+| D-34 | 2026-10-26 | R-32 (talla del sistema del tipo y coherencia de línea) en el servicio; trigger opcional, no en v1 | Cruza tres tablas; EF Core necesita `HasTrigger()`; solo el Dueño edita el catálogo | Trigger obligatorio; FK compuestas (llaves alternas inmutables en EF) | Propuesta (v0.4) |
+| D-35 | 2026-10-26 | `Bundles` (paquetes armados) fuera de v1; el paquete del proveedor es un producto con `UnitsPerPack` | El cliente no lo pidió (T-10, T-13) | Tabla `Bundles` desde ahora | Propuesta (v0.4) |
+| D-36 | 2026-10-26 | Temporadas como **ventana anual recurrente** (`StartMonth`, `StartDay`, `EndMonth`, `EndDay`, inclusiva, puede cruzar de año) con `StartKey`/`EndKey` calculadas | Navidad y Halloween se repiten cada año; con fechas fijas habría que volver a capturarlas cada año | `StartsAt`/`EndsAt` (`DATETIME2`) de la v0.4 | Propuesta (v0.4.2) |
+| D-37 | 2026-10-26 | Licencias como marca (Marvel, Pokémon…); "Sin marca" para genéricos con `Brands.ShowInFilters = 0` | Filtro y reportes por licencia; los genéricos no ensucian el filtro (P-15) | Marca "Genérica"; distribuidor como marca | Propuesta (v0.4.2) |
+| D-38 | 2026-10-26 | Precio efectivo (R-29) y temporada (R-28) como capacidades de `CatalogService` (entidad): `GetEffectivePrice` e `IsInSeason` | En Erl la utilidad no tiene lógica de negocio; el precio sí la tiene y es de un producto (P-17) | `PricingService` como utilidad; tarea `PriceProduct` | Propuesta (v0.4.2), cambia D-30 |
 
 ### 8.2 Registro de cambios del documento
 
@@ -938,5 +1273,8 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.2 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Hallazgos 🟡 de la revisión del PR #4: R-27 (Merma y conteo frente a lo apartado), §4.1 transacciones y concurrencia, `NO ACTION` en todas las FK salvo `PasswordResetTokens`, §1.6 equivalencias de enums (`DHLExpress`), `CK_Orders_PaymentBeforeFulfillment` e hito `Pagado` al registrar `PaidAt` |
 | 0.3 | 2026-10-22 | `sokko/db-schema` | Said (revisión de arquitectura) | Sugerencias 🟢 de la revisión del PR #4: cardinalidades `\|o` en el ER, §3.15 índices (incluidos los de FK), intercalación `Modern_Spanish_100_CI_AI`, repartidor interno o externo y FK simple en `Shipments`, devolución ligada al pedido, CHECK de SKU exacto, CHECK de `TaxRate`, fila `Carts` en §3.14, mapa SOA con un solo escritor de `ProductVariants` y `QuoteShipping` como tarea, contrato nuevo de `/api/config` |
 | 0.3.1 | 2026-10-22 | `said/db-alignment` | Said | Valores de API de los enums como códigos `snake_case` sin espacios ni acentos (§1.6): Carrier `estafeta`/`dhl_express` (explícito, BD sin cambios), PaymentMethod `tarjeta`/`oxxo_pay` y MovementType `entrada`…`inventario_inicial` (ahora con `SnakeCaseLower`). Las etiquetas de UI no cambian |
+| 0.4 | 2026-10-26 | `said/catalog-v04` | Said | Catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13): tablas nuevas `Brands`, `ProductTypes` y `Collections` (§3.5a–§3.5c, numeradas así para no mover las referencias existentes); `Tones` → `Colors`; `Sizes` por sistema; `Products` con `Line`, `Slug`, `BrandId`, `ProductTypeId`, `CollectionId`, `UnitsPerPack`; `ProductVariants` con `ColorCode`, `SizeId`, `UnitCost`, `Barcode` y SKU con 4 prefijos; `Users.PreferredSizeId`; enums de §1.6 (línea, tipo de colección, sistema de tallas, unidad); reglas R-28…R-32; contratos `GET /api/products` y `GET /api/catalog/nav`; `BrandService`, `ProductTypeService`, `CollectionService` y `PricingService`; semilla con 14 productos y 64 SKU; P-12…P-17 y D-26…D-35 |
+| 0.4.1 | 2026-10-26 | `said/catalog-v04` | Said | P-14 resuelto: la pretemporada cuenta como fuera de temporada (T-07 sin cambios); R-28 lo dice explícitamente |
+| 0.4.2 | 2026-10-26 | `said/catalog-v04` | Said | Temporadas recurrentes: `Collections` con ventana anual (`StartMonth`/`StartDay`/`EndMonth`/`EndDay`, inclusiva, cruza de año), algoritmo y casos de "¿está en temporada?", R-28/R-29, índice y semillas (Navidad 1-nov → 6-ene, Halloween 1-oct → 2-nov). P-15 (licencias como marca, "Sin marca" con `ShowInFilters = 0`), P-16 (`Users.PreferredSizeId` aceptado; `DECISIONES_CATALOGO` §5 corregido) y P-17 (`GetEffectivePrice` en `CatalogService`; sin `PricingService`) resueltos. D-36…D-38 |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.
