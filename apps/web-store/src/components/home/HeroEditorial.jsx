@@ -1,18 +1,23 @@
 import { useState } from 'react'
-import { scrollToId } from '../../utils/scroll'
+import { Link } from 'react-router-dom'
+import { ArrowIcon } from '../brand/Icons'
 import KnitTabi from '../product/KnitTabi'
 import ToneSwatches from '../product/ToneSwatches'
 
-const HERO_TONES = ['washi', 'sumi', 'laca', 'matcha']
-const pieceNumber = (id) => String(id).padStart(2, '0')
+const pieceNumber = (n) => String(n).padStart(2, '0')
 
-/** Hero editorial (DESIGN.md §6.5). `piece` es null mientras carga el catálogo. */
+/**
+ * Hero editorial del Home (DESIGN.md §6.5): SOKKO Japón es la insignia (DESIGN_CATALOG_UI.md §3.3, punto 1).
+ * `piece` es la pieza destacada (Settings.FeaturedProductId) o null mientras carga.
+ */
 export default function HeroEditorial({ piece }) {
-  // Estado local, solo visual: no cambia la pieza del carrito.
-  const [tone, setTone] = useState('washi')
+  // Estado local, solo visual: no cambia lo que se agrega a la bolsa.
+  const [tone, setTone] = useState(null)
+  const tones = piece?.colors.map((c) => c.apiCode) ?? []
+  const shown = tone ?? tones[0]
 
   return (
-    <section id="origen" className="gutter linen-tex relative scroll-mt-20 overflow-hidden">
+    <section className="gutter linen-tex relative overflow-hidden border-b border-ink/10">
       <span
         aria-hidden="true"
         className="pointer-events-none absolute top-[-6%] right-[-4%] font-jp text-[clamp(220px,34vw,460px)] leading-none text-ink/[.035] select-none"
@@ -29,46 +34,41 @@ export default function HeroEditorial({ piece }) {
       <div className="relative mx-auto grid max-w-7xl items-end gap-10 py-14 md:py-24 lg:grid-cols-12">
         <div className="hidden justify-center self-start pt-4 lg:col-span-1 lg:flex">
           <span aria-hidden="true" className="vertical font-jp text-[14px] tracking-[.7em] text-laca">
-            細部への礼讃
+            足袋の工房
           </span>
         </div>
 
         <div className="min-w-0 lg:col-span-6">
-          <p className="text-[11px] tracking-[.32em] text-matcha uppercase">El elogio del detalle · Colección I</p>
-          <h1 className="mt-6 font-serif text-[clamp(46px,7.4vw,104px)] leading-[.98] font-light tracking-[-.01em]">
-            Confort que <em className="text-laca italic">Renace</em>
-            <br />
-            en Cada Paso
+          <p className="flex items-center gap-2 text-[11px] tracking-[.32em] text-matcha uppercase">
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-laca" />
+            SOKKO Japón · colección propia
+          </p>
+          <h1 className="mt-6 font-serif text-[clamp(44px,6.4vw,92px)] leading-[.98] font-light tracking-[-.01em]">
+            Calcetas tabi tejidas en <em className="text-laca italic">lotes pequeños</em>
           </h1>
           <p className="mt-8 max-w-[34rem] text-[15.5px] leading-[1.85] text-ink-soft">
-            Algodón peinado de cosecha selecta, tejido a 200 agujas y cerrado a mano en la punta dividida. Una pieza
-            pensada para durar, que se suaviza con el tiempo y con la forma de su pie.
+            Seis diseños propios en algodón peinado, lino y bambú, con costuras visibles y tintes naturales. Hechos en Los
+            Mochis.
           </p>
-          <div className="mt-10 flex flex-wrap items-center gap-8">
-            <a
-              href="#atelier"
-              onClick={(e) => {
-                e.preventDefault()
-                scrollToId('atelier')
-              }}
-              className="group relative overflow-hidden border border-ink px-9 py-4 text-[12px] tracking-[.28em] uppercase"
+          <div className="mt-10 flex flex-wrap items-center gap-4">
+            <Link
+              to="/linea/sokko"
+              className="inline-flex min-h-11 items-center gap-2 bg-laca px-7 text-[12px] tracking-[.24em] text-white uppercase transition-colors hover:bg-laca-hover"
             >
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 translate-y-full bg-ink transition-transform duration-500 ease-out group-hover:translate-y-0"
-              />
-              <span className="relative transition-colors duration-500 group-hover:text-linen">Descubrir la Colección</span>
-            </a>
-            <a
-              href="#materia"
-              onClick={(e) => {
-                e.preventDefault()
-                scrollToId('materia')
-              }}
-              className="inline-flex min-h-11 items-center font-serif text-[18px] text-ink-soft italic underline decoration-ink/25 underline-offset-[6px] hover:text-ink"
-            >
-              La materia prima →
-            </a>
+              Ver SOKKO Japón <ArrowIcon className="h-4 w-4" />
+            </Link>
+            {piece && (
+              <Link
+                to={`/producto/${piece.slug}`}
+                className="group relative inline-flex min-h-11 items-center overflow-hidden border border-ink px-7 text-[12px] tracking-[.24em] uppercase"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 translate-y-full bg-ink transition-transform duration-500 ease-out group-hover:translate-y-0"
+                />
+                <span className="relative transition-colors duration-500 group-hover:text-linen">{piece.name}</span>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -79,12 +79,12 @@ export default function HeroEditorial({ piece }) {
               <>
                 <div aria-hidden="true" className="absolute top-[24%] left-[20%] aspect-square w-[30%] rounded-full bg-laca/90" />
                 <KnitTabi
-                  key={tone}
-                  tone={tone}
+                  key={shown}
+                  tone={shown}
                   className="animate-fade absolute inset-0 m-auto h-[78%] drop-shadow-[0_24px_24px_rgba(35,33,30,.12)]"
                 />
                 <span lang="ja" className="vertical absolute top-8 right-6 font-jp text-[12px] tracking-[.5em] text-ink-soft">
-                  {piece.jp}
+                  {piece.nameJp}
                 </span>
               </>
             ) : (
@@ -97,10 +97,10 @@ export default function HeroEditorial({ piece }) {
                 <div>
                   <p className="font-serif text-[22px] leading-tight">{piece.name}</p>
                   <p className="mt-1 text-[12px] text-ink-soft">
-                    Pieza n.º {pieceNumber(piece.id)} · Algodón peinado D-200
+                    Pieza n.º {pieceNumber(piece.pieceNumber)} · {piece.note}
                   </p>
                 </div>
-                <ToneSwatches tones={HERO_TONES} value={tone} onChange={setTone} label="Tono de la pieza" />
+                <ToneSwatches tones={tones} value={shown} onChange={setTone} label="Tono de la pieza" />
               </>
             ) : (
               <div className="h-12 w-48 animate-pulse bg-sand" />

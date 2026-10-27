@@ -41,7 +41,7 @@ function toCard(product, today) {
     line: product.line,
     name: product.name,
     nameJp: product.nameJp ?? null,
-    brand: { name: brand.name, slug: brand.slug, isOwnBrand: brand.isOwnBrand },
+    brand: { name: brand.name, slug: brand.slug, isOwnBrand: brand.isOwnBrand, showInFilters: brand.showInFilters },
     type: { code: type.code, name: type.name, unit: type.unit, sizeSystem: type.sizeSystem },
     unitsPerPack: product.unitsPerPack ?? 1,
     collection: collection
@@ -70,6 +70,7 @@ function toDetail(product, today) {
   const sizes = SIZES_BY_SYSTEM[card.type.sizeSystem]
   return {
     ...card,
+    pieceNumber: product.pieceNumber,
     note: product.note,
     sizes: sizes.map((s) => ({ ...s })),
     seasonWindow:
@@ -196,7 +197,8 @@ export async function getHome({ now } = {}) {
   const season = nav.activeCollections[0] ?? null
   return {
     nav,
-    featured: sokko.find((p) => p.slug === FEATURED_SLUG) ?? sokko[0] ?? null,
+    today: catalogToday(now),
+    featured: copy(getProductSync(FEATURED_SLUG, { now })),
     sokko: sokko.slice(0, 4),
     sokkoTotal: sokko.length,
     season: season ? { ...season, products: (await listProducts({ collection: season.slug }, { now })).slice(0, 3) } : null,
