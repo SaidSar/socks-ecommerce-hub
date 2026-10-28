@@ -4,8 +4,8 @@
 import { can } from '../config/roles'
 import { brandMargins, grossMargin, lineStats, productDto, seasonStatus, skuOf, validateCollection, validateProduct } from '../domain/catalog'
 import { buildDashboard } from '../domain/dashboard'
-import { LINES } from '../domain/enums'
-import { buildTemplate, previewCsv } from '../domain/importCsv'
+import { LINES, stockUnit } from '../domain/enums'
+import { buildTemplate, previewCsv, rowsToCsv } from '../domain/importCsv'
 import { applyInitial, applyMovement, applySale, available, matchesStockFilter, release, sortMovements, stockState, STOCK_FILTERS } from '../domain/inventory'
 import { advance, cancel, countByFilter, isLate, markPaid, matchesFilter, matchesQuery } from '../domain/orders'
 import { computeShipping, formatZone, validateZone } from '../domain/shipping'
@@ -247,34 +247,66 @@ export async function adjustStock(sku, { type, qty, note, folio }, user) {
 }
 
 /** TODO(api): POST /api/admin/inventory/import/preview */
-export async function previewImport(csvText) {
+export async function previewImport(csvText, role) {
   await latency()
-  return copy(previewCsv(csvText, db().inventory))
+  return copy(previewCsv(csvText, db().inventory, db().catalog, { canSeeCosts: can(role, 'costs.view') }))
 }
 
 /**
- * Aplica solo filas válidas como "Inventario inicial · Importado desde CSV".
+ * Aplica solo filas válidas como "Inventario inicial · Importado desde CSV", y los datos de catálogo de las
+ * columnas opcionales (marca, colección, unidades por paquete, costo solo del Dueño y código de barras).
  * El servidor vuelve a validar: lo que llega del navegador no se da por bueno.
  * TODO(api): POST /api/admin/inventory/import
  */
 export async function applyImport(rows, user) {
   await latency()
-  const csv = ['SKU,Pieza,Tono,Talla,Stock', ...rows.map((r) => [r.sku, '', '', '', r.stock].join(','))].join('\n')
-  const { valid } = previewCsv(csv, db().inventory)
+  const { inventory, catalog } = db()
+  const { valid } = previewCsv(rowsToCsv(rows), inventory, catalog, { canSeeCosts: can(user?.role, 'costs.view') })
   const at = stamp()
   valid.forEach((r) => {
     const res = applyInitial(findRow(r.sku), r.stock, by(user), at)
     replaceRow(res.row)
     db().movements.push(res.movement)
+    applyCatalogChanges(r.sku, r.changes)
   })
   save()
   return { applied: valid.length }
 }
 
-/** CSV con los SKU actuales y su stock. */
-export async function getTemplateCsv() {
+/** Cambios de catálogo de una fila del CSV ya validada. Unidades por paquete cambia la unidad de conteo de sus SKU. */
+function applyCatalogChanges(sku, { barcode, ...fields } = {}) {
+  const { catalog, inventory } = db()
+  const product = catalog.products.find((p) => productSkus(p).includes(sku))
+  if (!product || (!barcode && !Object.keys(fields).length)) return
+  Object.assign(product, fields)
+  if (barcode) product.barcodes = { ...product.barcodes, [sku]: barcode }
+  if ('unitsPerPack' in fields) {
+    const skus = productSkus(product)
+    inventory.filter((r) => skus.includes(r.sku)).forEach((r) => (r.unit = stockUnit(product.type, product.unitsPerPack)))
+  }
+}
+
+const productSkus = (p) => {
+  const { catalog } = db()
+  const type = catalog.types.find((t) => t.code === p.type)
+  return p.colors.flatMap((c) => catalog.sizes[type.sizeSystem].map((s) => skuOf(p.line, p.pieceNumber, c, s.code)))
+}
+
+/** CSV con los SKU actuales, su stock y los datos del catálogo (unit_cost solo para el Dueño). */
+export async function getTemplateCsv(role) {
   await latency()
-  return buildTemplate(db().inventory, (t) => colorOf(t)?.name ?? t)
+  const { inventory, catalog } = db()
+  const owner = can(role, 'costs.view')
+  const bySku = new Map(catalog.products.flatMap((p) => productSkus(p).map((sku) => [sku, p])))
+  return buildTemplate(
+    inventory,
+    (t) => colorOf(t)?.name ?? t,
+    (r) => {
+      const p = bySku.get(r.sku)
+      if (!p) return ['', '', '', '', '', '', '']
+      return [p.line, p.brand, p.type, p.collection ?? '', p.unitsPerPack ?? 1, owner ? (p.unitCost ?? '') : '', p.barcodes?.[r.sku] ?? '']
+    },
+  )
 }
 
 // ---------------------------------------------------------------- Catálogo (DESIGN_CATALOG_UI.md §4)
@@ -404,7 +436,7 @@ export async function saveProduct(form, user) {
   }
   if (!existing && catalog.products.some((p) => p.slug === product.slug)) product.slug = `${product.slug}-${pieceNumber}`
   catalog.products = existing ? catalog.products.map((p) => (p.slug === existing.slug ? product : p)) : [...catalog.products, product]
-  const unit = type.unit === 'par' && product.unitsPerPack === 1 ? 'par' : 'unidad'
+  const unit = stockUnit(product.type, product.unitsPerPack)
   form.colors.forEach((c) =>
     sizes.forEach((s) => {
       const sku = skuOf(line, pieceNumber, c, s.code)

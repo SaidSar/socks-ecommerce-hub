@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeed, DEMO_NOW, PIECES, skuOf } from '../data/seed'
-import { isLate } from '../domain/orders'
+import { isLate, itemCount, orderUnit } from '../domain/orders'
 import * as api from './adminApi'
 
 const OWNER = { name: 'Aiko Morales', role: 'dueno' }
@@ -305,6 +305,42 @@ describe('importación y configuración', () => {
     expect(after.stock).toBe(30)
     const [mv] = await api.getMovements(a.sku)
     expect(mv).toMatchObject({ type: 'inventario_inicial', note: 'Importado desde CSV', balance: 30 })
+  })
+
+  it('§4.7: las columnas del catálogo se aplican; unit_cost solo cuenta si importa el Dueño', async () => {
+    const head = 'SKU,Pieza,Tono,Talla,Stock,brand,units_per_pack,unit_cost,barcode'
+    const csv = [head, 'MRC-003-NEG-M,x,x,M,8,Puma,3,95,7501234500017'].join('\n')
+    const preview = await api.previewImport(csv, 'dueno')
+    expect(preview.valid[0].changes).toEqual({ brand: 'puma', unitsPerPack: 3, unitCost: 95, barcode: '7501234500017' })
+    await api.applyImport(preview.valid, OWNER)
+    const ua = (await api.getCatalog('dueno')).products.find((p) => p.slug === 'ua-heatgear-crew')
+    expect(ua).toMatchObject({ brand: { slug: 'puma' }, unitsPerPack: 3, unitCost: 95 })
+    expect(ua.variants.find((v) => v.sku === 'MRC-003-NEG-M')).toMatchObject({ barcode: '7501234500017', stock: 8 })
+    // Con paquete deja de ser "par": la unidad de conteo de sus SKU pasa a "unidad".
+    expect((await api.getInventory({ q: 'MRC-003-NEG-M' })).rows[0].unit).toBe('unidad')
+
+    const ops = await api.previewImport([head, 'MRC-004-BLA-S,x,x,S,5,,,10,'].join('\n'), 'operaciones')
+    expect(ops.valid[0]).toMatchObject({ warning: 'Se ignoró unit_cost: solo el Dueño registra costos.', changes: {} })
+    await api.applyImport(ops.valid, OPS)
+    expect((await api.getCatalog('dueno')).products.find((p) => p.slug === 'nike-elite-basketball').unitCost).not.toBe(10)
+  })
+
+  it('la plantilla trae las columnas nuevas; unit_cost vacío para Operaciones', async () => {
+    const owner = (await api.getTemplateCsv('dueno')).replace('﻿', '').split('\r\n')
+    const ops = (await api.getTemplateCsv('operaciones')).replace('﻿', '').split('\r\n')
+    expect(owner[0]).toBe('SKU,Pieza,Tono,Talla,Stock,line,brand,type,collection,units_per_pack,unit_cost,barcode')
+    const row = (lines) => lines.find((l) => l.startsWith('MRC-001-BLA-S,')).split(',')
+    expect(row(owner).slice(5)).toEqual(['marcas', 'nike', 'calcetas', '', '3', '305', '019523800100'])
+    expect(row(ops)[10]).toBe('')
+    // La plantilla es importable tal cual.
+    expect((await api.previewImport(owner.join('\n'), 'dueno')).invalid).toEqual([])
+  })
+
+  it('pedidos: unidades del pedido y "pares" solo si todo son calcetas sin paquete', () => {
+    const order = { items: [{ qty: 2, unit: 'par' }, { qty: 1, unit: 'par' }] }
+    expect(itemCount(order)).toBe(3)
+    expect(orderUnit(order)).toBe('par')
+    expect(orderUnit({ items: [{ qty: 1, unit: 'par' }, { qty: 1, unit: 'unidad' }] })).toBe('unidad')
   })
 
   it('la configuración tiene la forma de GET /api/config (DESIGN_DB.md §3.12) más las zonas', async () => {

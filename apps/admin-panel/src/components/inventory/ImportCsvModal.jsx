@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import { label, MOVEMENT_LABELS } from '../../domain/enums'
-import { COLUMNS } from '../../domain/importCsv'
+import { COLUMNS, EXTRA_COLUMNS } from '../../domain/importCsv'
 import { INITIAL } from '../../domain/inventory'
 import { useAdminData } from '../../hooks/useAdminData'
 import Button from '../ui/Button'
@@ -29,7 +29,10 @@ function demoCsv(template) {
   })
   const bad = rows[Math.min(rows.length - 1, 20)].split(',')
   bad[4] = '-2'
-  return [header, ...edited, 'SKK-099-AZU-M,Modelo desconocido,Azul,M,10', bad.join(',')].join('\n')
+  // Columnas del catálogo (§4.7): la marca propia SOKKO fuera de su línea rompe R-32.
+  const brand = rows.find((l) => l.startsWith('MRC-'))?.split(',')
+  if (brand && brand.length > 6) brand[6] = 'sokko'
+  return [header, ...edited, 'SKK-099-AZU-M,Modelo desconocido,Azul,M,10', bad.join(','), ...(brand ? [brand.join(',')] : [])].join('\n')
 }
 
 /**
@@ -131,6 +134,10 @@ export default function ImportCsvModal({ onClose }) {
                 </tbody>
               </table>
             </div>
+            <p className="text-[12px] text-ink-soft mt-2">
+              Opcionales, después de Stock: <span className="font-mono">{EXTRA_COLUMNS.join(', ')}</span>. Celda vacía = no cambia. Se validan con las
+              mismas reglas que el formulario de producto.
+            </p>
             <Button variant="outline" size="sm" className="mt-2" onClick={async () => download('plantilla-inventario-sokko.csv', await api.getTemplateCsv())}>
               <Icon name="download" className="w-4 h-4" />
               Descargar plantilla
@@ -216,7 +223,13 @@ export default function ImportCsvModal({ onClose }) {
                             <td className="px-3 py-2">{r.piece}</td>
                             <td className="px-3 py-2">{r.size}</td>
                             <td className="px-3 py-2 tnum text-right">{r.stock}</td>
-                            <td className="px-3 py-2 text-[12px]">{r.error ? <span className="text-laca">{r.error}</span> : <span className="text-matcha">Lista</span>}</td>
+                            <td className="px-3 py-2 text-[12px]">{r.error ? (
+                              <span className="text-laca">{r.error}</span>
+                            ) : r.warning ? (
+                              <span className="text-warn-ink">Lista · {r.warning}</span>
+                            ) : (
+                              <span className="text-matcha">Lista</span>
+                            )}</td>
                           </tr>
                         ))}
                       </tbody>

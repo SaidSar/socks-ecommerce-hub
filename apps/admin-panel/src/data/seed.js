@@ -1,12 +1,12 @@
 // Datos de ejemplo deterministas del panel (DESIGN_ADMIN.md §6.1). Solo los usa services/adminApi.js.
 import { skuOf as catalogSku } from '../domain/catalog'
-import { PAYMENT_METHOD_LABELS } from '../domain/enums'
+import { PAYMENT_METHOD_LABELS, stockUnit } from '../domain/enums'
 import { ADMIN_FIELDS, exampleBarcode } from './catalogAdmin'
 import { BRANDS, COLLECTIONS, COLORS, PRODUCT_TYPES, PRODUCTS, SIZES_BY_SYSTEM } from './catalogSeed'
 import { computeShipping } from '../domain/shipping'
 
 // Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
-export const SEED_VERSION = 5
+export const SEED_VERSION = 6
 
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
@@ -133,7 +133,7 @@ export function createSeed() {
       const qty = rnd() < 0.2 ? 2 : 1
       const same = items.find((it) => it.sku === sku)
       if (same) same.qty += qty
-      else items.push({ pieceId: p.id, name: p.name, tone, size, sku, qty, price: p.price })
+      else items.push({ pieceId: p.id, name: p.name, tone, size, sku, qty, price: p.price, unit: 'par' })
     }
     const subtotal = items.reduce((a, it) => a + it.price * it.qty, 0)
     const place = ov.city ? cityBy(ov.city) : pick(CITIES)
@@ -315,7 +315,7 @@ export function createSeed() {
       const type = catalog.types.find((t) => t.code === p.type)
       const sizes = catalog.sizes[type.sizeSystem]
       const skus = p.colors.flatMap((c) => sizes.map((s) => ({ sku: catalogSku(p.line, p.pieceNumber, c, s.code), color: c, size: s.code })))
-      const unit = type.unit === 'par' && p.unitsPerPack === 1 ? 'par' : 'unidad'
+      const unit = stockUnit(p.type, p.unitsPerPack)
       skus.forEach((v, i) => {
         // Reparto parejo del stock del producto; el sobrante va a las primeras variantes.
         const stock = Math.floor(p.stock / skus.length) + (i < p.stock % skus.length ? 1 : 0)

@@ -41,10 +41,10 @@ export default function Inventory() {
 
   const tabs = STOCK_FILTERS.map((t) => ({ ...t, count: data?.counts[t.key] }))
   const cards = data && [
-    ['Pares en almacén', formatInt(data.totals.units)],
-    ['Pares apartados', formatInt(data.totals.reserved)],
+    ['Unidades en almacén', formatInt(data.totals.units)],
+    ['Unidades apartadas', formatInt(data.totals.reserved)],
     ['SKU agotados', data.totals.out, data.totals.out > 0],
-    ['SKU con pocos pares', data.totals.few],
+    ['SKU con pocas unidades', data.totals.few],
   ]
 
   return (

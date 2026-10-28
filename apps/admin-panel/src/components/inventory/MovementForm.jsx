@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import { label, MOVEMENT_LABELS } from '../../domain/enums'
+import { countNoun, label, MOVEMENT_LABELS } from '../../domain/enums'
 import { checkMovement, MANUAL_MOVEMENTS, needsFolio, needsNote } from '../../domain/inventory'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
@@ -79,6 +79,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
   }
 
   const diff = isCount && qty !== '' ? Number(qty) - row.stock : null
+  const pairs = row.unit === 'par'
 
   return (
     <form onSubmit={submit} noValidate className="rounded-lg bg-linen border border-line p-4 space-y-3" aria-describedby={formError ? ids.err : undefined}>
@@ -101,7 +102,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
       </div>
       <div>
         <label htmlFor={ids.qty} className="text-[12px] text-ink-soft">
-          {isCount ? 'Pares contados en anaquel' : 'Cantidad de pares'}
+          {isCount ? (pairs ? 'Pares contados en anaquel' : 'Unidades contadas en anaquel') : pairs ? 'Cantidad de pares' : 'Cantidad de unidades'}
         </label>
         <input
           ref={qtyRef}
@@ -120,7 +121,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
         {diff !== null && (
           <p className="text-[12px] text-ink-soft mt-1 tnum">
             Diferencia contra sistema: {diff > 0 ? '+' : ''}
-            {diff} pares
+            {diff} {countNoun(Math.abs(diff), row.unit)}
           </p>
         )}
       </div>
@@ -147,7 +148,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
             className={`mt-1 h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[14px] tnum outline-none focus:border-ai placeholder:text-ink-soft ${folioError ? 'border-laca' : 'border-line'}`}
           />
           <p id={ids.folioHint} className="text-[12px] text-ink-soft mt-1">
-            Pedido del que regresan los pares.
+            {pairs ? 'Pedido del que regresan los pares.' : 'Pedido del que regresan las unidades.'}
           </p>
           {folioError && (
             <p id={ids.folioErr} className="text-[12.5px] text-laca mt-1" role="alert">

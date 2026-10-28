@@ -3,14 +3,14 @@ import Card from '../ui/Card'
 import CardHead from '../ui/CardHead'
 import StockChip from '../ui/StockChip'
 
-/** SKU con pocos pares o agotados (los 6 más urgentes). */
+/** SKU con pocas unidades o agotados (los 6 más urgentes). */
 export default function InventoryAlerts({ alerts, few }) {
   return (
     <Card className="min-w-0" aria-labelledby="alerts-title">
       <CardHead
         id="alerts-title"
         title="Alertas de inventario"
-        sub={`${alerts.length} SKU con ${few} pares o menos`}
+        sub={`${alerts.length} SKU con ${few} unidades o menos`}
         right={
           <Link to="/inventario?f=alertas" className="inline-flex items-center h-8 max-lg:h-11 px-3 rounded-md hover:bg-sand text-[12.5px] font-medium">
             Ver todo
@@ -37,7 +37,7 @@ export default function InventoryAlerts({ alerts, few }) {
           ))}
         </ul>
       ) : (
-        <p className="px-5 py-8 border-t border-line text-[13px] text-ink-soft">Sin alertas: todos los SKU tienen más de {few} pares.</p>
+        <p className="px-5 py-8 border-t border-line text-[13px] text-ink-soft">Sin alertas: todos los SKU tienen más de {few} unidades.</p>
       )}
     </Card>
   )
