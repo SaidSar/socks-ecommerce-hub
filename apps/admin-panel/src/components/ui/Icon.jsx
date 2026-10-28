@@ -107,6 +107,31 @@ const PATHS = {
   download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
   logout: <path d="M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4M10 16l-4-4 4-4M6 12h10" />,
   refresh: <path d="M20 11a8 8 0 00-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0014.3 4.9L20 16M20 20v-4h-4" />,
+  // Catálogo multilínea (mockup admin-catalogo.html).
+  brand: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M8.5 12.5l2.3 2.3 4.7-5" />
+    </>
+  ),
+  cal: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="1.5" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+    </>
+  ),
+  ruler: (
+    <>
+      <path d="M3 16.5 16.5 3 21 7.5 7.5 21z" />
+      <path d="M7 12.5l2 2M10 9.5l2 2M13 6.5l2 2" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="1.5" />
+      <path d="M8 10.5V7.5a4 4 0 018 0v3" />
+    </>
+  ),
 }
 
 /** Ícono SVG del sistema. `name` es una llave de PATHS. */

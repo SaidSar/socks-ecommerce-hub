@@ -1,11 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { isLate, pairCount } from '../../domain/orders'
+import { countText } from '../../domain/enums'
+import { isLate, itemCount, orderUnit } from '../../domain/orders'
 import { formatDate, formatMXN, formatTime } from '../../utils/format'
 import Card from '../ui/Card'
 import CardHead from '../ui/CardHead'
 import StatusChip from '../ui/StatusChip'
 
-/** Últimos 5 pedidos; el folio abre el detalle. Operaciones ve pares en lugar del total. */
+/** Últimos 5 pedidos; el folio abre el detalle. Operaciones ve unidades en lugar del total. */
 export default function RecentOrders({ orders, showMoney, now }) {
   const navigate = useNavigate()
   return (
@@ -28,7 +29,7 @@ export default function RecentOrders({ orders, showMoney, now }) {
               <th scope="col">Cliente</th>
               <th scope="col">Fecha</th>
               <th scope="col">Estado</th>
-              <th scope="col">{showMoney ? 'Total' : 'Pares'}</th>
+              <th scope="col">{showMoney ? 'Total' : 'Unidades'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -46,7 +47,7 @@ export default function RecentOrders({ orders, showMoney, now }) {
                 <td className="py-3">
                   <StatusChip status={o.status} late={isLate(o, now)} />
                 </td>
-                <td className="px-5 py-3 text-right tnum">{showMoney ? formatMXN(o.total) : `${pairCount(o)} pares`}</td>
+                <td className="px-5 py-3 text-right tnum">{showMoney ? formatMXN(o.total) : countText(itemCount(o), orderUnit(o))}</td>
               </tr>
             ))}
           </tbody>

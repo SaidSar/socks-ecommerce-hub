@@ -19,6 +19,7 @@
   --color-ai: #2f5e9e; /* serie principal, foco, enlaces de acción */
   --color-ai-hover: #244b80;
   --color-ocre: #b07a3c; /* serie de comparación, "Por preparar" */
+  --color-ocre-ink: #85571f; /* precio fuera de temporada y textos sobre ocre (AA sobre paper y linen) */
   --color-ok-bg: #e7ece3;
   --color-warn-bg: #f4e7d3;
   --color-crit-bg: #f3dedb;

@@ -1,9 +1,12 @@
 // Datos de ejemplo deterministas del panel (DESIGN_ADMIN.md §6.1). Solo los usa services/adminApi.js.
-import { PAYMENT_METHOD_LABELS } from '../domain/enums'
+import { skuOf as catalogSku } from '../domain/catalog'
+import { PAYMENT_METHOD_LABELS, stockUnit } from '../domain/enums'
+import { ADMIN_FIELDS, exampleBarcode } from './catalogAdmin'
+import { BRANDS, COLLECTIONS, COLORS, PRODUCT_TYPES, PRODUCTS, SIZES_BY_SYSTEM } from './catalogSeed'
 import { computeShipping } from '../domain/shipping'
 
 // Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
-export const SEED_VERSION = 4
+export const SEED_VERSION = 6
 
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
@@ -21,12 +24,7 @@ export function mulberry32(seed) {
 }
 
 // --- Catálogo: datos copiados de apps/web-store/src/data/catalog.mock.js (no se importa la ruta). ---
-export const TONES = {
-  sumi: { name: 'Tinta Sumi', hex: '#2C2925' },
-  washi: { name: 'Blanco Washi', hex: '#EFE8DC' },
-  laca: { name: 'Rojo Laca', hex: '#9E2F2C' },
-  matcha: { name: 'Oliva Matcha', hex: '#6E7A5E' },
-}
+export { TONES } from './tones'
 
 export const SIZES = [
   { code: 'S', label: '22–24 cm' },
@@ -135,7 +133,7 @@ export function createSeed() {
       const qty = rnd() < 0.2 ? 2 : 1
       const same = items.find((it) => it.sku === sku)
       if (same) same.qty += qty
-      else items.push({ pieceId: p.id, name: p.name, tone, size, sku, qty, price: p.price })
+      else items.push({ pieceId: p.id, name: p.name, tone, size, sku, qty, price: p.price, unit: 'par' })
     }
     const subtotal = items.reduce((a, it) => a + it.price * it.qty, 0)
     const place = ov.city ? cityBy(ov.city) : pick(CITIES)
@@ -233,7 +231,7 @@ export function createSeed() {
         const sku = skuOf(p.id, tone, code)
         const reserved = reservedBy[sku] ?? 0
         const base = rnd() < 0.12 ? 0 : int(0, max)
-        inventory.push({ sku, pieceId: p.id, piece: p.name, tone, size: code, stock: Math.max(base, reserved), reserved })
+        inventory.push({ sku, pieceId: p.id, piece: p.name, tone, size: code, stock: Math.max(base, reserved), reserved, line: 'sokko', unit: 'par' })
       }),
     ),
   )
@@ -308,5 +306,49 @@ export function createSeed() {
     })
   }
 
-  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES) }
+  // --- Catálogo multilínea: las demás líneas se agregan al inventario al final, sin consumir el PRNG,
+  // para que los datos de SOKKO (pedidos, kárdex, ventas) no cambien. Su stock sale de la semilla de la tienda.
+  const catalog = createCatalog()
+  catalog.products
+    .filter((p) => p.line !== 'sokko')
+    .forEach((p) => {
+      const type = catalog.types.find((t) => t.code === p.type)
+      const sizes = catalog.sizes[type.sizeSystem]
+      const skus = p.colors.flatMap((c) => sizes.map((s) => ({ sku: catalogSku(p.line, p.pieceNumber, c, s.code), color: c, size: s.code })))
+      const unit = stockUnit(p.type, p.unitsPerPack)
+      skus.forEach((v, i) => {
+        // Reparto parejo del stock del producto; el sobrante va a las primeras variantes.
+        const stock = Math.floor(p.stock / skus.length) + (i < p.stock % skus.length ? 1 : 0)
+        const tone = catalog.colors.find((c) => c.code === v.color).apiCode
+        inventory.push({ sku: v.sku, pieceId: p.slug, piece: p.name, tone, size: v.size, stock, reserved: 0, line: p.line, unit })
+        movements.push({ sku: v.sku, type: 'entrada', qty: stock, balance: stock, date: iso(at(26, 10, 0)), user: 'Daniel R.', note: 'Lote del proveedor', order: null })
+      })
+    })
+
+  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES), catalog }
+}
+
+/**
+ * Catálogo del panel: la semilla de la tienda (catalogSeed.js) más costo, ventas de ejemplo y códigos de barras.
+ * TODO(api): GET /api/admin/catalog.
+ */
+export function createCatalog() {
+  return structuredClone({
+    brands: BRANDS,
+    types: PRODUCT_TYPES,
+    sizes: SIZES_BY_SYSTEM,
+    collections: COLLECTIONS,
+    colors: COLORS,
+    products: PRODUCTS.map(({ stock, ...p }) => {
+      const sizes = SIZES_BY_SYSTEM[PRODUCT_TYPES.find((t) => t.code === p.type).sizeSystem]
+      const barcodes = {}
+      p.colors.forEach((c, ci) =>
+        sizes.forEach((s, si) => {
+          const code = exampleBarcode(p, ci, si)
+          if (code) barcodes[catalogSku(p.line, p.pieceNumber, c, s.code)] = code
+        }),
+      )
+      return { ...p, unitsPerPack: p.unitsPerPack ?? 1, collection: p.collection ?? null, stock, ...ADMIN_FIELDS[p.slug], barcodes }
+    }),
+  })
 }

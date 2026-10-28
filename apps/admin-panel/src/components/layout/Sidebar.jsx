@@ -15,8 +15,15 @@ export default function Sidebar({ items, toPrepare = 0, onNavigate }) {
         </span>
       </div>
       <ul className="p-3 space-y-0.5 flex-1 overflow-y-auto">
-        {items.map((n) => (
+        {items.map((n, i) => (
           <li key={n.key}>
+            {/* Título de grupo (Catálogo) antes de su primera sección; al terminar el grupo, una línea. */}
+            {n.group && n.group !== items[i - 1]?.group && (
+              <p className="px-3 pt-4 pb-1.5 text-[10.5px] tracking-[.16em] uppercase text-ink-soft">
+                {n.group}
+              </p>
+            )}
+            {!n.group && items[i - 1]?.group && <hr className="my-2 border-line" />}
             <NavLink
               to={n.to}
               end={n.to === '/'}

@@ -81,7 +81,11 @@ export const isPaymentPending = (order) => order.paymentStatus === 'pendiente'
 /** Pestaña "OXXO pendiente": PaymentMethod = OxxoPay AND PaymentStatus = Pendiente (DESIGN_DB.md §3.8). */
 export const isOxxoPending = (order) => order.pay === 'oxxo_pay' && isPaymentPending(order) && order.status === 'por_preparar'
 
-export const pairCount = (order) => order.items.reduce((a, it) => a + it.qty, 0)
+/** Unidades del pedido (cada par de calcetas cuenta como 1). */
+export const itemCount = (order) => order.items.reduce((a, it) => a + it.qty, 0)
+
+/** 'par' si todas las partidas son calcetas sin paquete; si no, 'unidad' (DESIGN_CATALOG_UI.md §4.7). */
+export const orderUnit = (order) => (order.items.every((it) => it.unit === 'par') ? 'par' : 'unidad')
 
 export function validateTracking(tracking) {
   return TRACKING_RE.test(String(tracking ?? '').trim()) ? '' : TRACKING_ERROR

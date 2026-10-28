@@ -1,4 +1,5 @@
 // Reglas de inventario y kárdex (DESIGN_ADMIN.md §5.3, R-27 de DESIGN_DB.md §3.6). Funciones puras.
+import { countText } from './enums'
 
 // Códigos de API de los movimientos (DESIGN_DB.md §1.6); las etiquetas viven en enums.js.
 // Movimientos que el usuario registra a mano desde el panel de stock.
@@ -10,15 +11,22 @@ export const INITIAL = 'inventario_inicial'
 export const FOLIO_MOVEMENTS = [SALE, 'devolucion']
 export const FOLIO_RE = /^SKK-\d{4,}$/
 
-const pairs = (n) => (n === 1 ? '1 par' : `${n} pares`)
-const reservedPairs = (n) => (n === 1 ? 'el par apartado' : `los ${n} pares apartados`)
+// "par" es masculino y "unidad" femenino: los mensajes concuerdan con la unidad del renglón (§4.7).
+const reservedText = (n, unit) =>
+  unit === 'par' ? (n === 1 ? 'el par apartado' : `los ${n} pares apartados`) : n === 1 ? 'la unidad apartada' : `las ${n} unidades apartadas`
+const reservedCount = (n, unit) => {
+  const word = unit === 'par' ? 'apartado' : 'apartada'
+  return n === 1 ? `1 está ${word}` : `${n} están ${word}s`
+}
 
+/** Mensajes de inventario. `unit` es la del renglón: 'par' (calcetas sin paquete) o 'unidad'. */
 export const MSG = {
   qty: 'Escriba una cantidad mayor a 0.',
-  count: 'Escriba cuántos pares contó (0 o más).',
-  tooMany: (n) => `No puede sacar más de ${n} pares.`,
-  tooManyReserved: (n, reserved) => `No puede sacar más de ${pairs(n)}; ${reserved === 1 ? '1 está apartado' : `${reserved} están apartados`} para pedidos.`,
-  belowReserved: (n, reserved) => `El conteo (${n}) es menor que ${reservedPairs(reserved)}. Cancele o surta esos pedidos antes de ajustar.`,
+  count: (unit = 'unidad') => (unit === 'par' ? 'Escriba cuántos pares contó (0 o más).' : 'Escriba cuántas unidades contó (0 o más).'),
+  tooMany: (n, unit = 'unidad') => `No puede sacar más de ${countText(n, unit)}.`,
+  tooManyReserved: (n, reserved, unit = 'unidad') => `No puede sacar más de ${countText(n, unit)}; ${reservedCount(reserved, unit)} para pedidos.`,
+  belowReserved: (n, reserved, unit = 'unidad') =>
+    `El conteo (${n}) es menor que ${reservedText(reserved, unit)}. Cancele o surta esos pedidos antes de ajustar.`,
   note: 'Escriba el motivo para la bitácora.',
   folio: 'Escriba el folio del pedido, por ejemplo SKK-1042.',
   folioUnknown: (folio) => `No encontramos el pedido ${folio}. Revise el folio.`,
@@ -54,13 +62,13 @@ export function checkMovement(row, { type, qty, note, folio }, { orderExists } =
   const raw = String(qty ?? '').trim()
   const n = /^\d+$/.test(raw) ? Number(raw) : NaN
   if (type === 'conteo_fisico') {
-    if (!Number.isInteger(n) || n < 0) return fail(MSG.count)
-    if (n < row.reserved) return fail(MSG.belowReserved(n, row.reserved), 409)
+    if (!Number.isInteger(n) || n < 0) return fail(MSG.count(row.unit))
+    if (n < row.reserved) return fail(MSG.belowReserved(n, row.reserved, row.unit), 409)
   } else if (!Number.isInteger(n) || n <= 0) {
     return fail(MSG.qty)
   }
   if (type === 'merma' && n > available(row)) {
-    return row.reserved > 0 ? fail(MSG.tooManyReserved(available(row), row.reserved), 409) : fail(MSG.tooMany(row.stock))
+    return row.reserved > 0 ? fail(MSG.tooManyReserved(available(row), row.reserved, row.unit), 409) : fail(MSG.tooMany(row.stock, row.unit))
   }
   if (needsNote(type) && !String(note ?? '').trim()) return fail(MSG.note, 422, 'note')
   if (needsFolio(type)) {

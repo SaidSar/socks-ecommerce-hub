@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeed, DEMO_NOW, PIECES, skuOf } from '../data/seed'
-import { isLate } from '../domain/orders'
+import { isLate, itemCount, orderUnit } from '../domain/orders'
 import * as api from './adminApi'
 
 const OWNER = { name: 'Aiko Morales', role: 'dueno' }
@@ -15,9 +15,11 @@ describe('seed determinista y coherente', () => {
     expect(createSeed()).toEqual(seed)
   })
 
-  it('6 piezas × tonos × S/M/L con SKU SKK-{id}-{tono}-{talla}', () => {
+  it('6 piezas × tonos × S/M/L con SKU SKK-{id}-{tono}-{talla}, más las variantes de las otras tres líneas', () => {
     const expected = PIECES.reduce((a, p) => a + p.tones.length * 3, 0)
-    expect(seed.inventory).toHaveLength(expected)
+    expect(seed.inventory.filter((r) => r.line === 'sokko')).toHaveLength(expected)
+    expect(seed.inventory).toHaveLength(120)
+    expect(new Set(seed.inventory.map((r) => r.sku)).size).toBe(120)
     expect(seed.inventory.some((r) => r.sku === skuOf(7, 'sumi', 'M'))).toBe(true)
     expect(skuOf(7, 'sumi', 'M')).toBe('SKK-007-SUM-M')
   })
@@ -158,6 +160,87 @@ describe('efecto de los pedidos en inventario', () => {
   })
 })
 
+describe('catálogo: DTO por rol y permisos (§2.2, §4.1)', () => {
+  it('Operaciones no recibe unitCost ni margin; el Dueño sí', async () => {
+    const ops = await api.getCatalog('operaciones')
+    const owner = await api.getCatalog('dueno')
+    expect(ops.products).toHaveLength(24)
+    ops.products.forEach((p) => {
+      expect(p).not.toHaveProperty('unitCost')
+      expect(p).not.toHaveProperty('margin')
+    })
+    const tabi = owner.products.find((p) => p.slug === 'tabi-origami-noche')
+    expect(tabi.unitCost).toBe(168)
+    expect(tabi.margin).toBeCloseTo((420 - 168) / 420)
+    expect(owner.products.find((p) => p.slug === 'tsuchi-raiz')).toMatchObject({ unitCost: null, margin: null })
+  })
+
+  it('las semillas coinciden con la tienda: SKU, unidad real de guantes y gorro sin tono Kyoto', async () => {
+    const { products, types } = await api.getCatalog('dueno')
+    expect(products.find((p) => p.slug === 'tabi-origami-noche').variants.map((v) => v.sku)).toContain('SKK-007-SUM-M')
+    expect(types.find((t) => t.code === 'guantes').unit).toBe('par')
+    expect(types.find((t) => t.code === 'mangas').unit).toBe('par')
+    expect(products.find((p) => p.slug === 'gorro-de-punto').colors.map((c) => c.code)).toEqual(['NEG', 'CAM'])
+  })
+
+  it('Operaciones recibe 403 al editar producto, marca, colección o tipo', async () => {
+    const { products } = await api.getCatalog('operaciones')
+    await expect(api.saveProduct({ ...products[0], brand: 'sokko', type: 'calcetas', colors: ['SUM'] }, OPS)).rejects.toMatchObject({ status: 403 })
+    await expect(api.addBrand('Adidas', OPS)).rejects.toMatchObject({ status: 403 })
+    await expect(api.setBrandVisibility('nike', false, OPS)).rejects.toMatchObject({ status: 403 })
+    await expect(api.saveCollection({ slug: 'navidad', kind: 'tematica' }, OPS)).rejects.toMatchObject({ status: 403 })
+    await expect(api.saveProductType('gorros', {}, OPS)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('el Dueño guarda con validaciones (422) y el código de barras es único', async () => {
+    const form = { slug: 'copo-navideno', line: 'especiales', name: 'Copo Navideño', brand: 'sin-marca', type: 'calcetas', collection: null, colors: ['ROJ', 'VER'], price: 199, unitCost: 82, unitsPerPack: 1 }
+    await expect(api.saveProduct(form, OWNER)).rejects.toMatchObject({ status: 422, errors: { collection: expect.any(String) } })
+    await expect(api.saveProduct({ ...form, collection: 'navidad', barcodes: { 'ESP-001-ROJ-S': '019523800100' } }, OWNER)).rejects.toMatchObject({
+      status: 422,
+      errors: { 'barcode:ESP-001-ROJ-S': 'Ese código de barras ya está en MRC-001-BLA-S.' },
+    })
+    const saved = await api.saveProduct({ ...form, collection: 'navidad', price: 209 }, OWNER)
+    expect(saved).toMatchObject({ price: 209, unitCost: 82 })
+  })
+
+  it('producto nuevo: siguiente número de pieza de la línea y variantes en inventario con stock 0', async () => {
+    const form = { line: 'especiales', name: 'Copo de Prueba', brand: 'sin-marca', type: 'calcetas', collection: 'navidad', colors: ['ROJ'], price: 199, unitCost: 150, unitsPerPack: 1 }
+    const saved = await api.saveProduct(form, OWNER)
+    expect(saved).toMatchObject({ pieceNumber: 9, stock: 0, margin: expect.any(Number) })
+    expect(saved.variants.map((v) => v.sku)).toEqual(['ESP-009-ROJ-S', 'ESP-009-ROJ-M', 'ESP-009-ROJ-L'])
+    const { rows } = await api.getInventory({ filter: 'todos', q: 'ESP-009' })
+    expect(rows.map((r) => r.stock)).toEqual([0, 0, 0])
+  })
+
+  it('colecciones: el Dueño cambia la ventana y el descuento; el estado y el precio fuera se recalculan', async () => {
+    const navidad = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
+    await expect(api.saveCollection({ ...navidad, endMonth: 2, endDay: 29 }, OWNER)).rejects.toMatchObject({ status: 422, errors: { window: expect.any(String) } })
+    await api.saveCollection({ ...navidad, startMonth: 10, startDay: 15, offSeasonDiscountPct: 0.4 }, OWNER)
+    const after = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
+    expect(after.status).toMatchObject({ tone: 'ok', inSeason: true })
+    expect(after.products.every((p) => p.offSeasonPrice === null)).toBe(true)
+    await api.saveCollection({ ...after, startMonth: 11, startDay: 1 }, OWNER)
+    const off = (await api.getCatalog('dueno')).collections.find((c) => c.slug === 'navidad')
+    expect(off.products.find((p) => p.price === 199).offSeasonPrice).toBe(119.4)
+  })
+
+  it('marcas: duplicado sin distinguir mayúsculas, y la propia siempre visible', async () => {
+    await expect(api.addBrand('nike', OWNER)).rejects.toMatchObject({ status: 422, errors: { name: 'Ya existe la marca nike.' } })
+    await expect(api.setBrandVisibility('sokko', false, OWNER)).rejects.toMatchObject({ status: 409 })
+    expect(await api.addBrand('Adidas', OWNER)).toMatchObject({ slug: 'adidas', showInFilters: true })
+  })
+
+  it('resumen: margen sin costo excluido y "N sin costo"; Operaciones sin importes', async () => {
+    const owner = await api.getCatalogSummary('dueno')
+    expect(owner.lines.find((l) => l.line === 'sokko').missingCost).toBe(1)
+    expect(owner.grossMargin).toBeGreaterThan(0)
+    const ops = await api.getCatalogSummary('operaciones')
+    expect(ops.lines[0]).toEqual({ line: 'sokko', units: expect.any(Number) })
+    expect(ops.grossMargin).toBeNull()
+    expect(ops.brands).toBeNull()
+  })
+})
+
 describe('marcar como pagado', () => {
   it('el Dueño confirma un OXXO pendiente; el historial queda en orden y ya puede pasar a preparando', async () => {
     const { orders } = await api.getOrders({ filter: 'oxxo' }, 'dueno')
@@ -222,6 +305,42 @@ describe('importación y configuración', () => {
     expect(after.stock).toBe(30)
     const [mv] = await api.getMovements(a.sku)
     expect(mv).toMatchObject({ type: 'inventario_inicial', note: 'Importado desde CSV', balance: 30 })
+  })
+
+  it('§4.7: las columnas del catálogo se aplican; unit_cost solo cuenta si importa el Dueño', async () => {
+    const head = 'SKU,Pieza,Tono,Talla,Stock,brand,units_per_pack,unit_cost,barcode'
+    const csv = [head, 'MRC-003-NEG-M,x,x,M,8,Puma,3,95,7501234500017'].join('\n')
+    const preview = await api.previewImport(csv, 'dueno')
+    expect(preview.valid[0].changes).toEqual({ brand: 'puma', unitsPerPack: 3, unitCost: 95, barcode: '7501234500017' })
+    await api.applyImport(preview.valid, OWNER)
+    const ua = (await api.getCatalog('dueno')).products.find((p) => p.slug === 'ua-heatgear-crew')
+    expect(ua).toMatchObject({ brand: { slug: 'puma' }, unitsPerPack: 3, unitCost: 95 })
+    expect(ua.variants.find((v) => v.sku === 'MRC-003-NEG-M')).toMatchObject({ barcode: '7501234500017', stock: 8 })
+    // Con paquete deja de ser "par": la unidad de conteo de sus SKU pasa a "unidad".
+    expect((await api.getInventory({ q: 'MRC-003-NEG-M' })).rows[0].unit).toBe('unidad')
+
+    const ops = await api.previewImport([head, 'MRC-004-BLA-S,x,x,S,5,,,10,'].join('\n'), 'operaciones')
+    expect(ops.valid[0]).toMatchObject({ warning: 'Se ignoró unit_cost: solo el Dueño registra costos.', changes: {} })
+    await api.applyImport(ops.valid, OPS)
+    expect((await api.getCatalog('dueno')).products.find((p) => p.slug === 'nike-elite-basketball').unitCost).not.toBe(10)
+  })
+
+  it('la plantilla trae las columnas nuevas; unit_cost vacío para Operaciones', async () => {
+    const owner = (await api.getTemplateCsv('dueno')).replace('﻿', '').split('\r\n')
+    const ops = (await api.getTemplateCsv('operaciones')).replace('﻿', '').split('\r\n')
+    expect(owner[0]).toBe('SKU,Pieza,Tono,Talla,Stock,line,brand,type,collection,units_per_pack,unit_cost,barcode')
+    const row = (lines) => lines.find((l) => l.startsWith('MRC-001-BLA-S,')).split(',')
+    expect(row(owner).slice(5)).toEqual(['marcas', 'nike', 'calcetas', '', '3', '305', '019523800100'])
+    expect(row(ops)[10]).toBe('')
+    // La plantilla es importable tal cual.
+    expect((await api.previewImport(owner.join('\n'), 'dueno')).invalid).toEqual([])
+  })
+
+  it('pedidos: unidades del pedido y "pares" solo si todo son calcetas sin paquete', () => {
+    const order = { items: [{ qty: 2, unit: 'par' }, { qty: 1, unit: 'par' }] }
+    expect(itemCount(order)).toBe(3)
+    expect(orderUnit(order)).toBe('par')
+    expect(orderUnit({ items: [{ qty: 1, unit: 'par' }, { qty: 1, unit: 'unidad' }] })).toBe('unidad')
   })
 
   it('la configuración tiene la forma de GET /api/config (DESIGN_DB.md §3.12) más las zonas', async () => {

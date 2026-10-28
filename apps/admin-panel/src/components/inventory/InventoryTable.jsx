@@ -77,7 +77,7 @@ export default function InventoryTable({ rows, selected, canAdjust, few, onSelec
         {!rows.length && <p className="px-5 py-14 text-center text-ink-soft">Ningún SKU coincide. Borre la búsqueda o elija “Todos”.</p>}
       </div>
       <p className="px-5 py-3 text-[12px] text-ink-soft border-t border-line">
-        Disponible = stock − apartado por pedidos sin enviar. Alerta con {few} pares o menos.
+        Disponible = stock − apartado por pedidos sin enviar. Alerta con {few} unidades o menos.
       </p>
     </Card>
   )

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyInitial, applyMovement, applySale, available, checkMovement, MSG, needsFolio, release, reserve, sortMovements, stockState, validateMovement } from './inventory'
 
-const row = (over = {}) => ({ sku: 'SKK-007-SUM-M', stock: 10, reserved: 2, ...over })
+const row = (over = {}) => ({ sku: 'SKK-007-SUM-M', stock: 10, reserved: 2, unit: 'par', ...over })
 const AT = '2026-10-18T15:00:00.000Z'
 
 describe('estados de stock', () => {
@@ -34,7 +34,7 @@ describe('movimientos manuales', () => {
 
   it('Merma mayor al stock se rechaza', () => {
     const res = applyMovement(row({ reserved: 0 }), { type: 'merma', qty: '11', note: 'Mancha' }, 'Daniel R.', AT)
-    expect(res.error).toBe(MSG.tooMany(10))
+    expect(res.error).toBe(MSG.tooMany(10, 'par'))
     expect(res.status).toBe(422)
     expect(res.row.stock).toBe(10)
   })
@@ -70,7 +70,7 @@ describe('movimientos manuales', () => {
 
   it('Conteo físico acepta 0; los demás exigen cantidad mayor a 0', () => {
     expect(validateMovement(row({ reserved: 0 }), { type: 'conteo_fisico', qty: '0' })).toBe('')
-    expect(validateMovement(row(), { type: 'conteo_fisico', qty: '' })).toBe(MSG.count)
+    expect(validateMovement(row(), { type: 'conteo_fisico', qty: '' })).toBe(MSG.count('par'))
     expect(validateMovement(row(), { type: 'entrada', qty: '0' })).toBe(MSG.qty)
     expect(validateMovement(row(), { type: 'entrada', qty: '2.5' })).toBe(MSG.qty)
   })
@@ -81,7 +81,7 @@ describe('R-27: pares apartados', () => {
   it('Merma hasta lo disponible pasa; un par más se rechaza con 409 y dice cuántos están apartados', () => {
     expect(applyMovement(row(), { type: 'merma', qty: '8', note: 'Mancha' }, 'Daniel R.', AT)).toMatchObject({ error: '', row: { stock: 2, reserved: 2 } })
     const res = applyMovement(row(), { type: 'merma', qty: '9', note: 'Mancha' }, 'Daniel R.', AT)
-    expect(res.error).toBe(MSG.tooManyReserved(8, 2))
+    expect(res.error).toBe(MSG.tooManyReserved(8, 2, 'par'))
     expect(res.error).toContain('2 están apartados')
     expect(res.status).toBe(409)
     expect(res.row.stock).toBe(10)
@@ -90,7 +90,7 @@ describe('R-27: pares apartados', () => {
   it('Conteo físico igual a lo apartado pasa; uno menos se rechaza con 409', () => {
     expect(applyMovement(row(), { type: 'conteo_fisico', qty: '2' }, 'Aiko M.', AT)).toMatchObject({ error: '', row: { stock: 2 } })
     const res = applyMovement(row(), { type: 'conteo_fisico', qty: '1' }, 'Aiko M.', AT)
-    expect(res.error).toBe(MSG.belowReserved(1, 2))
+    expect(res.error).toBe(MSG.belowReserved(1, 2, 'par'))
     expect(res.status).toBe(409)
     expect(validateMovement(row({ reserved: 0 }), { type: 'conteo_fisico', qty: '0' })).toBe('')
   })
@@ -98,12 +98,22 @@ describe('R-27: pares apartados', () => {
   it('el saldo nunca queda por debajo de lo apartado tras un movimiento válido', () => {
     const { row: r } = applyMovement(row({ stock: 5, reserved: 5 }), { type: 'conteo_fisico', qty: '5' }, 'Aiko M.', AT)
     expect(r.stock).toBeGreaterThanOrEqual(r.reserved)
-    expect(validateMovement(row({ stock: 5, reserved: 5 }), { type: 'merma', qty: '1', note: 'x' })).toBe(MSG.tooManyReserved(0, 5))
+    expect(validateMovement(row({ stock: 5, reserved: 5 }), { type: 'merma', qty: '1', note: 'x' })).toBe(MSG.tooManyReserved(0, 5, 'par'))
   })
 
   it('los mensajes concuerdan en singular', () => {
-    expect(MSG.tooManyReserved(1, 1)).toBe('No puede sacar más de 1 par; 1 está apartado para pedidos.')
-    expect(MSG.belowReserved(0, 1)).toContain('menor que el par apartado')
+    expect(MSG.tooManyReserved(1, 1, 'par')).toBe('No puede sacar más de 1 par; 1 está apartado para pedidos.')
+    expect(MSG.belowReserved(0, 1, 'par')).toContain('menor que el par apartado')
+  })
+
+  it('§4.7: fuera de las calcetas sin paquete se habla de unidades (femenino, singular y plural)', () => {
+    const gorro = row({ sku: 'ACC-002-NEG-U', unit: 'unidad', stock: 5, reserved: 2 })
+    expect(validateMovement(gorro, { type: 'merma', qty: '4', note: 'x' })).toBe('No puede sacar más de 3 unidades; 2 están apartadas para pedidos.')
+    expect(validateMovement(gorro, { type: 'conteo_fisico', qty: '1' })).toContain('menor que las 2 unidades apartadas')
+    expect(validateMovement(gorro, { type: 'conteo_fisico', qty: 'x' })).toBe('Escriba cuántas unidades contó (0 o más).')
+    expect(MSG.tooManyReserved(1, 1, 'unidad')).toBe('No puede sacar más de 1 unidad; 1 está apartada para pedidos.')
+    expect(MSG.belowReserved(0, 1, 'unidad')).toContain('menor que la unidad apartada')
+    expect(validateMovement(row({ unit: 'unidad', reserved: 0 }), { type: 'merma', qty: '11', note: 'x' })).toBe('No puede sacar más de 10 unidades.')
   })
 })
 
