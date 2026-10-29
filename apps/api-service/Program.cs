@@ -1,10 +1,33 @@
+using Microsoft.EntityFrameworkCore;
+using Sokko.Api.Data;
+using Sokko.Api.Data.Seed;
+
 const string WebStoreCorsPolicy = "AllowWebStore";
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ajustes por máquina fuera de Git (por ejemplo, la contraseña de un SQL Server en Docker).
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: true);
+
 // Add services to the container.
 
 builder.Services.AddControllers();
+
+// SQL Server vía EF Core (DESIGN_DB.md). En producción la cadena llega por ConnectionStrings__Sokko (Azure SQL).
+builder.Services.AddDbContext<SokkoDbContext>(options =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("Sokko")
+        ?? throw new InvalidOperationException("Falta la cadena de conexión 'ConnectionStrings:Sokko'.");
+    options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
+
+    // Productos, SKU y usuarios demo solo en Development (DESIGN_DB §5); corre con `dotnet ef database update`.
+    if (builder.Environment.IsDevelopment())
+    {
+        options
+            .UseSeeding((context, _) => DevelopmentDataSeeder.Seed(context))
+            .UseAsyncSeeding((context, _, cancellationToken) => DevelopmentDataSeeder.SeedAsync(context, cancellationToken));
+    }
+});
 
 // CORS: permite que apps/web-store (Vite) consuma este servicio.
 builder.Services.AddCors(options =>

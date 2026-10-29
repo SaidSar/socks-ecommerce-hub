@@ -114,14 +114,14 @@ se incluye en el bundle de la tienda.
   - `Models/` — entidades de dominio.
   - `DTOs/` — objetos de transferencia (contrato de entrada/salida, desacoplado del dominio).
   - `Services/` — lógica de negocio (interfaces + implementaciones, inyectadas por DI).
-  - `Data/` — acceso a datos (futuro `DbContext` de EF Core).
+  - `Data/` — acceso a datos: `SokkoDbContext`, configuraciones por tabla, migraciones y semillas (EF Core).
 - **Convención de rutas:** `api/[recurso]` (p. ej. `GET /api/health`).
 
-### 2.3 Base de datos (fase futura)
+### 2.3 Base de datos
 
-- **Motor:** SQL Server.
+- **Motor:** SQL Server (Azure SQL en producción; Developer, Express o Docker en local).
 - **Acceso:** Entity Framework Core desde `apps/api-service/Data`.
-- **Estado:** *aún no configurada.*
+- **Esquema:** `docs/design/DESIGN_DB.md`; migración inicial `InitialCreate` con semillas de catálogo y, en Development, datos demo.
 
 ---
 
@@ -153,7 +153,7 @@ Respuesta:
 ## 5. Hoja de ruta
 
 - [x] **Fase 0** — Scaffolding del monorepo, frontend y backend; endpoint de salud.
-- [ ] **Fase 1** — Integración con SQL Server (EF Core, migraciones).
+- [x] **Fase 1** — Integración con SQL Server (EF Core, migraciones).
 - [ ] **Fase 2** — Catálogo de productos (calcetines), detalle, filtros.
 - [ ] **Fase 3** — Carrito, checkout y órdenes.
 - [ ] **Fase 4** — Autenticación de usuarios y panel de administración.
