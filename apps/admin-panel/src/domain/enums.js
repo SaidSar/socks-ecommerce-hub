@@ -1,0 +1,54 @@
+// Enums con su código de API (DESIGN_DB.md §1.6) y su etiqueta para la UI.
+// Los datos guardan siempre el código; los componentes muestran la etiqueta con label(), nunca un texto a mano.
+
+export const CARRIER_LABELS = { estafeta: 'Estafeta', dhl_express: 'DHL Express' }
+
+export const PAYMENT_METHOD_LABELS = { tarjeta: 'Tarjeta', oxxo_pay: 'OXXO Pay' }
+
+export const PAYMENT_STATUS_LABELS = { pendiente: 'Pendiente de pago', pagado: 'Pagado', reembolsado: 'Reembolsado' }
+
+export const MOVEMENT_LABELS = {
+  entrada: 'Entrada',
+  merma: 'Merma',
+  devolucion: 'Devolución',
+  conteo_fisico: 'Conteo físico',
+  venta: 'Venta',
+  inventario_inicial: 'Inventario inicial',
+}
+
+// Catálogo multilínea (DESIGN_DB.md v0.4.2 §1.6): mismos códigos que apps/web-store/src/config/enums.js.
+export const LINE_LABELS = { sokko: 'SOKKO Japón', marcas: 'Marcas', especiales: 'Especiales', accesorios: 'Accesorios' }
+export const LINE_SHORT_LABELS = { sokko: 'SOKKO', marcas: 'Marcas', especiales: 'Especiales', accesorios: 'Accesorios' }
+export const LINES = Object.keys(LINE_LABELS)
+
+export const COLLECTION_KIND_LABELS = { temporada: 'Temporada', tematica: 'Temática' }
+
+export const SIZE_SYSTEM_LABELS = { calceta: 'Calceta', guante: 'Guante', unitalla: 'Unitalla' }
+
+export const UNIT_LABELS = { par: 'Par', pieza: 'Pieza' }
+const UNIT_PLURALS = { par: 'pares', pieza: 'piezas' }
+
+/**
+ * Sustantivo de conteo de stock (DESIGN_CATALOG_UI.md §4.7): `unit` es la del renglón de inventario,
+ * 'par' solo en calcetas sin paquete; todo lo demás se cuenta en unidades.
+ */
+export const countNoun = (n, unit) => (unit === 'par' ? (n === 1 ? 'par' : 'pares') : n === 1 ? 'unidad' : 'unidades')
+export const countText = (n, unit) => `${n} ${countNoun(n, unit)}`
+
+/** Unidad de conteo del renglón de inventario: 'par' solo en calcetas sin paquete (§4.7). */
+export const stockUnit = (typeCode, unitsPerPack = 1) => (typeCode === 'calcetas' && unitsPerPack === 1 ? 'par' : 'unidad')
+
+/** Etiqueta de un código; si el código no está en el mapa se muestra tal cual. */
+export const label = (labels, code) => labels[code] ?? code ?? ''
+
+/** Unidad de venta: "Par", "Pieza" o "Paquete de 3 pares" (T-10). */
+export function unitText(unit, unitsPerPack = 1) {
+  if (unitsPerPack > 1) return `Paquete de ${unitsPerPack} ${UNIT_PLURALS[unit] ?? unit}`
+  return label(UNIT_LABELS, unit)
+}
+
+export const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+export const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** Día y mes cortos: "1 nov". */
+export const dayMonth = (month, day) => `${day} ${MONTHS_SHORT[month - 1]}`

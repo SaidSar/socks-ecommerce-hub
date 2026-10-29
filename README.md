@@ -20,13 +20,14 @@ construido con una **Arquitectura Orientada a Servicios (SOA)**.
 ```
 socks-ecommerce-hub/
 ├── apps/
-│   ├── web-store/          # Frontend · React + Vite + Tailwind CSS
+│   ├── web-store/          # Tienda · React + Vite + Tailwind CSS
 │   │   └── src/
 │   │       ├── components/
 │   │       ├── pages/
 │   │       ├── services/   # Clientes HTTP hacia api-service
 │   │       ├── context/
 │   │       └── assets/
+│   ├── admin-panel/        # Panel administrativo · React + Vite + Tailwind CSS
 │   └── api-service/        # Backend SOA · ASP.NET Core Web API (Sokko.Api)
 │       ├── Controllers/
 │       ├── Models/
@@ -39,15 +40,19 @@ socks-ecommerce-hub/
 ```
 
 ```
- web-store (React)  ──HTTP/JSON──▶  api-service (.NET)  ──▶  SQL Server (próximamente)
- localhost:5173                     localhost:5080
+ web-store (React)    ──HTTP/JSON──▶  api-service (.NET)  ──▶  SQL Server (próximamente)
+ localhost:5173                       localhost:5080
+ admin-panel (React)  ──HTTP/JSON──▶  /api/admin/*
+ localhost:5174
 ```
 
-## Paleta
+## Paleta — Kyoto Artisan
 
-| `washi` | `sumi` | `aka` |
-|:---:|:---:|:---:|
-| `#FAF8F5` | `#1A1A1A` | `#D32F2F` |
+| `linen` | `sand` | `ink` | `ink-soft` | `laca` | `matcha` | `moss` |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `#F4F0EB` | `#ECE5DC` | `#23211E` | `#6A645C` | `#A62B2B` | `#5A6654` | `#8F9779` |
+
+Especificación de diseño completa en [`docs/design/DESIGN.md`](docs/design/DESIGN.md).
 
 ## Requisitos
 
@@ -78,14 +83,51 @@ npm run dev
 - Tienda: `http://localhost:5173`
 - La URL de la API se configura con `VITE_API_URL` (ver `apps/web-store/.env.example`).
 
+### 3. Panel administrativo — `admin-panel`
+
+```bash
+npm --prefix apps/admin-panel install
+npm --prefix apps/admin-panel run dev
+```
+
+- Panel: `http://localhost:5174` (cuentas demo y detalles en [`apps/admin-panel/README.md`](apps/admin-panel/README.md)).
+- Pruebas: `npm --prefix apps/admin-panel test`.
+
 ### Compilación
 
 ```bash
 # Frontend
 cd apps/web-store && npm run build
 
+# Panel administrativo
+cd apps/admin-panel && npm run build
+
 # Backend
 cd apps/api-service && dotnet build
+```
+
+## CI
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) corre en cada PR hacia `main` y en cada push a `main`. Un push nuevo al mismo PR cancela la ejecución anterior.
+
+| Job | Corre si cambió… | Pasos |
+|---|---|---|
+| `changes` | siempre | Detecta qué apps cambiaron (`dorny/paths-filter`) |
+| `web-store` | `apps/web-store/**` o el workflow | Node LTS · `npm ci` · `npm run lint` · `npm test` · `npm run build` |
+| `admin-panel` | `apps/admin-panel/**` o el workflow | Node LTS · `npm ci` · `npm run lint` · `npm test` · `npm run build` |
+| `api-service` | `apps/api-service/**`, `docs/design/DESIGN_DB.md` o el workflow | .NET 10 · `dotnet restore` · `dotnet build -c Release` · `dotnet test` (solo si existe `apps/api-service.Tests`) |
+
+Un job que no aplica queda como *skipped*, y GitHub lo cuenta como exitoso, así que no bloquea el merge. Para correr lo mismo en local:
+
+```bash
+# Tienda
+cd apps/web-store && npm ci && npm run lint && npm test && npm run build
+
+# Panel administrativo
+cd apps/admin-panel && npm ci && npm run lint && npm test && npm run build
+
+# Backend
+cd apps/api-service && dotnet restore Sokko.Api.csproj && dotnet build Sokko.Api.csproj --no-restore -c Release
 ```
 
 ## Endpoints

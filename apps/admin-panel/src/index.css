@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+
+/*
+ * Tokens del panel (DESIGN_ADMIN.md §2): la marca Kyoto Artisan en modo de trabajo.
+ * Mismos nombres que web-store donde coinciden (linen, sand, sand-2, ink, ink-soft, laca, matcha, ocre)
+ * más los propios del panel (paper, line, ai y fondos de estado).
+ */
+@theme {
+  --color-linen: #f4f0eb;
+  --color-paper: #ffffff;
+  --color-sand: #ece5dc;
+  --color-sand-2: #e3dacd;
+  --color-line: #ddd5ca;
+  --color-ink: #23211e;
+  --color-ink-soft: #6a645c;
+  --color-laca: #a62b2b; /* acción principal y alertas críticas únicamente */
+  --color-laca-hover: #8f2424;
+  --color-matcha: #5a6654;
+  --color-ai: #2f5e9e; /* serie principal, foco, enlaces de acción */
+  --color-ai-hover: #244b80;
+  --color-ocre: #b07a3c; /* serie de comparación, "Por preparar" */
+  --color-ocre-ink: #85571f; /* precio fuera de temporada y textos sobre ocre (AA sobre paper y linen) */
+  --color-ok-bg: #e7ece3;
+  --color-warn-bg: #f4e7d3;
+  --color-crit-bg: #f3dedb;
+  --color-info-bg: #e3e9f2;
+  /* Texto sobre los fondos de estado (contraste ≥ 4.5:1, tomados del mockup). */
+  --color-warn-ink: #7a4e16;
+  --color-info-ink: #22487a;
+  --color-ok-ink: #3f4a3a;
+
+  --font-sans: 'Work Sans', 'Helvetica Neue', system-ui, sans-serif;
+  --font-serif: 'Cormorant Garamond', Garamond, 'Times New Roman', serif;
+  --font-jp: 'Shippori Mincho', 'Yu Mincho', serif;
+
+  --animate-fade: fade 0.3s ease;
+  --animate-slide: slide 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes slide {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    @apply bg-linen text-ink;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    font-size: 14px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ai);
+    outline-offset: 2px;
+  }
+
+  button:not(:disabled),
+  [role='button'],
+  label[for] {
+    cursor: pointer;
+  }
+}
+
+/*
+ * Foco visible en campos: varias utilidades usan outline-none + borde Ai. Esta regla va fuera de capas
+ * para ganarle a las utilidades y sumar un halo Ai (los buscadores lo llevan en su contenedor).
+ */
+:where(input:not([type='search']):not([type='checkbox']):not([type='file']):not([data-in-wrap]), select, textarea):focus-visible {
+  box-shadow: 0 0 0 2px rgb(47 94 158 / 0.35);
+}
+
+label:has(> input[type='search']:focus-visible),
+[data-field-wrap]:has(> input:focus-visible) {
+  box-shadow: 0 0 0 2px rgb(47 94 158 / 0.35);
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Gutter lateral: 16 px (32 px desde lg) respetando el área segura del dispositivo. */
+@utility gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+
+  @media (width >= 64rem) {
+    padding-left: 32px;
+    padding-right: max(32px, env(safe-area-inset-right, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

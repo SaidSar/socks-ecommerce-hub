@@ -19,31 +19,48 @@ ser coherente con este documento.
 
 ### 1.1 Paleta de colores
 
-| Token   | Hex       | Uso                                                        |
-|---------|-----------|------------------------------------------------------------|
-| `washi` | `#FAF8F5` | Fondo principal (papel *washi*): superficies, lienzo       |
-| `sumi`  | `#1A1A1A` | Tinta *sumi*: texto, tipografía, bordes, elementos primarios |
-| `aka`   | `#D32F2F` | Rojo *aka* (sello *hanko*): acentos, CTAs, estados activos |
+> **Dirección visual aprobada: Kyoto Artisan & Botanical Wabi-Sabi (Propuesta 3).**
+> Especificación completa en `docs/design/DESIGN.md`. Sustituye a la paleta Zen original
+> (`washi #FAF8F5`, `sumi #1A1A1A`, `aka #D32F2F`).
+
+| Token Tailwind | Hex | Uso |
+|---|---|---|
+| `linen` | `#F4F0EB` | Fondo base de la página y del drawer |
+| `sand` | `#ECE5DC` | Secciones alternas, tarjetas de imagen, top bar |
+| `sand-2` | `#E3DACD` | Estados deshabilitados, hover de superficies |
+| `ink` | `#23211E` | Texto principal, trazos, bordes al 10–20 % de opacidad |
+| `ink-soft` | `#6A645C` | Texto secundario y metadatos |
+| `laca` | `#A62B2B` | Acento único: CTA de pago, sello, "pocos ejemplares", énfasis en itálica |
+| `laca-hover` | `#8F2424` | Hover del CTA de pago |
+| `matcha` | `#5A6654` | Etiquetas de sección (eyebrows), tags de material, estado "agregado" (ajustado para pasar 4.5:1 sobre sand) |
+| `moss` | `#8F9779` | **Solo bordes y puntos decorativos.** No usar como color de texto |
+
+Tipografía: **Cormorant Garamond** (`font-serif`, titulares y precios), **Work Sans**
+(`font-sans`, cuerpo y botones) y **Shippori Mincho** (`font-jp`, kanji decorativos).
+
+Logotipo oficial del cliente en `docs/brand/` (ver `README.md`). Rojo de logo `#D91F25` exclusivo de marca; la UI usa laca `#A62B2B`.
 
 ### 1.2 Principios visuales
 
 - **Ma (間)** — espacio negativo generoso; menos elementos, más aire.
 - **Kanso (簡素)** — simplicidad; sin ornamentos innecesarios.
-- El rojo `aka` se usa con moderación: solo para acciones principales y acentos.
-- Tipografía sobria, jerarquía clara, bordes finos.
+- **Wabi-sabi (侘寂)** — texturas de lino, láminas botánicas, belleza de lo imperfecto.
+- El rojo `laca` se usa con moderación: solo en los puntos enumerados en DESIGN.md §1.1.
+- Esquinas rectas, bordes finos, sin sombras de tarjeta.
 
 ---
 
 ## 2. Arquitectura general
 
-Monorepo con dos aplicaciones independientes que se comunican vía HTTP/JSON
+Monorepo con un proveedor y dos consumidores independientes que se comunican vía HTTP/JSON
 (arquitectura orientada a servicios).
 
 ```
 socks-ecommerce-hub/
 ├── apps/
-│   ├── web-store/      → Frontend (consumidor del servicio)
-│   └── api-service/    → Backend SOA (proveedor del servicio)
+│   ├── web-store/      → Tienda pública (consumidor externo: compradores)
+│   ├── admin-panel/    → Panel administrativo (consumidor interno: Dueño y Operaciones)
+│   └── api-service/    → Backend SOA (proveedor único del servicio)
 ├── docs/               → Documentación del proyecto
 ├── CONTEXTO_MAESTRO.md
 └── README.md
@@ -54,8 +71,16 @@ socks-ecommerce-hub/
 │  web-store           │ ─────────────────────▶ │  api-service             │ ─────▶ │  SQL Server  │
 │  React + Vite        │ ◀───────────────────── │  ASP.NET Core Web API    │        │  (futuro)    │
 │  localhost:5173      │      CORS AllowWebStore│  Swagger / OpenAPI       │        └──────────────┘
-└──────────────────────┘                        └──────────────────────────┘
+└──────────────────────┘                        │  grupos public y admin   │
+┌──────────────────────┐   HTTP / JSON (REST)   │                          │
+│  admin-panel         │ ─────────────────────▶ │  /api/admin/*            │
+│  React + Vite        │ ◀───────────────────── │  Bearer + roles          │
+│  localhost:5174      │                        └──────────────────────────┘
+└──────────────────────┘
 ```
+
+Un proveedor, dos consumidores ligados al mismo contrato OpenAPI. El código del panel nunca
+se incluye en el bundle de la tienda.
 
 ### 2.1 Frontend — `apps/web-store`
 
@@ -69,6 +94,15 @@ socks-ecommerce-hub/
   - `context/` — estado global (React Context: carrito, sesión, etc.).
   - `assets/` — imágenes, fuentes y recursos estáticos.
 - **Configuración:** la URL de la API se lee de `VITE_API_URL`.
+
+### 2.1b Panel administrativo — `apps/admin-panel`
+
+- **Stack:** React + Vite + Tailwind CSS (mismas versiones que `web-store`), `react-router-dom`; pruebas con `vitest`.
+- **Puerto de desarrollo:** `http://localhost:5174` (`npm --prefix apps/admin-panel run dev`).
+- **Usuarios:** Dueño (todo, con cifras en pesos) y Operaciones (pedidos, envíos e inventario, sin pesos ni configuración).
+- **Estructura de `src/`:** `config/` (roles y permisos), `domain/` (reglas puras con pruebas), `services/`
+  (`adminApi.js`, única capa que conocerá `/api/admin/*`; hoy simulada), `context/`, `hooks/`, `components/`, `pages/`.
+- **Especificación:** `docs/design/DESIGN_ADMIN.md` y `docs/design/DECISIONES_ADMIN.md`.
 
 ### 2.2 Backend — `apps/api-service`
 
@@ -96,7 +130,8 @@ socks-ecommerce-hub/
 1. **Contrato de servicio explícito** — DTOs + OpenAPI definen el contrato.
 2. **Bajo acoplamiento** — el frontend solo conoce el contrato HTTP, nunca el modelo interno.
 3. **Abstracción** — la lógica vive en `Services/`, los controladores solo orquestan.
-4. **Reutilización** — los servicios pueden ser consumidos por otros clientes (móvil, admin).
+4. **Reutilización** — los mismos servicios los consumen la tienda (`web-store`, consumidor público) y el panel
+   (`admin-panel`, consumidor interno); a futuro, otros clientes (móvil).
 5. **Autonomía** — cada app se compila, ejecuta y despliega de forma independiente.
 
 ---

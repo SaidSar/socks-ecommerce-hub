@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SOKKO Acceso Kyoto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Work+Sans:wght@300;400;500&family=Shippori+Mincho:wght@400;600&display=swap">
+<style>
+  /* Layout: a two-leaf folding screen (byōbu). Left leaf = sand editorial panel with the knitted Tabi and why-join copy; right leaf = linen form sheet. Same Kyoto Artisan tokens as the Home (AA-corrected matcha). Single linen theme by design. */
+  :root {
+    --linen: #F4F0EB;
+    --sand: #ECE5DC;
+    --sand-2: #E3DACD;
+    --ink: #23211E;
+    --ink-soft: #6A645C;
+    --laca: #A62B2B;
+    --laca-hover: #8F2424;
+    --laca-dark-bg: #C8473F;
+    --matcha: #5A6654;
+    --moss: #8F9779;
+    --font-serif: "Cormorant Garamond", "Cormorant", Garamond, "Times New Roman", serif;
+    --font-sans: "Work Sans", "Helvetica Neue", system-ui, sans-serif;
+    --font-jp: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+    color-scheme: light;
+  }
+  html, body { background: var(--linen); color: var(--ink); }
+  body { font-family: var(--font-sans); font-weight: 300; -webkit-font-smoothing: antialiased; }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--linen); }
+  .gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  @media (min-width: 768px) { .gutter { padding-left: max(48px, env(safe-area-inset-left, 0px)); padding-right: max(48px, env(safe-area-inset-right, 0px)); } }
+  .serif { font-family: var(--font-serif); }
+  .jp { font-family: var(--font-jp); }
+  .vertical { writing-mode: vertical-rl; text-orientation: upright; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { text-wrap: balance; }
+  .linen-tex { background-image: repeating-linear-gradient(0deg, rgba(35,33,30,.018) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(35,33,30,.014) 0 1px, transparent 1px 4px); }
+  .field { width: 100%; background: transparent; border: 0; border-bottom: 1px solid rgba(35,33,30,.25); padding: 10px 0 9px; font-size: 16px; font-weight: 400; color: var(--ink); outline: none; transition: border-color .3s; border-radius: 0; }
+  .field::placeholder { color: rgba(106,100,92,.75); font-weight: 300; }
+  .field:focus { border-bottom-color: var(--ink); }
+  .field[aria-invalid="true"] { border-bottom-color: var(--laca); }
+  .fade { animation: fade .5s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .stamp { animation: stamp .55s cubic-bezier(.2,1.4,.4,1) forwards; }
+  @keyframes stamp { from { transform: scale(1.7) rotate(-14deg); opacity: 0; } to { transform: scale(1) rotate(-6deg); opacity: 1; } }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .shake { animation: shake .4s ease; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+  :focus-visible { outline: 1px solid var(--laca); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  #root:empty::after { content: "Preparando el acceso…"; display: block; padding: 48px 16px; font-family: var(--font-serif); font-size: 20px; color: var(--ink-soft); }
+</style>
+
+<div id="root"></div>
+
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { theme: { extend: { colors: {
+    linen: "#F4F0EB", sand: "#ECE5DC", sand2: "#E3DACD", ink: "#23211E", inks: "#6A645C", laca: "#A62B2B", lacah: "#8F2424", lacadk: "#C8473F", matcha: "#5A6654", moss: "#8F9779"
+  } } } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* Credenciales de demostración (mock; en producción POST /api/auth/login) */
+const DEMO = { email: "hola@sokko.mx", password: "Kyoto2026", name: "Aiko" };
+const TAKEN = ["hola@sokko.mx", "nexus@sokko.mx"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/* ---------- Calceta tejida (igual que en el Home) ---------- */
+function KnitTabi({ hex = "#EFE8DC", line = "#23211E", className = "" }) {
+  const D = "M84 22 H142 V118 C142 146 150 166 162 180 C178 198 172 226 146 228 H62 C40 228 30 214 33 199 C36 188 47 183 58 181 L70 177 C82 168 84 148 84 128 Z";
+  return (
+    <svg viewBox="0 0 220 250" className={className} aria-hidden="true">
+      <defs>
+        <pattern id="knitA" width="7" height="6" patternUnits="userSpaceOnUse">
+          <rect width="7" height="6" fill={hex} />
+          <path d="M0.5 0.5 L3.5 5 L6.5 0.5" fill="none" stroke={line} strokeOpacity=".16" strokeWidth=".8" />
+        </pattern>
+        <clipPath id="clipA"><path d={D} /></clipPath>
+      </defs>
+      <g clipPath="url(#clipA)">
+        <rect width="220" height="250" fill="url(#knitA)" />
+        <rect x="80" y="18" width="70" height="24" fill="rgba(0,0,0,.07)" />
+        {Array.from({ length: 5 }).map((_, i) => <line key={i} x1={88 + i * 12} y1="20" x2={88 + i * 12} y2="42" stroke={line} strokeOpacity=".22" strokeWidth="1.2" />)}
+        <path d="M128 196 C140 192 156 196 170 206 L170 240 L120 240 Z" fill="rgba(0,0,0,.08)" />
+      </g>
+      <path d={D} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M58 186 C66 196 66 214 56 227" fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Logo() {
+  return (
+    <span className="flex items-center gap-3 select-none">
+      <svg viewBox="0 0 48 48" className="w-9 h-9" aria-hidden="true">
+        <circle cx="19" cy="23" r="7" fill="var(--laca)" />
+        <path d="M20 6 H32 V22 C32 28 34 31 37 34 C41 38 39 43 34 43 H14 C10 43 8 40 9 37 C10 35 12 34 14 34 L17 33 C20 31 20 27 20 24 Z" fill="none" stroke="var(--ink)" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M14 35 C16 37 16 41 14 43" fill="none" stroke="var(--ink)" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+      <span className="leading-none">
+        <span className="block serif text-[22px] tracking-[.28em]">SOKKO</span>
+        <span className="block jp text-[10px] tracking-[.6em] text-laca mt-1" aria-hidden="true">足袋工房</span>
+      </span>
+    </span>
+  );
+}
+
+const Eye = ({ off }) => off
+  ? <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.9 9.9 0 0112 6c5 0 8.5 4 9.5 6-.5 1-1.6 2.6-3.2 3.9M6.4 7.6C4.6 8.9 3.2 10.7 2.5 12c1 2 4.5 6 9.5 6 1.5 0 2.9-.4 4.1-1"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/></svg>
+  : <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M2.5 12C3.5 10 7 6 12 6s8.5 4 9.5 6c-1 2-4.5 6-9.5 6s-8.5-4-9.5-6z"/><circle cx="12" cy="12" r="3"/></svg>;
+
+/* ---------- Campos ---------- */
+function Field({ id, label, type = "text", value, onChange, onBlur, error, hint, autoComplete, placeholder, right, inputRef }) {
+  const describedBy = [error ? `${id}-err` : null, hint ? `${id}-hint` : null].filter(Boolean).join(" ") || undefined;
+  return (
+    <div>
+      <label htmlFor={id} className="block text-[11px] tracking-[.24em] uppercase text-inks">{label}</label>
+      <div className="relative">
+        <input ref={inputRef} id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur}
+          autoComplete={autoComplete} placeholder={placeholder} aria-invalid={error ? "true" : "false"} aria-describedby={describedBy}
+          className={`field ${right ? "pr-11" : ""}`} />
+        {right && <div className="absolute right-0 top-1/2 -translate-y-1/2">{right}</div>}
+      </div>
+      {hint && !error && <p id={`${id}-hint`} className="text-[12px] text-inks mt-1.5">{hint}</p>}
+      {error && <p id={`${id}-err`} className="text-[12.5px] text-laca mt-1.5 fade">{error}</p>}
+    </div>
+  );
+}
+
+function PasswordField({ id, label, value, onChange, onBlur, error, hint, autoComplete }) {
+  const [show, setShow] = useState(false);
+  return (
+    <Field id={id} label={label} type={show ? "text" : "password"} value={value} onChange={onChange} onBlur={onBlur} error={error} hint={hint} autoComplete={autoComplete}
+      right={<button type="button" onClick={() => setShow(s => !s)} aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={show}
+        className="w-11 h-11 flex items-center justify-end text-inks hover:text-ink"><Eye off={show} /></button>} />
+  );
+}
+
+function Check({ id, checked, onChange, children, error }) {
+  return (
+    <div>
+      <label htmlFor={id} className="flex items-start gap-3 cursor-pointer text-[13.5px] leading-snug">
+        <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} aria-invalid={error ? "true" : "false"}
+          className="mt-0.5 w-4 h-4 shrink-0 accent-[#5A6654]" />
+        <span>{children}</span>
+      </label>
+      {error && <p className="text-[12.5px] text-laca mt-1.5 ml-7 fade">{error}</p>}
+    </div>
+  );
+}
+
+function SubmitButton({ loading, children, loadingText }) {
+  return (
+    <button type="submit" disabled={loading}
+      className="w-full h-[52px] bg-laca hover:bg-lacah disabled:opacity-80 text-linen text-[12px] tracking-[.28em] uppercase transition-colors flex items-center justify-center gap-3">
+      {loading && <svg viewBox="0 0 24 24" className="w-4 h-4 spin" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3a9 9 0 019 9" /></svg>}
+      {loading ? loadingText : children}
+    </button>
+  );
+}
+
+/* ---------- Medidor de contraseña: pincelada ---------- */
+function strength(pw) {
+  const rules = [
+    { ok: pw.length >= 8, t: "8 caracteres o más" },
+    { ok: /[A-ZÁÉÍÓÚÑ]/.test(pw) && /[a-záéíóúñ]/.test(pw), t: "Mayúsculas y minúsculas" },
+    { ok: /\d/.test(pw), t: "Al menos un número" },
+    { ok: /[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]/.test(pw), t: "Un símbolo (opcional, la hace más fuerte)" },
+  ];
+  const score = rules.filter(r => r.ok).length;
+  const label = pw.length === 0 ? "" : score <= 1 ? "Débil" : score === 2 ? "Aceptable" : score === 3 ? "Buena" : "Excelente";
+  const valid = rules[0].ok && rules[1].ok && rules[2].ok;
+  return { rules, score, label, valid };
+}
+function StrengthBrush({ pw }) {
+  const s = strength(pw);
+  const pathRef = useRef(null);
+  const [len, setLen] = useState(300);
+  useEffect(() => { if (pathRef.current) setLen(pathRef.current.getTotalLength()); }, []);
+  const pct = pw.length ? s.score / 4 : 0;
+  const color = s.score <= 1 ? "var(--laca)" : s.score === 2 ? "#B07A3C" : "var(--matcha)";
+  return (
+    <div className="mt-3" aria-live="polite">
+      <div className="flex items-center gap-3">
+        <svg viewBox="0 0 310 20" className="flex-1 h-4" aria-hidden="true">
+          <path d="M5 11 C 60 6, 110 15, 160 10 S 260 7, 305 11" fill="none" stroke="var(--ink)" strokeOpacity=".1" strokeWidth="5" strokeLinecap="round" />
+          <path ref={pathRef} d="M5 11 C 60 6, 110 15, 160 10 S 260 7, 305 11" fill="none" stroke={color} strokeWidth="5.5" strokeLinecap="round"
+            strokeDasharray={len} strokeDashoffset={len - pct * len} style={{ transition: "stroke-dashoffset .6s ease, stroke .4s" }} />
+        </svg>
+        <span className="serif italic text-[15px] w-[74px] text-right" style={{ color: pw.length ? color : "transparent" }}>{s.label || "—"}</span>
+      </div>
+      <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+        {s.rules.map((r, i) => (
+          <li key={i} className={`text-[12px] flex items-center gap-2 ${r.ok ? "text-matcha" : "text-inks"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${r.ok ? "bg-matcha" : "bg-moss/50"}`} aria-hidden="true" />
+            {r.t}<span className="sr-only">{r.ok ? ": cumplido" : ": pendiente"}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ---------- Iniciar sesión ---------- */
+function LoginForm({ onSuccess, goForgot, goRegister }) {
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+  const emailRef = useRef(null);
+  useEffect(() => { emailRef.current?.focus(); }, []);
+
+  const validate = () => {
+    const e = {};
+    if (!email.trim()) e.email = "Escriba su correo electrónico.";
+    else if (!EMAIL_RE.test(email.trim())) e.email = "Revise el formato del correo, por ejemplo nombre@dominio.com.";
+    if (!pw) e.pw = "Escriba su contraseña.";
+    return e;
+  };
+  const submit = (ev) => {
+    ev.preventDefault();
+    setFormError("");
+    const e = validate(); setErrors(e);
+    if (Object.keys(e).length) { setShake(true); setTimeout(() => setShake(false), 450); return; }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      if (email.trim().toLowerCase() === DEMO.email && pw === DEMO.password) onSuccess({ name: DEMO.name, email: DEMO.email, mode: "login", remember });
+      else { setFormError("El correo o la contraseña no coinciden. Revise ambos o restablezca su contraseña."); setShake(true); setTimeout(() => setShake(false), 450); }
+    }, 1100);
+  };
+  return (
+    <form onSubmit={submit} noValidate className={`flex flex-col gap-7 ${shake ? "shake" : ""}`}>
+      {formError && <div role="alert" className="border-l-2 border-laca bg-sand/70 px-4 py-3 text-[13.5px] fade">{formError}</div>}
+      <Field id="login-email" inputRef={emailRef} label="Correo electrónico" type="email" value={email} onChange={v => { setEmail(v); setErrors(x => ({ ...x, email: undefined })); }}
+        onBlur={() => email && !EMAIL_RE.test(email.trim()) && setErrors(x => ({ ...x, email: "Revise el formato del correo, por ejemplo nombre@dominio.com." }))}
+        error={errors.email} autoComplete="email" placeholder="nombre@dominio.com" />
+      <div>
+        <PasswordField id="login-pw" label="Contraseña" value={pw} onChange={v => { setPw(v); setErrors(x => ({ ...x, pw: undefined })); }} error={errors.pw} autoComplete="current-password" />
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <Check id="remember" checked={remember} onChange={setRemember}>Mantener la sesión</Check>
+          <button type="button" onClick={goForgot} className="serif italic text-[16px] text-inks hover:text-ink underline decoration-ink/25 underline-offset-4 shrink-0">¿Olvidó su contraseña?</button>
+        </div>
+      </div>
+      <SubmitButton loading={loading} loadingText="Verificando…">Iniciar sesión</SubmitButton>
+      <p className="text-[13.5px] text-inks text-center">¿Primera visita al atelier?{" "}
+        <button type="button" onClick={goRegister} className="text-ink underline decoration-laca underline-offset-4">Crear una cuenta</button>
+      </p>
+      <p className="text-[12px] text-inks text-center border-t border-ink/10 pt-5">
+        Demo · correo <span className="text-ink select-all">hola@sokko.mx</span> · contraseña <span className="text-ink select-all">Kyoto2026</span>
+      </p>
+    </form>
+  );
+}
+
+/* ---------- Crear cuenta ---------- */
+function RegisterForm({ onSuccess, goLogin }) {
+  const [f, setF] = useState({ first: "", last: "", email: "", pw: "", pw2: "", size: "", news: true, terms: false });
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+  const firstRef = useRef(null);
+  useEffect(() => { firstRef.current?.focus(); }, []);
+  const set = (k) => (v) => { setF(x => ({ ...x, [k]: v })); setErrors(x => ({ ...x, [k]: undefined })); };
+  const s = strength(f.pw);
+
+  const validate = () => {
+    const e = {};
+    if (!f.first.trim()) e.first = "Escriba su nombre.";
+    if (!f.last.trim()) e.last = "Escriba su apellido.";
+    if (!f.email.trim()) e.email = "Escriba su correo electrónico.";
+    else if (!EMAIL_RE.test(f.email.trim())) e.email = "Revise el formato del correo, por ejemplo nombre@dominio.com.";
+    else if (TAKEN.includes(f.email.trim().toLowerCase())) e.email = "Este correo ya tiene una cuenta. Inicie sesión o use otro correo.";
+    if (!s.valid) e.pw = "La contraseña necesita 8 caracteres, mayúsculas, minúsculas y un número.";
+    if (!f.pw2) e.pw2 = "Repita la contraseña.";
+    else if (f.pw2 !== f.pw) e.pw2 = "Las contraseñas no coinciden.";
+    if (!f.terms) e.terms = "Para crear la cuenta debe aceptar los términos y el aviso de privacidad.";
+    return e;
+  };
+  const submit = (ev) => {
+    ev.preventDefault();
+    const e = validate(); setErrors(e);
+    if (Object.keys(e).length) {
+      setShake(true); setTimeout(() => setShake(false), 450);
+      const first = ["first", "last", "email", "pw", "pw2", "terms"].find(k => e[k]);
+      const idMap = { first: "reg-first", last: "reg-last", email: "reg-email", pw: "reg-pw", pw2: "reg-pw2", terms: "terms" };
+      document.getElementById(idMap[first])?.focus();
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => { setLoading(false); onSuccess({ name: f.first.trim(), email: f.email.trim(), mode: "register", size: f.size }); }, 1300);
+  };
+  const errCount = Object.values(errors).filter(Boolean).length;
+  return (
+    <form onSubmit={submit} noValidate className={`flex flex-col gap-7 ${shake ? "shake" : ""}`}>
+      {errCount > 1 && <div role="alert" className="border-l-2 border-laca bg-sand/70 px-4 py-3 text-[13.5px] fade">Hay {errCount} campos por revisar.</div>}
+      <div className="grid sm:grid-cols-2 gap-7">
+        <Field id="reg-first" inputRef={firstRef} label="Nombre" value={f.first} onChange={set("first")} error={errors.first} autoComplete="given-name" />
+        <Field id="reg-last" label="Apellido" value={f.last} onChange={set("last")} error={errors.last} autoComplete="family-name" />
+      </div>
+      <Field id="reg-email" label="Correo electrónico" type="email" value={f.email} onChange={set("email")} error={errors.email} autoComplete="email" placeholder="nombre@dominio.com"
+        hint="Aquí recibirá la confirmación de sus pedidos." />
+      <div>
+        <PasswordField id="reg-pw" label="Contraseña" value={f.pw} onChange={set("pw")} error={errors.pw} autoComplete="new-password" />
+        <StrengthBrush pw={f.pw} />
+      </div>
+      <PasswordField id="reg-pw2" label="Confirmar contraseña" value={f.pw2} onChange={set("pw2")} error={errors.pw2} autoComplete="new-password"
+        onBlur={() => f.pw2 && f.pw2 !== f.pw && setErrors(x => ({ ...x, pw2: "Las contraseñas no coinciden." }))} />
+
+      <fieldset>
+        <legend className="text-[11px] tracking-[.24em] uppercase text-inks">Su talla habitual <span className="normal-case tracking-normal">(opcional)</span></legend>
+        <p className="text-[12px] text-inks mt-1">La preseleccionaremos en cada pieza del atelier.</p>
+        <div className="mt-3 grid grid-cols-3 border border-ink/15" role="radiogroup" aria-label="Talla habitual">
+          {[["S", "22–24 cm"], ["M", "25–27 cm"], ["L", "28–30 cm"]].map(([c, cm], i) => (
+            <button key={c} type="button" role="radio" aria-checked={f.size === c} onClick={() => set("size")(f.size === c ? "" : c)}
+              className={`h-14 flex flex-col items-center justify-center leading-none transition-colors ${i ? "border-l border-ink/15" : ""} ${f.size === c ? "bg-ink text-linen" : "hover:bg-sand"}`}>
+              <span className="text-[13px] tracking-[.14em]">{c}</span>
+              <span className={`text-[11px] mt-1.5 tnum ${f.size === c ? "text-linen/75" : "text-inks"}`}>{cm}</span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="flex flex-col gap-4">
+        <Check id="news" checked={f.news} onChange={set("news")}>Quiero enterarme de las ediciones limitadas antes de su lanzamiento. <span className="text-inks">Un correo al mes, como máximo.</span></Check>
+        <Check id="terms" checked={f.terms} onChange={set("terms")} error={errors.terms}>
+          Acepto los <a href="#terminos" className="underline decoration-ink/30 underline-offset-2">términos y condiciones</a> y el <a href="#privacidad" className="underline decoration-ink/30 underline-offset-2">aviso de privacidad</a>.
+        </Check>
+      </div>
+
+      <SubmitButton loading={loading} loadingText="Creando su cuenta…">Crear mi cuenta</SubmitButton>
+      <p className="text-[13.5px] text-inks text-center">¿Ya tiene cuenta?{" "}
+        <button type="button" onClick={goLogin} className="text-ink underline decoration-laca underline-offset-4">Iniciar sesión</button>
+      </p>
+    </form>
+  );
+}
+
+/* ---------- Recuperar contraseña ---------- */
+function ForgotForm({ goLogin }) {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => { ref.current?.focus(); }, []);
+  const submit = (e) => {
+    e.preventDefault();
+    if (!EMAIL_RE.test(email.trim())) { setError("Revise el formato del correo, por ejemplo nombre@dominio.com."); return; }
+    setLoading(true);
+    setTimeout(() => { setLoading(false); setSent(true); }, 1000);
+  };
+  if (sent) return (
+    <div className="fade" role="status">
+      <p className="jp text-[44px] text-ink/20 leading-none" aria-hidden="true">便</p>
+      <p className="serif text-[28px] leading-tight mt-4">Revise su correo</p>
+      <p className="text-[14.5px] text-inks leading-relaxed mt-3">Si <span className="text-ink">{email.trim()}</span> tiene una cuenta, le enviamos un enlace para crear una contraseña nueva. El enlace dura 30 minutos.</p>
+      <p className="text-[13px] text-inks mt-3">¿No llegó? Revise la carpeta de correo no deseado o espere un minuto antes de pedir otro.</p>
+      <div className="mt-8 flex flex-wrap gap-6 items-center">
+        <button onClick={goLogin} className="h-12 px-8 border border-ink text-[12px] tracking-[.26em] uppercase hover:bg-ink hover:text-linen transition-colors">Volver a iniciar sesión</button>
+        <button onClick={() => setSent(false)} className="serif italic text-[16px] text-inks underline decoration-ink/25 underline-offset-4">Usar otro correo</button>
+      </div>
+    </div>
+  );
+  return (
+    <form onSubmit={submit} noValidate className="flex flex-col gap-7 fade">
+      <p className="text-[14.5px] text-inks leading-relaxed -mt-2">Escriba el correo de su cuenta y le enviaremos un enlace para crear una contraseña nueva.</p>
+      <Field id="forgot-email" inputRef={ref} label="Correo electrónico" type="email" value={email} onChange={v => { setEmail(v); setError(""); }} error={error} autoComplete="email" placeholder="nombre@dominio.com" />
+      <SubmitButton loading={loading} loadingText="Enviando…">Enviar enlace</SubmitButton>
+      <button type="button" onClick={goLogin} className="serif italic text-[16px] text-inks hover:text-ink self-center">← Volver a iniciar sesión</button>
+    </form>
+  );
+}
+
+/* ---------- Bienvenida ---------- */
+function Welcome({ user, onReset }) {
+  const isNew = user.mode === "register";
+  return (
+    <div className="fade" role="status">
+      <div className="relative w-24 h-24">
+        <span className="stamp absolute inset-0 border-2 border-laca text-laca flex items-center justify-center jp text-[22px] leading-tight text-center bg-linen" aria-hidden="true">
+          {isNew ? <>歓<br/>迎</> : <>お<br/>帰</>}
+        </span>
+      </div>
+      <p className="text-[11px] tracking-[.32em] uppercase text-matcha mt-8">{isNew ? "Cuenta creada" : "Sesión iniciada"}</p>
+      <h2 className="serif font-light text-[clamp(34px,4vw,48px)] leading-[1.05] mt-3">
+        {isNew ? <>Le damos la bienvenida,<br/><em className="italic text-laca">{user.name}</em>.</> : <>Qué gusto verle de nuevo, <em className="italic text-laca">{user.name}</em>.</>}
+      </h2>
+      <p className="text-[15px] text-inks leading-relaxed mt-5 max-w-md">
+        {isNew
+          ? <>Enviamos un correo a <span className="text-ink">{user.email}</span> para confirmar su cuenta.{user.size && <> Guardamos su talla <span className="text-ink">{user.size}</span> para preseleccionarla en el atelier.</>}</>
+          : <>Su bolsa y sus pedidos están donde los dejó.</>}
+      </p>
+      <dl className="mt-8 grid grid-cols-3 border-y border-ink/10 max-w-md">
+        {[["0", "pedidos"], [user.size || "—", "talla guardada"], ["1", "par en su bolsa"]].map(([v, l], i) => (
+          <div key={l} className={`py-4 flex flex-col-reverse ${i ? "pl-4 border-l border-ink/10" : ""}`}>
+            <dt className="text-[11.5px] text-inks mt-1.5">{l}</dt>
+            <dd className="serif text-[26px] leading-none tnum">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-9 flex flex-wrap items-center gap-6">
+        <button className="h-[52px] px-9 bg-laca hover:bg-lacah text-linen text-[12px] tracking-[.28em] uppercase transition-colors">Volver al atelier</button>
+        <button onClick={onReset} className="serif italic text-[16px] text-inks underline decoration-ink/25 underline-offset-4">Cerrar sesión (demo)</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Panel editorial ---------- */
+const PANEL = {
+  login:    { kanji: "入", eyebrow: "Regresar al atelier", title: <>Sus pasos <em className="italic">le esperan</em>.</>, tone: "#2C2925", line: "#F4F0EB" },
+  register: { kanji: "新", eyebrow: "Unirse al atelier",  title: <>Una cuenta, <em className="italic">un ritmo propio</em>.</>, tone: "#EFE8DC", line: "#23211E" },
+  forgot:   { kanji: "鍵", eyebrow: "Recuperar acceso",   title: <>Un nuevo <em className="italic">comienzo</em>.</>, tone: "#6E7A5E", line: "#F4F0EB" },
+  welcome:  { kanji: "迎", eyebrow: "Bienvenida",         title: <>El atelier <em className="italic">es suyo</em>.</>, tone: "#9E2F2C", line: "#F4F0EB" },
+};
+const BENEFITS = [
+  ["01", "Su talla guardada", "Cada pieza aparece ya en S, M o L según su pie."],
+  ["02", "Ediciones limitadas primero", "Aviso 48 horas antes de que un tiraje numerado salga a la venta."],
+  ["03", "Historial y cambios", "Sus pedidos, guías de rastreo y cambios en 30 días, en un solo lugar."],
+];
+function EditorialPanel({ view }) {
+  const p = PANEL[view];
+  return (
+    <aside className="relative bg-sand linen-tex overflow-hidden lg:min-h-full" aria-label="Por qué crear una cuenta">
+      <span key={p.kanji} aria-hidden="true" className="fade absolute jp text-ink/[.05] leading-none select-none pointer-events-none" style={{ fontSize: "clamp(220px,30vw,420px)", right: "-6%", top: "-4%" }}>{p.kanji}</span>
+      <div className="relative gutter lg:pl-[max(48px,env(safe-area-inset-left,0px))] lg:pr-12 py-10 lg:py-16 h-full flex flex-col">
+        <a href="#" aria-label="SOKKO, volver a la tienda" className="self-start"><Logo /></a>
+
+        <div className="mt-10 lg:mt-16 grid grid-cols-[1fr_auto] lg:grid-cols-1 gap-6 items-end">
+          <div className="min-w-0">
+            <p className="text-[11px] tracking-[.32em] uppercase text-matcha">{p.eyebrow}</p>
+            <p key={view} className="fade serif font-light text-[clamp(32px,4.2vw,56px)] leading-[1.02] mt-4">{p.title}</p>
+          </div>
+          <div className="relative w-[110px] sm:w-[150px] lg:w-[min(320px,70%)] lg:mt-6 aspect-[4/5]" aria-hidden="true">
+            <div className="absolute inset-0 border border-ink/10 bg-linen/60" />
+            <div className="absolute rounded-full bg-laca/90" style={{ width: "30%", aspectRatio: "1", left: "20%", top: "26%" }} />
+            <KnitTabi key={view} hex={p.tone} line={p.line} className="fade absolute inset-0 m-auto h-[80%] drop-shadow-[0_18px_18px_rgba(35,33,30,.12)]" />
+          </div>
+        </div>
+
+        <ol className="hidden lg:block mt-12 border-t border-ink/15 max-w-md">
+          {BENEFITS.map(([n, t, d]) => (
+            <li key={n} className="py-4 border-b border-ink/15 grid grid-cols-[2.5rem_1fr]">
+              <span className="serif text-[18px] text-laca leading-none pt-1">{n}.</span>
+              <span><span className="block serif text-[20px] leading-tight">{t}</span><span className="block text-[13px] text-inks mt-1">{d}</span></span>
+            </li>
+          ))}
+        </ol>
+        <p className="hidden lg:block mt-auto pt-10 serif italic text-[15px] text-inks max-w-sm">“Cada par tejido con respeto al pie.”</p>
+      </div>
+    </aside>
+  );
+}
+
+/* ---------- App ---------- */
+function App() {
+  const [view, setView] = useState("login");
+  const [user, setUser] = useState(null);
+  const tabs = [["login", "Iniciar sesión"], ["register", "Crear cuenta"]];
+  const heading = { login: "Iniciar sesión", register: "Crear cuenta", forgot: "Restablecer contraseña", welcome: "" }[view];
+  const go = (v) => { setView(v); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  return (
+    <div className="min-h-screen grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <EditorialPanel view={view} />
+      <main className="relative linen-tex">
+        <div className="gutter lg:pr-[max(48px,env(safe-area-inset-right,0px))] lg:pl-16 py-8 lg:py-12 flex flex-col min-h-full">
+          <div className="flex items-center justify-between gap-4 text-[13px]">
+            <a href="#" className="text-inks hover:text-ink">← Volver a la tienda</a>
+            <span className="hidden sm:inline text-inks">Envío de cortesía desde $799 MXN</span>
+          </div>
+
+          <div className="w-full max-w-[460px] mx-auto lg:mx-0 my-auto pt-10 pb-6">
+            {view !== "welcome" && (
+              <>
+                {view !== "forgot" ? (
+                  <div className="grid grid-cols-2 border-b border-ink/15 mb-10" role="tablist" aria-label="Acceso a su cuenta">
+                    {tabs.map(([k, l]) => (
+                      <button key={k} role="tab" id={`tab-${k}`} aria-selected={view === k} aria-controls="auth-panel" onClick={() => go(k)}
+                        className={`relative pb-3.5 text-left serif text-[22px] transition-colors ${view === k ? "text-ink" : "text-inks hover:text-ink"}`}>
+                        {l}
+                        <span className={`absolute left-0 -bottom-px h-[2px] bg-laca transition-all duration-500 ${view === k ? "w-16" : "w-0"}`} />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] tracking-[.32em] uppercase text-matcha mb-4">Recuperar acceso</p>
+                )}
+                <h1 className={view === "forgot" ? "serif font-light text-[clamp(32px,3.6vw,44px)] leading-tight mb-6" : "sr-only"}>{heading}</h1>
+              </>
+            )}
+
+            <div id="auth-panel" role={view === "login" || view === "register" ? "tabpanel" : undefined} aria-labelledby={view === "login" || view === "register" ? `tab-${view}` : undefined}>
+              {view === "login" && <LoginForm key="l" onSuccess={(u) => { setUser(u); go("welcome"); }} goForgot={() => go("forgot")} goRegister={() => go("register")} />}
+              {view === "register" && <RegisterForm key="r" onSuccess={(u) => { setUser(u); go("welcome"); }} goLogin={() => go("login")} />}
+              {view === "forgot" && <ForgotForm key="f" goLogin={() => go("login")} />}
+              {view === "welcome" && user && <Welcome user={user} onReset={() => { setUser(null); go("login"); }} />}
+            </div>
+
+            {(view === "login" || view === "register") && (
+              <div className="mt-10 pt-6 border-t border-ink/10 flex items-center justify-between gap-4">
+                <p className="text-[13px] text-inks">¿Prefiere no crear cuenta ahora?</p>
+                <a href="#" className="serif italic text-[16px] underline decoration-ink/25 underline-offset-4 shrink-0">Comprar como invitado</a>
+              </div>
+            )}
+          </div>
+
+          <footer className="pt-8 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-inks">
+            <a href="#privacidad" className="hover:text-ink">Aviso de privacidad</a>
+            <a href="#terminos" className="hover:text-ink">Términos</a>
+            <span>© 2026 SOKKO <span className="jp" aria-hidden="true">ソッコ</span> · NEXUS CODE · UAdeO</span>
+          </footer>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+</html>

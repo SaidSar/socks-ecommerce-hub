@@ -1,25 +1,39 @@
-import ApiStatus from './components/ApiStatus'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import StoreLayout from './components/layout/StoreLayout'
+import { AuthProvider } from './context/AuthContext'
+import { CartProvider } from './context/CartContext'
+import { ConfigProvider } from './context/ConfigContext'
+import Account from './pages/Account'
+import Home from './pages/Home'
+import LinePage from './pages/LinePage'
+import NotFound from './pages/NotFound'
+import ProductPage from './pages/ProductPage'
+import SearchPage from './pages/SearchPage'
 
 function App() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      {/* Sello hanko */}
-      <div className="mb-10 flex size-14 items-center justify-center bg-aka text-xl font-bold text-washi">
-        ソ
-      </div>
-
-      <h1 className="text-5xl font-light tracking-[0.3em] sm:text-6xl">
-        SOKKO <span className="text-3xl tracking-normal text-sumi/60 sm:text-4xl">(ソッコ)</span>
-      </h1>
-
-      <div className="my-8 h-px w-16 bg-aka" />
-
-      <p className="text-lg tracking-wide text-sumi/70">Confort que Renace cada paso</p>
-
-      <div className="mt-14">
-        <ApiStatus />
-      </div>
-    </main>
+    <ConfigProvider>
+      <AuthProvider>
+        <CartProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Tienda (DESIGN_CATALOG_UI.md §3.1): encabezado con las cuatro líneas, pie y bolsa. */}
+              <Route element={<StoreLayout />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/linea/:line" element={<LinePage />} />
+                <Route path="/buscar" element={<SearchPage />} />
+                <Route path="/producto/:slug" element={<ProductPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+              <Route path="/cuenta" element={<Account view="login" />} />
+              <Route path="/cuenta/registro" element={<Account view="register" />} />
+              <Route path="/cuenta/recuperar" element={<Account view="forgot" />} />
+              <Route path="/cuenta/bienvenida" element={<Account view="welcome" />} />
+            </Routes>
+          </BrowserRouter>
+        </CartProvider>
+      </AuthProvider>
+    </ConfigProvider>
   )
 }
 
