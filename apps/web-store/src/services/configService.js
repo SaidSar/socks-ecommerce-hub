@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from '../config/commerce'
-// import { API_URL } from './api'
+import { apiGet, USE_API } from './api'
 
 const MOCK_LATENCY_MS = 150
 
@@ -9,10 +9,7 @@ const MOCK_LATENCY_MS = 150
  *   localFreeShipping: boolean, fewUnitsThreshold: number, ivaRate: number }>}
  */
 export async function getConfig() {
-  // TODO(api): sustituir el mock por el servicio real; la respuesta ya tiene esta misma forma.
-  // const response = await fetch(`${API_URL}/api/config`)
-  // if (!response.ok) throw new Error(`API respondió ${response.status}`)
-  // return response.json()
+  if (USE_API) return apiGet('/api/config')
   await new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS))
   return { ...DEFAULT_CONFIG }
 }
