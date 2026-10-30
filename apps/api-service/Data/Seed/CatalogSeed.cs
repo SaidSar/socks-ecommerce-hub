@@ -21,7 +21,7 @@ public static class CatalogSeed
 
     public static class BrandIds
     {
-        public const int Sokko = 1, Nike = 2, Puma = 3, UnderArmour = 4, Pokemon = 5, SinMarca = 6;
+        public const int Sokko = 1, Nike = 2, Puma = 3, UnderArmour = 4, Pokemon = 5, SinMarca = 6, Marvel = 7;
     }
 
     public static class ProductTypeIds
@@ -31,7 +31,7 @@ public static class CatalogSeed
 
     public static class CollectionIds
     {
-        public const int Navidad = 1, Halloween = 2, Anime = 3;
+        public const int Navidad = 1, Halloween = 2, Anime = 3, Superheroes = 4;
     }
 
     public static Color[] Colors =>
@@ -40,10 +40,17 @@ public static class CatalogSeed
         new() { Code = "WAS", Slug = "washi", Name = "Blanco Washi", Hex = "#EFE8DC", LineHex = "#23211E", IsSokkoTone = true, SortOrder = 2 },
         new() { Code = "LAC", Slug = "laca", Name = "Rojo Laca", Hex = "#9E2F2C", LineHex = "#F4F0EB", IsSokkoTone = true, SortOrder = 3 },
         new() { Code = "MAT", Slug = "matcha", Name = "Oliva Matcha", Hex = "#6E7A5E", LineHex = "#F4F0EB", IsSokkoTone = true, SortOrder = 4 },
-        new() { Code = "NEG", Slug = "negro", Name = "Negro", Hex = "#1C1C1C", LineHex = "#F4F0EB", SortOrder = 5 },
-        new() { Code = "BLA", Slug = "blanco", Name = "Blanco", Hex = "#FFFFFF", LineHex = "#23211E", SortOrder = 6 },
-        new() { Code = "GRI", Slug = "gris", Name = "Gris", Hex = "#8A8A8A", LineHex = "#F4F0EB", SortOrder = 7 },
-        new() { Code = "MUL", Slug = "multicolor", Name = "Multicolor", Hex = null, LineHex = null, SortOrder = 8 },
+        new() { Code = "NEG", Slug = "negro", Name = "Negro", Hex = "#1F1D1B", LineHex = "#F4F0EB", SortOrder = 5 },
+        new() { Code = "BLA", Slug = "blanco", Name = "Blanco", Hex = "#F7F5F1", LineHex = "#23211E", SortOrder = 6 },
+        new() { Code = "GRI", Slug = "gris", Name = "Gris jaspe", Hex = "#A7A39C", LineHex = "#23211E", SortOrder = 7 },
+        // Sin productos en la semilla actual; lleva muestra para que un diseño estampado no se pinte de gris.
+        new() { Code = "MUL", Slug = "multicolor", Name = "Multicolor", Hex = "#7A5C8E", LineHex = "#F4F0EB", SortOrder = 8 },
+        new() { Code = "ROJ", Slug = "rojo", Name = "Rojo", Hex = "#B5302B", LineHex = "#F4F0EB", SortOrder = 9 },
+        new() { Code = "VER", Slug = "verde", Name = "Verde pino", Hex = "#2F5A43", LineHex = "#F4F0EB", SortOrder = 10 },
+        new() { Code = "NAR", Slug = "calabaza", Name = "Calabaza", Hex = "#D06A26", LineHex = "#F4F0EB", SortOrder = 11 },
+        new() { Code = "AZU", Slug = "azul", Name = "Azul noche", Hex = "#26385C", LineHex = "#F4F0EB", SortOrder = 12 },
+        new() { Code = "AMA", Slug = "amarillo", Name = "Amarillo", Hex = "#E3B53B", LineHex = "#23211E", SortOrder = 13 },
+        new() { Code = "CAM", Slug = "camello", Name = "Camello", Hex = "#B08A63", LineHex = "#23211E", SortOrder = 14 },
     ];
 
     public static Size[] Sizes =>
@@ -51,10 +58,10 @@ public static class CatalogSeed
         new() { Id = SizeIds.CalcetaS, SizeSystem = SizeSystem.Calceta, Code = "S", Label = "22–24 cm", SortOrder = 1 },
         new() { Id = SizeIds.CalcetaM, SizeSystem = SizeSystem.Calceta, Code = "M", Label = "25–27 cm", SortOrder = 2 },
         new() { Id = SizeIds.CalcetaL, SizeSystem = SizeSystem.Calceta, Code = "L", Label = "28–30 cm", SortOrder = 3 },
-        new() { Id = SizeIds.GuanteS, SizeSystem = SizeSystem.Guante, Code = "S", Label = "Chica", SortOrder = 1 },
-        new() { Id = SizeIds.GuanteM, SizeSystem = SizeSystem.Guante, Code = "M", Label = "Mediana", SortOrder = 2 },
-        new() { Id = SizeIds.GuanteL, SizeSystem = SizeSystem.Guante, Code = "L", Label = "Grande", SortOrder = 3 },
-        new() { Id = SizeIds.Unitalla, SizeSystem = SizeSystem.Unitalla, Code = "U", Label = "Unitalla", SortOrder = 1 },
+        new() { Id = SizeIds.GuanteS, SizeSystem = SizeSystem.Guante, Code = "S", Label = "Palma 17–19 cm", SortOrder = 1 },
+        new() { Id = SizeIds.GuanteM, SizeSystem = SizeSystem.Guante, Code = "M", Label = "Palma 19–21 cm", SortOrder = 2 },
+        new() { Id = SizeIds.GuanteL, SizeSystem = SizeSystem.Guante, Code = "L", Label = "Palma 21–23 cm", SortOrder = 3 },
+        new() { Id = SizeIds.Unitalla, SizeSystem = SizeSystem.Unitalla, Code = "U", Label = "Talla única", SortOrder = 1 },
     ];
 
     public static Brand[] Brands =>
@@ -66,6 +73,7 @@ public static class CatalogSeed
         new() { Id = BrandIds.Pokemon, Name = "Pokémon", Slug = "pokemon", CreatedAt = SeededAt },
         // P-15: agrupa los genéricos y nunca sale en el filtro de marcas.
         new() { Id = BrandIds.SinMarca, Name = "Sin marca", Slug = "sin-marca", ShowInFilters = false, CreatedAt = SeededAt },
+        new() { Id = BrandIds.Marvel, Name = "Marvel", Slug = "marvel", CreatedAt = SeededAt },
     ];
 
     public static ProductType[] ProductTypes =>
@@ -97,6 +105,11 @@ public static class CatalogSeed
         new()
         {
             Id = CollectionIds.Anime, Name = "Anime", Slug = "anime", Kind = CollectionKind.Tematica,
+            OffSeasonDiscountPct = 0.30m, CreatedAt = SeededAt, UpdatedAt = SeededAt,
+        },
+        new()
+        {
+            Id = CollectionIds.Superheroes, Name = "Superhéroes", Slug = "superheroes", Kind = CollectionKind.Tematica,
             OffSeasonDiscountPct = 0.30m, CreatedAt = SeededAt, UpdatedAt = SeededAt,
         },
     ];
