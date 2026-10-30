@@ -1,10 +1,12 @@
 // Catálogo multilínea (DESIGN_CATALOG_UI.md §2, DESIGN_DB.md §3.12). Única capa que conoce las reglas de temporada:
 // los componentes reciben `price`, `listPrice` y `collection.inSeason` ya calculados y nunca deciden precio ni visibilidad.
-// TODO(api): sustituir la semilla por GET /api/products, /api/products/{slug} y /api/catalog/nav; la forma no cambia.
+// Con USE_API las vistas leen de apps/api-service (catalogApi.js) y reciben la misma forma; sin ella, de la semilla.
 import { DEFAULT_CONFIG } from '../config/commerce'
 import { label, LINE_LABELS, LINES } from '../config/enums'
 import { BRANDS, COLLECTIONS, COLORS, FEATURED_SLUG, PRODUCT_TYPES, PRODUCTS, SIZES_BY_SYSTEM } from '../data/catalogSeed'
 import { effectivePrice, isInSeason } from '../domain/season'
+import { USE_API } from './api'
+import * as catalogApi from './catalogApi'
 import { catalogToday } from './catalogToday'
 
 const MOCK_LATENCY_MS = 150
@@ -115,14 +117,16 @@ export function getProductSync(slug, { now } = {}) {
   return product ? toDetail(product, catalogToday(now)) : null
 }
 
-/** TODO(api): GET /api/products?line=&brand=&type=&collection= */
+/** GET /api/products?line=&brand=&type=&collection= */
 export async function listProducts(filters = {}, options = {}) {
+  if (USE_API) return catalogApi.listProducts(filters)
   await latency()
   return copy(listProductsSync(filters, options))
 }
 
-/** Búsqueda en las 4 líneas, incluida la temporada inactiva con su precio rebajado (R-29). TODO(api): GET /api/products?q= */
+/** Búsqueda en las 4 líneas, incluida la temporada inactiva con su precio rebajado (R-29). GET /api/products?q= */
 export async function searchProducts(q, { now } = {}) {
+  if (USE_API) return catalogApi.searchProducts(q)
   await latency()
   const term = normalizeText(q)
   if (!term) return []
@@ -130,15 +134,17 @@ export async function searchProducts(q, { now } = {}) {
   return copy(PRODUCTS.filter((p) => searchText(p).includes(term)).map((p) => toCard(p, today)))
 }
 
-/** TODO(api): GET /api/products/{slug} */
+/** GET /api/products/{slug} */
 export async function getProduct(slug, options = {}) {
+  if (USE_API) return catalogApi.getProduct(slug)
   await latency()
   const product = getProductSync(slug, options)
   return product ? copy(product) : null
 }
 
-/** CatalogNav (DESIGN_CATALOG_UI.md §2.1). TODO(api): GET /api/catalog/nav */
+/** CatalogNav (DESIGN_CATALOG_UI.md §2.1). GET /api/catalog/nav */
 export async function getNav({ now } = {}) {
+  if (USE_API) return catalogApi.getNav()
   await latency()
   const today = catalogToday(now)
   const visible = PRODUCTS.filter((p) => isVisible(p, today))
@@ -161,6 +167,7 @@ export async function getNav({ now } = {}) {
  * (SOKKO → tono, Marcas → marca con showInFilters, Especiales → colección visible, Accesorios → tipo).
  */
 export async function getLinePage(line, filters = {}, { now } = {}) {
+  if (USE_API) return catalogApi.getLinePage(line, filters)
   await latency()
   const today = catalogToday(now)
   const inLine = PRODUCTS.filter((p) => p.line === line)
@@ -204,7 +211,9 @@ export async function getHome({ now } = {}) {
   return {
     nav,
     today: catalogToday(now),
-    featured: copy(getProductSync(FEATURED_SLUG, { now })),
+    featured: USE_API
+      ? nav.featuredSlug && (await catalogApi.getProduct(nav.featuredSlug))
+      : copy(getProductSync(FEATURED_SLUG, { now })),
     sokko: sokko.slice(0, 4),
     sokkoTotal: sokko.length,
     season: season ? { ...season, products: (await listProducts({ collection: season.slug }, { now })).slice(0, 3) } : null,

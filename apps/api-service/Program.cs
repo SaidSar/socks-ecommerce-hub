@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Sokko.Api.Data;
 using Sokko.Api.Data.Seed;
+using Sokko.Api.Services;
 
 const string WebStoreCorsPolicy = "AllowWebStore";
 
@@ -11,7 +14,9 @@ builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.Environment
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+// Enums en JSON con los códigos de API de DESIGN_DB §1.6.
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)));
 
 // SQL Server vía EF Core (DESIGN_DB.md). En producción la cadena llega por ConnectionStrings__Sokko (Azure SQL).
 builder.Services.AddDbContext<SokkoDbContext>(options =>
@@ -28,6 +33,13 @@ builder.Services.AddDbContext<SokkoDbContext>(options =>
             .UseAsyncSeeding((context, _, cancellationToken) => DevelopmentDataSeeder.SeedAsync(context, cancellationToken));
     }
 });
+
+// Servicios de negocio (clasificación de Erl, DESIGN_DB §6).
+builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddScoped<ICollectionService, CollectionService>();
+builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<ICatalogService, CatalogService>();
+builder.Services.AddScoped<IQuoteShipping, QuoteShipping>();
 
 // CORS: permite que apps/web-store (Vite) consuma este servicio.
 builder.Services.AddCors(options =>
@@ -66,3 +78,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Visible para WebApplicationFactory en las pruebas de integración.
+public partial class Program;
