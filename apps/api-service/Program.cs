@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sokko.Api.Data;
 using Sokko.Api.Data.Seed;
+using Sokko.Api.Services;
 
 const string WebStoreCorsPolicy = "AllowWebStore";
 
@@ -28,6 +29,13 @@ builder.Services.AddDbContext<SokkoDbContext>(options =>
             .UseAsyncSeeding((context, _, cancellationToken) => DevelopmentDataSeeder.SeedAsync(context, cancellationToken));
     }
 });
+
+// Servicios de negocio (clasificación de Erl, DESIGN_DB §6).
+builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddScoped<ICollectionService, CollectionService>();
+builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<ICatalogService, CatalogService>();
+builder.Services.AddScoped<IQuoteShipping, QuoteShipping>();
 
 // CORS: permite que apps/web-store (Vite) consuma este servicio.
 builder.Services.AddCors(options =>
