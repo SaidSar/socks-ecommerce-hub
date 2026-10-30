@@ -55,7 +55,14 @@ describe('getProduct', () => {
   it('funciona aunque la temporada esté inactiva, con tallas del sistema y SKU por variante', async () => {
     const copo = await getProduct('copo-navideno', at(OCT_26))
     expect(copo).toMatchObject({ price: 139.3, offSeasonPct: 30, seasonWindow: { startMonth: 11, endMonth: 1, endDay: 6 } })
-    expect(copo.variants[0]).toEqual({ sku: 'ESP-001-ROJ-S', color: 'ROJ', size: 'S' })
+    expect(copo.variants[0]).toEqual({ sku: 'ESP-001-ROJ-S', color: 'ROJ', size: 'S', stock: 5 })
+  })
+
+  it('stock por combinación: suma el del producto y puede agotarse una sola', async () => {
+    const kintsugi = await getProduct('kintsugi-washi', at(OCT_26))
+    expect(kintsugi.variants.reduce((sum, v) => sum + v.stock, 0)).toBe(kintsugi.stock)
+    expect(kintsugi.variants.find((v) => v.sku === 'SKK-003-WAS-S').stock).toBe(1)
+    expect(kintsugi.variants.find((v) => v.sku === 'SKK-003-SUM-S').stock).toBe(0)
   })
 
   it('SKU de SOKKO sin cambios; guantes con talla de guante; unitalla con U', async () => {

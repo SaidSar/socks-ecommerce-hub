@@ -58,6 +58,6 @@ describe('toDetail', () => {
       seasonWindow: { startMonth: 11, startDay: 1, endMonth: 1, endDay: 6 },
       sizes: copo.sizes,
     })
-    expect(toDetail(copo, 4).variants[0]).toEqual({ sku: 'ESP-001-MUL-S', color: 'MUL', size: 'S' })
+    expect(toDetail(copo, 4).variants[0]).toEqual({ sku: 'ESP-001-MUL-S', color: 'MUL', size: 'S', stock: 3 })
   })
 })

@@ -3,7 +3,7 @@
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
 > **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, `DECISIONES_CATALOGO.md` (catálogo multilínea, v0.4), y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** ✅ Aprobado (v0.4.3) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
+> **Estado:** ✅ Aprobado (v0.4.4) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
 
 ---
 
@@ -786,38 +786,44 @@ Las zonas locales no viajan en `/api/config`: la tienda cotiza por CP con `POST 
 | `type` | `guantes` | Filtra por `ProductTypes.Code` |
 | `collection` | `halloween` | Filtra por `Collections.Slug` |
 | `section` | `home` | Selección del Home: hero SOKKO (`Settings.FeaturedProductId`), "Temporada" (solo con colección activa), "Marcas favoritas", "Completa tu look" |
-| `q` | `navidad` | Búsqueda por nombre, material, marca y colección (sin distinguir acentos, §1.2) |
+| `q` | `navidad` | Búsqueda por nombre, material, marca y colección (sin distinguir mayúsculas ni acentos, §1.2; con la intercalación española, `ñ` y `n` son letras distintas) |
 | `page`, `pageSize` | `1`, `24` | Paginación; `pageSize` máximo 48 |
 
 - **Sin `q`**: aplica R-28 y excluye los productos de colecciones de temporada fuera de fecha, además de los inactivos.
 - **Con `q`**: incluye la temporada inactiva, marcada con `offSeason: true` y con el precio de R-29 (`C-02`).
+- **Respuesta (v0.4.4):** `{ "items": [...], "total": 24, "page": 1, "pageSize": 24 }`. Parámetros inválidos: `400` con `ProblemDetails`.
+- **Orden (v0.4.4):** línea (SOKKO primero), `CreatedAt` y `PieceNumber`; las variantes y los colores, en orden de alta (`ProductVariants.Id`).
 
 Cada producto de la respuesta:
 
 | Campo | Ejemplo | Origen |
 |---|---|---|
-| `id`, `slug` | `202`, `"calceta-calabaza"` | `Products` |
+| `id`, `slug`, `pieceNumber` | `204`, `"calabaza-nocturna"`, `4` | `Products` (v0.4.4: `pieceNumber`) |
 | `line` | `"especiales"` | `Products.Line` (§1.6) |
-| `brand` | `{ "slug": "sin-marca", "name": "Sin marca" }` | `Brands` |
-| `type` | `{ "code": "calcetas", "unitLabel": "par", "sizeSystem": "calceta" }` | `ProductTypes` |
-| `collection` | `{ "slug": "halloween", "name": "Halloween", "kind": "temporada" }` o `null` | `Collections` |
+| `brand` | `{ "slug": "sin-marca", "name": "Sin marca", "isOwnBrand": false, "showInFilters": false }` | `Brands` |
+| `type` | `{ "code": "calcetas", "name": "Calcetas", "unitLabel": "par", "sizeSystem": "calceta" }` | `ProductTypes` |
+| `collection` | `{ "slug": "halloween", "name": "Halloween", "kind": "temporada", "inSeason": true, "startMonth": 10, "startDay": 1, "endMonth": 11, "endDay": 2 }` o `null`. La ventana es `null` en una temática | `Collections` (R-28) |
 | `name`, `nameJp`, `material`, `imageUrl`, `editionSize` | | `Products` (`nameJp` es `null` fuera de SOKKO) |
 | `unitsPerPack` | `3` | `Products.UnitsPerPack` ("paquete de 3 pares") |
 | `price` | `179.00` | Precio de lista |
 | `finalPrice` | `125.30` | Precio a cobrar: igual a `price`, o con descuento si `offSeason` (R-29) |
 | `offSeason`, `discountPct` | `true`, `0.30` | R-28 / R-29. La tienda muestra "Fuera de temporada · −30 %" y `price` tachado |
-| `variants` | `[{ "sku": "ESP-002-MUL-M", "color": "multicolor", "size": "M", "stock": 6 }]` | `ProductVariants` (`color` = `Colors.Slug`, `size` = `Sizes.Code`, `stock` = disponible) |
+| `colors` | `[{ "code": "NAR", "slug": "calabaza", "name": "Calabaza", "hex": "#D06A26", "lineHex": "#F4F0EB", "isSokkoTone": false }]` | v0.4.4. Colores de sus variantes activas (`Colors`) |
+| `variants` | `[{ "sku": "ESP-004-NAR-M", "color": "calabaza", "size": "M", "stock": 4 }]` | `ProductVariants` activas (`color` = `Colors.Slug`, `size` = `Sizes.Code`, `stock` = disponible, `Stock − Reserved`) |
 
-`GET /api/products/{slug}` — ficha por URL directa: mismo objeto, **también** para temporada inactiva (R-28), con su tabla de tallas según `type.sizeSystem`. `404` si el producto no existe o está inactivo.
+`GET /api/products/{slug}` — ficha por URL directa: mismo objeto, **también** para temporada inactiva (R-28), más `sizes`, su tabla de tallas según `type.sizeSystem`: `[{ "code": "S", "label": "22–24 cm" }]` (v0.4.4; no viaja en los listados). Cada `variants[].stock` es el disponible de esa combinación de color y talla: la ficha muestra "Agotado" y desactiva la compra con `0`, y "Pocas unidades" con `fewUnitsThreshold` o menos. `404` si el producto no existe o está inactivo.
 
 `GET /api/catalog/nav` — datos para armar el menú de la tienda:
 
 | Campo | Contenido |
 |---|---|
-| `lines` | Las 4 líneas en orden de menú: `[{ "code": "sokko", "label": "SOKKO Japón" }, …]` (SOKKO primero, T-01) |
+| `lines` | Las 4 líneas en orden de menú (SOKKO primero, T-01): `[{ "code": "especiales", "label": "Especiales", "count": 5, "hiddenCount": 3, "hiddenCollections": [{ "slug": "navidad", "name": "Navidad" }] }, …]`. `count` son los visibles y `hidden*` los que R-28 oculta hoy (v0.4.4) |
 | `brands` | Marcas con `ShowInFilters = 1` y al menos un producto **visible** (R-28): `[{ "slug": "nike", "name": "Nike" }]`. "Sin marca" nunca aparece |
-| `collections` | Colecciones activas: temáticas y de temporada dentro de su ventana hoy (R-28): `[{ "slug": "halloween", "name": "Halloween", "kind": "temporada" }]` |
+| `collections` | Colecciones activas: temáticas y de temporada dentro de su ventana hoy (R-28): `[{ "slug": "halloween", "name": "Halloween", "kind": "temporada", "startMonth": 10, "startDay": 1, "endMonth": 11, "endDay": 2, "offSeasonDiscountPct": 0.30 }]` (v0.4.4: ventana y descuento) |
 | `types` | Tipos con productos visibles, para el filtro de Accesorios: `[{ "code": "guantes", "name": "Guantes" }]` |
+| `featuredSlug` | v0.4.4. Slug de la pieza del hero (`Settings.FeaturedProductId`), o `null` si no hay una activa: `"tabi-origami-noche"` |
+
+`POST /api/shipping/quote` (v0.4.4) — entrada `{ "postalCode": "81250", "subtotal": 800 }`; salida `{ "method": "local", "cost": 0 }` (R-14). `400` con `ProblemDetails` si el CP no tiene 5 dígitos.
 
 Rutas de administración (solo Dueño, `[Authorize(Roles = "Owner")]`): CRUD de `/api/admin/brands`, `/api/admin/collections` y `/api/admin/product-types`. El DTO de variante del panel tiene dos formas: con `unitCost` (Dueño) y sin él (Operaciones).
 
@@ -962,11 +968,13 @@ Las operaciones que tocan `Stock`/`Reserved` desde la tienda o al surtir **no** 
 
 La semilla corre en la fase de EF Core (idempotente, solo en Development salvo catálogos y configuración). Fechas de semilla en UTC.
 
-**Implementación (v0.4.3):** §5.1–§5.3, §5.5 y §5.6 van en la migración `InitialCreate` (`HasData`, todos los ambientes). §5.4, §5.4a y §5.7 los aplica `DevelopmentDataSeeder` con `UseSeeding` al correr `dotnet ef database update` en Development. Por eso la migración deja `Settings.FeaturedProductId = NULL` y el *seeder* lo apunta a la pieza 7; en producción lo elige el Dueño desde el panel.
+**Implementación (v0.4.4):** §5.1–§5.3, §5.5 y §5.6 van en las migraciones `InitialCreate` y `AlignCatalogWithStore` (`HasData`, todos los ambientes). §5.4, §5.4a y §5.7 los aplica `DevelopmentDataSeeder` con `UseSeeding` al correr `dotnet ef database update` en Development. Por eso la migración deja `Settings.FeaturedProductId = NULL` y el *seeder* lo apunta a la pieza 7; en producción lo elige el Dueño desde el panel.
 
-### 5.1 `Colors` (8)
+**Fuente de verdad del catálogo demo (v0.4.4):** `apps/web-store/src/data/catalogSeed.js`; una prueba compara slugs, precios y stock con la semilla de .NET. Los costos y códigos de barras salen de `apps/admin-panel/src/data/catalogAdmin.js`.
 
-Los 4 tonos Kyoto conservan sus valores; los 4 genéricos son para las demás líneas (T-05).
+### 5.1 `Colors` (14)
+
+Los 4 tonos Kyoto conservan sus valores; los demás son para las otras líneas (T-05). `MUL` ya no tiene productos en la semilla, pero sigue disponible para diseños estampados.
 
 | Code | Slug | Name | Hex | LineHex | IsSokkoTone | SortOrder |
 |---|---|---|---|---|---|---|
@@ -974,10 +982,16 @@ Los 4 tonos Kyoto conservan sus valores; los 4 genéricos son para las demás l�
 | `WAS` | `washi` | Blanco Washi | `#EFE8DC` | `#23211E` | 1 | 2 |
 | `LAC` | `laca` | Rojo Laca | `#9E2F2C` | `#F4F0EB` | 1 | 3 |
 | `MAT` | `matcha` | Oliva Matcha | `#6E7A5E` | `#F4F0EB` | 1 | 4 |
-| `NEG` | `negro` | Negro | `#1C1C1C` | `#F4F0EB` | 0 | 5 |
-| `BLA` | `blanco` | Blanco | `#FFFFFF` | `#23211E` | 0 | 6 |
-| `GRI` | `gris` | Gris | `#8A8A8A` | `#F4F0EB` | 0 | 7 |
-| `MUL` | `multicolor` | Multicolor | NULL | NULL | 0 | 8 |
+| `NEG` | `negro` | Negro | `#1F1D1B` | `#F4F0EB` | 0 | 5 |
+| `BLA` | `blanco` | Blanco | `#F7F5F1` | `#23211E` | 0 | 6 |
+| `GRI` | `gris` | Gris jaspe | `#A7A39C` | `#23211E` | 0 | 7 |
+| `MUL` | `multicolor` | Multicolor | `#7A5C8E` | `#F4F0EB` | 0 | 8 |
+| `ROJ` | `rojo` | Rojo | `#B5302B` | `#F4F0EB` | 0 | 9 |
+| `VER` | `verde` | Verde pino | `#2F5A43` | `#F4F0EB` | 0 | 10 |
+| `NAR` | `calabaza` | Calabaza | `#D06A26` | `#F4F0EB` | 0 | 11 |
+| `AZU` | `azul` | Azul noche | `#26385C` | `#F4F0EB` | 0 | 12 |
+| `AMA` | `amarillo` | Amarillo | `#E3B53B` | `#23211E` | 0 | 13 |
+| `CAM` | `camello` | Camello | `#B08A63` | `#23211E` | 0 | 14 |
 
 ### 5.2 `Sizes` (7)
 
@@ -986,14 +1000,14 @@ Los 4 tonos Kyoto conservan sus valores; los 4 genéricos son para las demás l�
 | 1 | Calceta | `S` | 22–24 cm | 1 |
 | 2 | Calceta | `M` | 25–27 cm | 2 |
 | 3 | Calceta | `L` | 28–30 cm | 3 |
-| 4 | Guante | `S` | Chica | 1 |
-| 5 | Guante | `M` | Mediana | 2 |
-| 6 | Guante | `L` | Grande | 3 |
-| 7 | Unitalla | `U` | Unitalla | 1 |
+| 4 | Guante | `S` | Palma 17–19 cm | 1 |
+| 5 | Guante | `M` | Palma 19–21 cm | 2 |
+| 6 | Guante | `L` | Palma 21–23 cm | 3 |
+| 7 | Unitalla | `U` | Talla única | 1 |
 
 Las tallas de guante y las de calcetas de marca siguen pendientes con el cliente (**P-13**).
 
-### 5.3 `Brands` (6), `ProductTypes` (7) y `Collections` (3)
+### 5.3 `Brands` (7), `ProductTypes` (7) y `Collections` (4)
 
 | Id | Brand | Slug | IsOwnBrand | ShowInFilters |
 |---|---|---|---|---|
@@ -1003,8 +1017,9 @@ Las tallas de guante y las de calcetas de marca siguen pendientes con el cliente
 | 4 | Under Armour | `under-armour` | 0 | 1 |
 | 5 | Pokémon | `pokemon` | 0 | 1 |
 | 6 | Sin marca | `sin-marca` | 0 | **0** |
+| 7 | Marvel | `marvel` | 0 | 1 |
 
-Under Armour no tiene productos en la semilla, así que no aparece en `/api/catalog/nav`. Pokémon es una licencia (P-15). "Sin marca" agrupa los genéricos (temporada sin licencia y accesorios) y nunca sale en el filtro de marcas.
+Pokémon y Marvel son licencias (P-15). "Sin marca" agrupa los genéricos (temporada sin licencia y accesorios) y nunca sale en el filtro de marcas.
 
 | Id | Code | Name | SizeSystem | UnitLabel | SortOrder |
 |---|---|---|---|---|---|
@@ -1023,87 +1038,50 @@ Ventanas anuales, inclusivas y en hora local de Los Mochis; se repiten cada año
 | 1 | Navidad | `navidad` | Temporada | 11 / 1 | 1 / 6 | `1101`–`106` | 1-nov → 6-ene (cruza de año) | 0.3000 |
 | 2 | Halloween | `halloween` | Temporada | 10 / 1 | 11 / 2 | `1001`–`1102` | 1-oct → 2-nov | 0.3000 |
 | 3 | Anime | `anime` | Tematica | NULL / NULL | NULL / NULL | — | Siempre visible | 0.3000 (no se usa) |
+| 4 | Superhéroes | `superheroes` | Tematica | NULL / NULL | NULL / NULL | — | Siempre visible | 0.3000 (no se usa) |
 
 Al 26-oct-2026, Halloween está en temporada y Navidad todavía no: sus productos solo salen en la búsqueda y por URL, con −30 %. Es lo que se espera: la pretemporada cuenta como fuera de temporada, y el Dueño decide cuándo arranca la Navidad con su fecha de inicio (P-14).
 
-### 5.4 `Products` (14)
+### 5.4 `Products` (24) y `ProductVariants` (120 SKU)
 
-Los 6 de SOKKO no cambian (`Id = PieceNumber`, para que coincidan con `catalog.mock.js` y `seed.js`); se agregan 8 de ejemplo de `DECISIONES_CATALOGO` §5. `ImageUrl = NULL` e `IsActive = 1` en todos; `EditionSize` solo en SOKKO 7 (120) y 3 (80).
+`Id = PieceNumber` en SOKKO (D-21) y centena de la línea en las demás. `CreatedAt` sigue el orden de `catalogSeed.js`. `ImageUrl = NULL` e `IsActive = 1` en todos; `EditionSize` solo en SOKKO 7 (120) y 3 (80); `NameJp` solo en SOKKO. `Material` es la `note` de `catalogSeed.js`.
 
-| Id | Line | PieceNumber | Slug | Name | NameJp | Brand | Type | Collection | Price | UnitsPerPack |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 7 | Sokko | 7 | `tabi-origami-noche` | Tabi Origami Noche | 折紙・夜 | SOKKO | calcetas | — | 420.00 | 1 |
-| 12 | Sokko | 12 | `lino-komorebi` | Lino Komorebi | 木漏れ日 | SOKKO | calcetas | — | 380.00 | 1 |
-| 3 | Sokko | 3 | `kintsugi-washi` | Kintsugi Washi | 金継ぎ | SOKKO | calcetas | — | 460.00 | 1 |
-| 21 | Sokko | 21 | `hanami-laca` | Hanami Laca | 花見 | SOKKO | calcetas | — | 395.00 | 1 |
-| 15 | Sokko | 15 | `tsuchi-raiz` | Tsuchi Raíz | 土 | SOKKO | calcetas | — | 360.00 | 1 |
-| 9 | Sokko | 9 | `mizu-calma` | Mizu Calma | 水 | SOKKO | calcetas | — | 340.00 | 1 |
-| 101 | Marcas | 1 | `nike-everyday-paquete-3` | Nike Everyday · paquete de 3 pares | NULL | Nike | calcetas | — | 449.00 | 3 |
-| 102 | Marcas | 2 | `puma-deportiva-tobillera` | Puma Deportiva tobillera | NULL | Puma | calcetas | — | 189.00 | 1 |
-| 201 | Especiales | 1 | `calceta-navidena-copo` | Calceta navideña Copo | NULL | Sin marca | calcetas | Navidad | 199.00 | 1 |
-| 202 | Especiales | 2 | `calceta-calabaza` | Calceta Calabaza | NULL | Sin marca | calcetas | Halloween | 179.00 | 1 |
-| 203 | Especiales | 3 | `calceta-pokemon-pikachu` | Calceta Pokémon Pikachu (licencia oficial) | NULL | Pokémon | calcetas | Anime | 229.00 | 1 |
-| 301 | Accesorios | 1 | `gorro-tejido` | Gorro tejido | NULL | Sin marca | gorros | — | 249.00 | 1 |
-| 302 | Accesorios | 2 | `guantes-termicos` | Guantes térmicos | NULL | Sin marca | guantes | — | 279.00 | 1 |
-| 303 | Accesorios | 3 | `lentes-de-sol` | Lentes de sol | NULL | Sin marca | lentes | — | 299.00 | 1 |
+| Id | Line | Pieza | Slug | Name | Brand | Type | Collection | Price | UnitsPerPack | SKU | Stock | UnitCost |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | Sokko | 7 | `tabi-origami-noche` | Tabi Origami Noche | SOKKO | calcetas | — | 420.00 | 1 | 6 | 15 | 168.00 |
+| 12 | Sokko | 12 | `lino-komorebi` | Lino Komorebi | SOKKO | calcetas | — | 380.00 | 1 | 6 | 13 | 152.00 |
+| 3 | Sokko | 3 | `kintsugi-washi` | Kintsugi Washi | SOKKO | calcetas | — | 460.00 | 1 | 9 | 3 | 190.00 |
+| 21 | Sokko | 21 | `hanami-laca` | Hanami Laca | SOKKO | calcetas | — | 395.00 | 1 | 6 | 26 | 158.00 |
+| 15 | Sokko | 15 | `tsuchi-raiz` | Tsuchi Raíz | SOKKO | calcetas | — | 360.00 | 1 | 6 | 17 | NULL |
+| 9 | Sokko | 9 | `mizu-calma` | Mizu Calma | SOKKO | calcetas | — | 340.00 | 1 | 9 | 37 | 128.00 |
+| 101 | Marcas | 1 | `nike-everyday-cushion-3` | Everyday Cushion Crew | Nike | calcetas | — | 449.00 | 3 | 6 | 22 | 305.00 |
+| 102 | Marcas | 2 | `puma-quarter-3` | Quarter Sport | Puma | calcetas | — | 329.00 | 3 | 6 | 18 | 214.00 |
+| 103 | Marcas | 3 | `ua-heatgear-crew` | HeatGear Crew | Under Armour | calcetas | — | 189.00 | 1 | 6 | 4 | 121.00 |
+| 104 | Marcas | 4 | `nike-elite-basketball` | Elite Basketball Crew | Nike | calcetas | — | 299.00 | 1 | 6 | 9 | 196.00 |
+| 201 | Especiales | 1 | `copo-navideno` | Copo Navideño | Sin marca | calcetas | Navidad | 199.00 | 1 | 6 | 30 | 82.00 |
+| 202 | Especiales | 2 | `reno-de-lana` | Reno de Lana | Sin marca | calcetas | Navidad | 219.00 | 1 | 3 | 12 | 95.00 |
+| 203 | Especiales | 3 | `duendes-del-bosque` | Duendes del Bosque | Sin marca | calcetas | Navidad | 189.00 | 1 | 6 | 17 | 80.00 |
+| 204 | Especiales | 4 | `calabaza-nocturna` | Calabaza Nocturna | Sin marca | calcetas | Halloween | 179.00 | 1 | 6 | 21 | 70.00 |
+| 205 | Especiales | 5 | `telarana-nocturna` | Telaraña Nocturna | Sin marca | calcetas | Halloween | 169.00 | 1 | 6 | 9 | 66.00 |
+| 206 | Especiales | 6 | `luna-de-calabazas` | Luna de Calabazas | Sin marca | calcetas | Halloween | 189.00 | 1 | 3 | 4 | 74.00 |
+| 207 | Especiales | 7 | `pokemon-pikachu` | Calceta Pokémon Pikachu | Pokémon | calcetas | Anime | 239.00 | 1 | 3 | 14 | 140.00 |
+| 208 | Especiales | 8 | `marvel-avengers` | Marvel Avengers | Marvel | calcetas | Superhéroes | 229.00 | 1 | 6 | 3 | 135.00 |
+| 301 | Accesorios | 1 | `gorro-de-punto` | Gorro de punto | Sin marca | gorros | — | 249.00 | 1 | 2 | 16 | 98.00 |
+| 302 | Accesorios | 2 | `guantes-tactiles` | Guantes táctiles | Sin marca | guantes | — | 199.00 | 1 | 6 | 11 | 84.00 |
+| 303 | Accesorios | 3 | `bufanda-de-lana` | Bufanda de lana | Sin marca | bufandas | — | 289.00 | 1 | 2 | 8 | 120.00 |
+| 304 | Accesorios | 4 | `gorra-nike-club` | Gorra Club | Nike | gorras | — | 499.00 | 1 | 2 | 6 | 340.00 |
+| 305 | Accesorios | 5 | `lentes-de-sol-polarizados` | Lentes de sol polarizados | Sin marca | lentes | — | 299.00 | 1 | 1 | 2 | 110.00 |
+| 306 | Accesorios | 6 | `mangas-uv` | Mangas UV | Sin marca | mangas | — | 149.00 | 1 | 2 | 19 | 52.00 |
 
-`Material` de los 6 de SOKKO sin cambios (v0.3); en los de ejemplo, la composición del proveedor. La calceta de Pokémon es mercancía **con licencia oficial** comprada a distribuidor (`DECISIONES_CATALOGO` §6); su marca es la licencia (P-15).
+### 5.4a Reparto del stock e inventario inicial
 
-### 5.4a `ProductVariants` (64 SKU) y stock inicial
+Un SKU por color × talla del sistema del tipo, con `Reserved = 0`, el `UnitCost` del producto y SKU `{LÍNEA}-{Pieza}-{Color}-{Talla}`. El stock del producto se reparte en orden de color y talla: parejo, y el sobrante va a las primeras variantes (misma regla que la tienda y el panel). Por eso **11 SKU nacen agotados**: 6 de Kintsugi Washi, 2 de HeatGear Crew y 3 de Marvel Avengers. `Barcode` solo en Marcas: `0195238{Pieza}{índice de color}{índice de talla}` (`MRC-001-NEG-M` = `019523800111`).
 
-**SOKKO (42 SKU, sin cambios):** tonos de cada pieza × 3 tallas de `Calceta` (14 tonos-pieza × 3). El mock de la tienda da stock **por tono**, no por talla: se reparte entre S/M/L en partes iguales y el sobrante va primero a M y luego a L (ver **P-07**). `Reserved = 0`, `UnitCost = NULL` (por capturar, C-03), `Barcode = NULL`.
+**Totales:** 24 productos · **120 SKU** · **336 unidades vendibles** (SOKKO 111, Marcas 53, Especiales 110, Accesorios 62). En una BD nueva, cada SKU con stock recibe un `InventarioInicial` (`Quantity = Balance = stock`, `CreatedByName = 'Semilla'`): **109 movimientos**.
 
-| Pieza | Tono | Stock mock | SKU S | SKU M | SKU L | S / M / L |
-|---|---|---|---|---|---|---|
-| 7 | SUM | 3 | `SKK-007-SUM-S` | `SKK-007-SUM-M` | `SKK-007-SUM-L` | 1 / 1 / 1 |
-| 7 | WAS | 12 | `SKK-007-WAS-S` | `SKK-007-WAS-M` | `SKK-007-WAS-L` | 4 / 4 / 4 |
-| 12 | MAT | 9 | `SKK-012-MAT-S` | `SKK-012-MAT-M` | `SKK-012-MAT-L` | 3 / 3 / 3 |
-| 12 | WAS | 4 | `SKK-012-WAS-S` | `SKK-012-WAS-M` | `SKK-012-WAS-L` | 1 / 2 / 1 |
-| 3 | WAS | 2 | `SKK-003-WAS-S` | `SKK-003-WAS-M` | `SKK-003-WAS-L` | 0 / 1 / 1 |
-| 3 | SUM | 8 | `SKK-003-SUM-S` | `SKK-003-SUM-M` | `SKK-003-SUM-L` | 2 / 3 / 3 |
-| 3 | LAC | 6 | `SKK-003-LAC-S` | `SKK-003-LAC-M` | `SKK-003-LAC-L` | 2 / 2 / 2 |
-| 21 | LAC | 11 | `SKK-021-LAC-S` | `SKK-021-LAC-M` | `SKK-021-LAC-L` | 3 / 4 / 4 |
-| 21 | WAS | 15 | `SKK-021-WAS-S` | `SKK-021-WAS-M` | `SKK-021-WAS-L` | 5 / 5 / 5 |
-| 15 | MAT | 14 | `SKK-015-MAT-S` | `SKK-015-MAT-M` | `SKK-015-MAT-L` | 4 / 5 / 5 |
-| 15 | SUM | 3 | `SKK-015-SUM-S` | `SKK-015-SUM-M` | `SKK-015-SUM-L` | 1 / 1 / 1 |
-| 9 | WAS | 20 | `SKK-009-WAS-S` | `SKK-009-WAS-M` | `SKK-009-WAS-L` | 6 / 7 / 7 |
-| 9 | MAT | 7 | `SKK-009-MAT-S` | `SKK-009-MAT-M` | `SKK-009-MAT-L` | 2 / 3 / 2 |
-| 9 | SUM | 10 | `SKK-009-SUM-S` | `SKK-009-SUM-M` | `SKK-009-SUM-L` | 3 / 4 / 3 |
+**BD de Development ya sembrada (v0.4.3):** el *seeder* agrega por slug y SKU lo que falte, sin duplicar. Elimina los 8 productos de la semilla anterior que ocupan sus piezas y SKU (se detiene con error si tienen pedidos o movimientos que no sean de la semilla). Los SKU que solo tienen movimientos de la semilla toman costo y código de barras, y un cambio de stock se registra como `ConteoFisico` (D-12). Una BD así queda con los mismos productos, SKU y stock, y con más movimientos que una nueva.
 
-Subtotal SOKKO: **124 pares**.
-
-**Ejemplos de las otras líneas (22 SKU):** `Reserved = 0`, `Barcode = NULL` (se captura al importar, T-12). El costo es de ejemplo.
-
-| SKU | Producto | Color | Talla (sistema) | Stock | UnitCost |
-|---|---|---|---|---|---|
-| `MRC-001-NEG-M` | 101 Nike paquete de 3 | NEG | M (Calceta) | 6 | 290.00 |
-| `MRC-001-NEG-L` | 101 | NEG | L (Calceta) | 6 | 290.00 |
-| `MRC-001-BLA-M` | 101 | BLA | M (Calceta) | 4 | 290.00 |
-| `MRC-001-BLA-L` | 101 | BLA | L (Calceta) | 4 | 290.00 |
-| `MRC-002-NEG-S` | 102 Puma tobillera | NEG | S (Calceta) | 5 | 110.00 |
-| `MRC-002-NEG-M` | 102 | NEG | M (Calceta) | 8 | 110.00 |
-| `MRC-002-NEG-L` | 102 | NEG | L (Calceta) | 7 | 110.00 |
-| `ESP-001-MUL-S` | 201 Navideña Copo | MUL | S (Calceta) | 6 | 95.00 |
-| `ESP-001-MUL-M` | 201 | MUL | M (Calceta) | 8 | 95.00 |
-| `ESP-001-MUL-L` | 201 | MUL | L (Calceta) | 6 | 95.00 |
-| `ESP-002-MUL-S` | 202 Calabaza | MUL | S (Calceta) | 4 | 90.00 |
-| `ESP-002-MUL-M` | 202 | MUL | M (Calceta) | 6 | 90.00 |
-| `ESP-002-MUL-L` | 202 | MUL | L (Calceta) | 5 | 90.00 |
-| `ESP-003-MUL-S` | 203 Pokémon Pikachu | MUL | S (Calceta) | 3 | 120.00 |
-| `ESP-003-MUL-M` | 203 | MUL | M (Calceta) | 5 | 120.00 |
-| `ESP-003-MUL-L` | 203 | MUL | L (Calceta) | 4 | 120.00 |
-| `ACC-001-NEG-U` | 301 Gorro tejido | NEG | U (Unitalla) | 10 | 120.00 |
-| `ACC-001-GRI-U` | 301 | GRI | U (Unitalla) | 8 | 120.00 |
-| `ACC-002-NEG-S` | 302 Guantes térmicos | NEG | S (Guante) | 4 | 140.00 |
-| `ACC-002-NEG-M` | 302 | NEG | M (Guante) | 6 | 140.00 |
-| `ACC-002-NEG-L` | 302 | NEG | L (Guante) | 5 | 140.00 |
-| `ACC-003-NEG-U` | 303 Lentes de sol | NEG | U (Unitalla) | 12 | 130.00 |
-
-Subtotal de ejemplo: **132 unidades** (Marcas 40, de las cuales 20 son paquetes de 3 pares; Especiales 47; Accesorios 45).
-
-**Totales:** 14 productos · **64 SKU** · **256 unidades vendibles** (124 SOKKO + 132 de ejemplo; en pares de calceta son 296, porque los 20 paquetes Nike suman 60 pares). Cada SKU con stock > 0 recibe un movimiento `InventarioInicial` (`Quantity = Balance = stock`, `CreatedByName = 'Semilla'`, `Note = 'Inventario inicial de semilla'`): **63 movimientos** (`SKK-003-WAS-S`, con stock 0, no lleva).
-
-Visibilidad de la semilla al 26-oct-2026 (R-28, hoy = `1026`): Halloween (`1001`–`1102`) está en temporada y Navidad (`1101`–`106`) no; se listan 13 productos; `calceta-navidena-copo` solo aparece en la búsqueda y por URL, a 139.30 (199.00 × 0.70).
+Visibilidad de la semilla al 26-oct-2026 (R-28, hoy = `1026`): Halloween (`1001`–`1102`) está en temporada y Navidad (`1101`–`106`) no; se listan 21 productos; `copo-navideno` solo aparece en la búsqueda y por URL, a 139.30 (199.00 × 0.70).
 
 ### 5.5 `Settings` (1 fila)
 
@@ -1281,5 +1259,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.4.2 | 2026-10-26 | `said/catalog-v04` | Said | Temporadas recurrentes: `Collections` con ventana anual (`StartMonth`/`StartDay`/`EndMonth`/`EndDay`, inclusiva, cruza de año), algoritmo y casos de "¿está en temporada?", R-28/R-29, índice y semillas (Navidad 1-nov → 6-ene, Halloween 1-oct → 2-nov). P-15 (licencias como marca, "Sin marca" con `ShowInFilters = 0`), P-16 (`Users.PreferredSizeId` aceptado; `DECISIONES_CATALOGO` §5 corregido) y P-17 (`GetEffectivePrice` en `CatalogService`; sin `PricingService`) resueltos. D-36…D-38 |
 | 0.4.3 | 2026-10-29 | `carlos/db-efcore` | Carlos | Implementación en EF Core (Prompt 4): `IS NOT NULL` en `CK_InventoryMovements_NoteRequired`, `CAST` a `DECIMAL(10,2)` en `Orders.TaxIncluded`, intercalación binaria en los `CHECK` de *slugs* y código de barras, y reparto de la semilla entre la migración y el *seeder* de Development (§5) |
 | 0.4.3 | 2026-10-30 | `carlos/db-efcore` (PR #10) | Said (revisión de arquitectura) | Revisión y aprobación de la v0.4.3 con el merge del PR #10. Decisiones en Propuesta pasan a Aprobada |
+| 0.4.4 | 2026-10-30 | `said/seed-align` | Said | Semilla alineada con `apps/web-store/src/data/catalogSeed.js`: migración `AlignCatalogWithStore` (14 colores, Marvel, Superhéroes, etiquetas de talla) y 24 productos con 120 SKU (§5). §3.12 documenta el contrato real: `colors`, `sizes`, `featuredSlug`, paginación, cotización de envío y `variants[].stock` como disponible por combinación |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.

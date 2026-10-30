@@ -38,8 +38,7 @@ function toLine(product, color, size) {
     size,
     sizeLabel: product.type.sizeSystem === 'unitalla' ? sizeLabel : `Talla ${size}`,
     qty: 1,
-    // TODO(api): cuando la API dé stock por variante, max = stock de la variante.
-    max: product.stock,
+    max: product.variants.find((v) => v.color === swatch.code && v.size === size)?.stock ?? 0,
   }
 }
 

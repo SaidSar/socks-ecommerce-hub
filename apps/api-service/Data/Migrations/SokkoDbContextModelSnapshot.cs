@@ -145,6 +145,16 @@ namespace Sokko.Api.Data.Migrations
                             Name = "Sin marca",
                             ShowInFilters = false,
                             Slug = "sin-marca"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CreatedAt = new DateTime(2026, 10, 21, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            IsOwnBrand = false,
+                            Name = "Marvel",
+                            ShowInFilters = true,
+                            Slug = "marvel"
                         });
                 });
 
@@ -291,6 +301,17 @@ namespace Sokko.Api.Data.Migrations
                             OffSeasonDiscountPct = 0.30m,
                             Slug = "anime",
                             UpdatedAt = new DateTime(2026, 10, 21, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CreatedAt = new DateTime(2026, 10, 21, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Kind = "Tematica",
+                            Name = "Superhéroes",
+                            OffSeasonDiscountPct = 0.30m,
+                            Slug = "superheroes",
+                            UpdatedAt = new DateTime(2026, 10, 21, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
 
@@ -410,7 +431,7 @@ namespace Sokko.Api.Data.Migrations
                         new
                         {
                             Code = "NEG",
-                            Hex = "#1C1C1C",
+                            Hex = "#1F1D1B",
                             IsActive = true,
                             IsSokkoTone = false,
                             LineHex = "#F4F0EB",
@@ -421,7 +442,7 @@ namespace Sokko.Api.Data.Migrations
                         new
                         {
                             Code = "BLA",
-                            Hex = "#FFFFFF",
+                            Hex = "#F7F5F1",
                             IsActive = true,
                             IsSokkoTone = false,
                             LineHex = "#23211E",
@@ -432,22 +453,90 @@ namespace Sokko.Api.Data.Migrations
                         new
                         {
                             Code = "GRI",
-                            Hex = "#8A8A8A",
+                            Hex = "#A7A39C",
                             IsActive = true,
                             IsSokkoTone = false,
-                            LineHex = "#F4F0EB",
-                            Name = "Gris",
+                            LineHex = "#23211E",
+                            Name = "Gris jaspe",
                             Slug = "gris",
                             SortOrder = (byte)7
                         },
                         new
                         {
                             Code = "MUL",
+                            Hex = "#7A5C8E",
                             IsActive = true,
                             IsSokkoTone = false,
+                            LineHex = "#F4F0EB",
                             Name = "Multicolor",
                             Slug = "multicolor",
                             SortOrder = (byte)8
+                        },
+                        new
+                        {
+                            Code = "ROJ",
+                            Hex = "#B5302B",
+                            IsActive = true,
+                            IsSokkoTone = false,
+                            LineHex = "#F4F0EB",
+                            Name = "Rojo",
+                            Slug = "rojo",
+                            SortOrder = (byte)9
+                        },
+                        new
+                        {
+                            Code = "VER",
+                            Hex = "#2F5A43",
+                            IsActive = true,
+                            IsSokkoTone = false,
+                            LineHex = "#F4F0EB",
+                            Name = "Verde pino",
+                            Slug = "verde",
+                            SortOrder = (byte)10
+                        },
+                        new
+                        {
+                            Code = "NAR",
+                            Hex = "#D06A26",
+                            IsActive = true,
+                            IsSokkoTone = false,
+                            LineHex = "#F4F0EB",
+                            Name = "Calabaza",
+                            Slug = "calabaza",
+                            SortOrder = (byte)11
+                        },
+                        new
+                        {
+                            Code = "AZU",
+                            Hex = "#26385C",
+                            IsActive = true,
+                            IsSokkoTone = false,
+                            LineHex = "#F4F0EB",
+                            Name = "Azul noche",
+                            Slug = "azul",
+                            SortOrder = (byte)12
+                        },
+                        new
+                        {
+                            Code = "AMA",
+                            Hex = "#E3B53B",
+                            IsActive = true,
+                            IsSokkoTone = false,
+                            LineHex = "#23211E",
+                            Name = "Amarillo",
+                            Slug = "amarillo",
+                            SortOrder = (byte)13
+                        },
+                        new
+                        {
+                            Code = "CAM",
+                            Hex = "#B08A63",
+                            IsActive = true,
+                            IsSokkoTone = false,
+                            LineHex = "#23211E",
+                            Name = "Camello",
+                            Slug = "camello",
+                            SortOrder = (byte)14
                         });
                 });
 
@@ -1560,7 +1649,7 @@ namespace Sokko.Api.Data.Migrations
                             Id = 4,
                             Code = "S",
                             IsActive = true,
-                            Label = "Chica",
+                            Label = "Palma 17–19 cm",
                             SizeSystem = "Guante",
                             SortOrder = (byte)1
                         },
@@ -1569,7 +1658,7 @@ namespace Sokko.Api.Data.Migrations
                             Id = 5,
                             Code = "M",
                             IsActive = true,
-                            Label = "Mediana",
+                            Label = "Palma 19–21 cm",
                             SizeSystem = "Guante",
                             SortOrder = (byte)2
                         },
@@ -1578,7 +1667,7 @@ namespace Sokko.Api.Data.Migrations
                             Id = 6,
                             Code = "L",
                             IsActive = true,
-                            Label = "Grande",
+                            Label = "Palma 21–23 cm",
                             SizeSystem = "Guante",
                             SortOrder = (byte)3
                         },
@@ -1587,7 +1676,7 @@ namespace Sokko.Api.Data.Migrations
                             Id = 7,
                             Code = "U",
                             IsActive = true,
-                            Label = "Unitalla",
+                            Label = "Talla única",
                             SizeSystem = "Unitalla",
                             SortOrder = (byte)1
                         });

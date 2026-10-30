@@ -4,6 +4,7 @@
 import { DEFAULT_CONFIG } from '../config/commerce'
 import { label, LINE_LABELS, LINES } from '../config/enums'
 import { BRANDS, COLLECTIONS, COLORS, FEATURED_SLUG, PRODUCT_TYPES, PRODUCTS, SIZES_BY_SYSTEM } from '../data/catalogSeed'
+import { variantStock } from '../domain/availability'
 import { effectivePrice, isInSeason } from '../domain/season'
 import { USE_API } from './api'
 import * as catalogApi from './catalogApi'
@@ -80,7 +81,14 @@ function toDetail(product, today) {
       collection?.kind === 'temporada'
         ? { startMonth: collection.startMonth, startDay: collection.startDay, endMonth: collection.endMonth, endDay: collection.endDay }
         : null,
-    variants: card.colors.flatMap((c) => sizes.map((s) => ({ sku: skuOf(product, c.code, s.code), color: c.code, size: s.code }))),
+    variants: card.colors.flatMap((c, ci) =>
+      sizes.map((s, si) => ({
+        sku: skuOf(product, c.code, s.code),
+        color: c.code,
+        size: s.code,
+        stock: variantStock(product.stock, card.colors.length * sizes.length, ci * sizes.length + si),
+      })),
+    ),
   }
 }
 

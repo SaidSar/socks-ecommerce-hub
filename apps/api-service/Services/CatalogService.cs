@@ -92,6 +92,7 @@ public class CatalogService(
         var total = await products.CountAsync(cancellationToken);
         var page = await WithDetails(products)
             .OrderBy(p => p.Line == ProductLine.Sokko ? 0 : p.Line == ProductLine.Marcas ? 1 : p.Line == ProductLine.Especiales ? 2 : 3)
+            .ThenBy(p => p.CreatedAt)
             .ThenBy(p => p.PieceNumber)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
@@ -147,7 +148,7 @@ public class CatalogService(
             .Select(p => p.Brand)
             .Where(b => b.ShowInFilters)
             .DistinctBy(b => b.Id)
-            .OrderBy(b => b.Name)
+            .OrderBy(b => b.Id)
             .Select(b => new NavBrandDto(b.Slug, b.Name))
             .ToList();
 
@@ -180,10 +181,8 @@ public class CatalogService(
     {
         var price = GetEffectivePrice(product, today);
         var collection = product.Collection;
-        var variants = product.Variants
-            .OrderBy(v => v.Color.SortOrder)
-            .ThenBy(v => v.Size.SortOrder)
-            .ToList();
+        // Orden de alta: el primer color es el que muestra la tarjeta.
+        var variants = product.Variants.OrderBy(v => v.Id).ToList();
 
         return new ProductDto(
             product.Id,

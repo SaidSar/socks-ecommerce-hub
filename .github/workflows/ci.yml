@@ -45,6 +45,8 @@ jobs:
               - 'apps/api-service/**'
               - 'apps/api-service.Tests/**'
               - 'docs/design/DESIGN_DB.md'
+              # SeedTests compara la semilla de .NET con este archivo.
+              - 'apps/web-store/src/data/catalogSeed.js'
               - '.github/workflows/ci.yml'
 
   web-store:

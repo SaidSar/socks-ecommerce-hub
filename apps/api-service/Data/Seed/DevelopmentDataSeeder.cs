@@ -54,36 +54,116 @@ public static class DevelopmentDataSeeder
 
     private static async Task SeedCatalogAsync(SokkoDbContext db, CancellationToken cancellationToken)
     {
-        if (await db.Products.AnyAsync(cancellationToken))
+        await RemoveRetiredProductsAsync(db, cancellationToken);
+        await AddMissingProductsAsync(db, cancellationToken);
+        await AlignVariantsAsync(db, cancellationToken);
+
+        var settings = await db.Settings.SingleAsync(cancellationToken);
+        settings.FeaturedProductId ??= DevelopmentSeed.FeaturedProductId;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Quita los productos de la semilla anterior, que ocupan piezas y SKU de los nuevos. Nunca toca datos con actividad real.</summary>
+    private static async Task RemoveRetiredProductsAsync(SokkoDbContext db, CancellationToken cancellationToken)
+    {
+        var retired = await db.Products
+            .Where(p => DevelopmentSeed.RetiredSlugs.Contains(p.Slug))
+            .Include(p => p.Variants).ThenInclude(v => v.Movements)
+            .ToListAsync(cancellationToken);
+        if (retired.Count == 0)
+        {
+            return;
+        }
+
+        var variants = retired.SelectMany(p => p.Variants).ToList();
+        var variantIds = variants.Select(v => v.Id).ToList();
+        var hasActivity = variants.Any(v => !IsSeedOnly(v))
+            || await db.OrderItems.AnyAsync(i => variantIds.Contains(i.VariantId), cancellationToken);
+        if (hasActivity)
+        {
+            throw new InvalidOperationException(
+                "Hay productos de la semilla anterior con pedidos o movimientos reales: revíselos antes de alinear la semilla.");
+        }
+
+        db.InventoryMovements.RemoveRange(variants.SelectMany(v => v.Movements));
+        db.ProductVariants.RemoveRange(variants);
+        db.Products.RemoveRange(retired);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task AddMissingProductsAsync(SokkoDbContext db, CancellationToken cancellationToken)
+    {
+        var existing = await db.Products.ToDictionaryAsync(p => p.Slug, cancellationToken);
+        var seed = DevelopmentSeed.Products;
+
+        // El orden del catálogo sale de CreatedAt: los que ya existían toman el de la semilla.
+        foreach (var product in seed.Where(p => existing.ContainsKey(p.Slug)))
+        {
+            existing[product.Slug].CreatedAt = product.CreatedAt;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+
+        var missing = seed.Where(p => !existing.ContainsKey(p.Slug)).ToList();
+        if (missing.Count == 0)
         {
             return;
         }
 
         // Ids fijos (Id = PieceNumber en SOKKO, D-21): requieren IDENTITY_INSERT en la misma conexión.
         await db.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT [dbo].[Products] ON", cancellationToken);
-        db.Products.AddRange(DevelopmentSeed.Products);
+        db.Products.AddRange(missing);
         await db.SaveChangesAsync(cancellationToken);
         await db.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT [dbo].[Products] OFF", cancellationToken);
+    }
 
-        var variants = DevelopmentSeed.Variants;
-        db.ProductVariants.AddRange(variants);
+    /// <summary>
+    /// Crea los SKU que falten con su InventarioInicial (R-19) y alinea los que solo tienen movimientos de la semilla.
+    /// El kárdex es de solo inserción (D-12): un cambio de stock se registra como ConteoFisico.
+    /// </summary>
+    private static async Task AlignVariantsAsync(SokkoDbContext db, CancellationToken cancellationToken)
+    {
+        var existing = await db.ProductVariants
+            .Include(v => v.Movements)
+            .ToDictionaryAsync(v => v.Sku, cancellationToken);
+        var seed = DevelopmentSeed.Variants;
+
+        var missing = seed.Where(v => !existing.ContainsKey(v.Sku)).ToList();
+        db.ProductVariants.AddRange(missing);
         await db.SaveChangesAsync(cancellationToken);
 
-        // Un InventarioInicial por SKU con stock, para que el último saldo del kárdex sea igual al stock (R-19).
-        db.InventoryMovements.AddRange(variants
+        db.InventoryMovements.AddRange(missing
             .Where(v => v.Stock > 0)
-            .Select(v => new InventoryMovement
-            {
-                VariantId = v.Id,
-                Type = InventoryMovementType.InventarioInicial,
-                Quantity = v.Stock,
-                Balance = v.Stock,
-                Note = DevelopmentSeed.InitialInventoryNote,
-                CreatedByName = DevelopmentSeed.SeedActorName,
-            }));
+            .Select(v => SeedMovement(v, InventoryMovementType.InventarioInicial, v.Stock, DevelopmentSeed.InitialInventoryNote)));
 
-        var settings = await db.Settings.SingleAsync(cancellationToken);
-        settings.FeaturedProductId ??= DevelopmentSeed.FeaturedProductId;
+        foreach (var target in seed.Where(v => existing.ContainsKey(v.Sku)))
+        {
+            var variant = existing[target.Sku];
+            if (!IsSeedOnly(variant))
+            {
+                continue;
+            }
+
+            variant.UnitCost = target.UnitCost;
+            variant.Barcode = target.Barcode;
+            if (variant.Stock != target.Stock)
+            {
+                db.InventoryMovements.Add(SeedMovement(target, InventoryMovementType.ConteoFisico, target.Stock - variant.Stock, DevelopmentSeed.AlignmentNote, variant.Id));
+                variant.Stock = target.Stock;
+            }
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static bool IsSeedOnly(ProductVariant variant) =>
+        variant.Reserved == 0 && variant.Movements.All(m => m.CreatedByName == DevelopmentSeed.SeedActorName);
+
+    private static InventoryMovement SeedMovement(ProductVariant target, InventoryMovementType type, int quantity, string note, int? variantId = null) => new()
+    {
+        VariantId = variantId ?? target.Id,
+        Type = type,
+        Quantity = quantity,
+        Balance = target.Stock,
+        Note = note,
+        CreatedByName = DevelopmentSeed.SeedActorName,
+    };
 }

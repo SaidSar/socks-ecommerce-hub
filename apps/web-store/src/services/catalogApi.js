@@ -69,7 +69,7 @@ export function toDetail(p, fewUnitsThreshold) {
     sizes: p.sizes ?? [],
     seasonWindow:
       c?.kind === 'temporada' ? { startMonth: c.startMonth, startDay: c.startDay, endMonth: c.endMonth, endDay: c.endDay } : null,
-    variants: p.variants.map((v) => ({ sku: v.sku, color: codeBySlug[v.color], size: v.size })),
+    variants: p.variants.map((v) => ({ sku: v.sku, color: codeBySlug[v.color], size: v.size, stock: v.stock })),
   }
 }
 
