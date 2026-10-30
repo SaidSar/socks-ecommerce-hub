@@ -8,6 +8,8 @@ import { SeasonTag } from '../components/product/ProductCard'
 import { label, LINE_LABELS, unitText } from '../config/enums'
 import { useAsync } from '../hooks/useAsync'
 import { useCart } from '../hooks/useCart'
+import { useConfig } from '../hooks/useConfig'
+import { AVAILABILITY_TEXT, availabilityOf } from '../domain/availability'
 import { getProduct, listProducts } from '../services/catalogService'
 import { formatPrice } from '../utils/currency'
 import { formatMonthDay, formatWindow } from '../utils/dates'
@@ -44,6 +46,7 @@ function stockText(product) {
 
 function ProductDetail({ product }) {
   const { add, open } = useCart()
+  const { fewUnitsThreshold } = useConfig()
   const [color, setColor] = useState(product.colors[0].code)
   const single = product.sizes.length === 1
   const [size, setSize] = useState(single ? product.sizes[0].code : null)
@@ -52,7 +55,11 @@ function ProductDetail({ product }) {
   const errorId = useId()
   const isSokko = product.line === 'sokko'
   const swatch = product.colors.find((c) => c.code === color)
-  const sku = product.variants.find((v) => v.color === color && v.size === size)?.sku
+  const variant = product.variants.find((v) => v.color === color && v.size === size)
+  const sku = variant?.sku
+  // Sin talla elegida todavía no hay combinación: se muestra el resumen del producto.
+  const availability = size ? availabilityOf(variant?.stock, fewUnitsThreshold) : null
+  const soldOut = availability === 'agotado'
   const { data: related } = useAsync(() => listProducts({ line: 'accesorios' }), 'accesorios')
 
   useEffect(() => () => clearTimeout(openTimer.current), [])
@@ -62,6 +69,7 @@ function ProductDetail({ product }) {
       setError(true)
       return
     }
+    if (soldOut) return
     add(product, color, size)
     clearTimeout(openTimer.current)
     openTimer.current = setTimeout(open, OPEN_CART_DELAY_MS)
@@ -194,13 +202,18 @@ function ProductDetail({ product }) {
             <button
               type="button"
               onClick={addToBag}
+              disabled={soldOut}
               aria-describedby={error ? errorId : undefined}
-              className="inline-flex min-h-11 w-full items-center justify-center bg-laca px-6 py-3 text-[13px] tracking-[.14em] text-white uppercase transition-colors hover:bg-laca-hover"
+              className={`inline-flex min-h-11 w-full items-center justify-center px-6 py-3 text-[13px] tracking-[.14em] text-white uppercase transition-colors ${
+                soldOut ? 'cursor-not-allowed bg-ink-soft' : 'bg-laca hover:bg-laca-hover'
+              }`}
             >
-              Agregar a la bolsa · {formatPrice(product.price)}
+              {soldOut ? AVAILABILITY_TEXT.agotado : `Agregar a la bolsa · ${formatPrice(product.price)}`}
             </button>
             <p className="tnum flex flex-wrap justify-between gap-3 text-[12.5px] text-ink-soft">
-              <span className={product.fewUnits ? 'text-laca' : ''}>{stockText(product)}</span>
+              <span role="status" className={(availability ? availability !== 'disponible' : product.fewUnits) ? 'text-laca' : ''}>
+                {availability ? AVAILABILITY_TEXT[availability] : stockText(product)}
+              </span>
               <span>SKU {sku ?? `${product.skuPrefix}-${color}-?`}</span>
             </p>
           </div>
