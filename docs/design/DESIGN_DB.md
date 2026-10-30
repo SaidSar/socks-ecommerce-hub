@@ -3,7 +3,7 @@
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
 > **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, `DECISIONES_CATALOGO.md` (catálogo multilínea, v0.4), y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** 🟡 Propuesta (v0.4.2) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
+> **Estado:** 🟡 Propuesta (v0.4.3) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
 
 ---
 
@@ -54,6 +54,7 @@ Los nombres en inglés siguen lo que ya usan `DESIGN.md` §9 y `DESIGN_AUTH.md` 
 **Intercalación:** explícita a nivel de base de datos, **`Modern_Spanish_100_CI_AI`** (no se depende de la predeterminada de la instancia). En EF Core se fija en el modelo con `UseCollation`, así la crea igual la migración en local, Docker o Azure SQL.
 - *CI* (sin distinguir mayúsculas) y *AI* (sin distinguir acentos): la búsqueda del panel por folio, cliente, correo o SKU (`matchesQuery` en `orders.js`, que normaliza acentos) se resuelve con un `LIKE` normal: "lopez" encuentra "López" sin `COLLATE` en cada consulta.
 - `VARCHAR` usa la página de códigos 1252, suficiente para los códigos ASCII (SKU, CP, enums).
+- Los `CHECK` de patrón sobre códigos ASCII (*slugs*, `Colors.Code`, `Sizes.Code`, `Sku`, `Barcode`, `Hex`) llevan `COLLATE Latin1_General_100_BIN2`: con *CI_AI*, `[a-z]` también acepta mayúsculas y letras acentuadas (v0.4.3).
 - **`UQ_Users_Email` sigue siendo correcto:** dos correos que solo difieren en mayúsculas (`Hola@` / `hola@`) colisionan, que es lo que pide R-01. Con *AI* también colisionan variantes que solo difieren en acentos (`jose@` / `josé@`); se acepta a propósito, porque los buzones reales son ASCII y así se evitan cuentas casi idénticas. La API sigue normalizando con `trim().ToLowerInvariant()` (igual que `authService.js`).
 - Los demás `UNIQUE` sobre texto (`Colors.Name`, `Brands.Name`, `Collections.Name`, `Sku`, `Folio`) tampoco cambian de comportamiento: sus valores son ASCII en mayúsculas o nombres de catálogo que no deben repetirse con otro acento.
 
@@ -616,7 +617,7 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 Reglas CHECK de coherencia por tipo:
 - `CK_InventoryMovements_Sign`:
   `(Type IN ('Entrada','Devolucion') AND Quantity > 0) OR (Type IN ('Merma','Venta') AND Quantity < 0) OR (Type IN ('ConteoFisico','InventarioInicial'))`. El conteo y la importación fijan el stock, así que su delta puede ser +, − o 0.
-- `CK_InventoryMovements_NoteRequired`: `Type NOT IN ('Merma','Devolucion') OR LEN(LTRIM(RTRIM(Note))) > 0`
+- `CK_InventoryMovements_NoteRequired`: `Type NOT IN ('Merma','Devolucion') OR (Note IS NOT NULL AND LEN(LTRIM(RTRIM(Note))) > 0)`. El `IS NOT NULL` es necesario: con `Note = NULL`, `LEN(...) > 0` da *UNKNOWN* y un `CHECK` lo deja pasar (v0.4.3).
 - `CK_InventoryMovements_OrderRequired`: `Type NOT IN ('Venta','Devolucion') OR OrderId IS NOT NULL`. Una venta y una devolución siempre apuntan a su pedido; el resto puede o no llevarlo.
 - La forma de Devolución del panel aún no pide el folio (`MovementForm.jsx`) y el `seed.js` demo genera devoluciones sin pedido: ambos se ajustan en el PR del frontend.
 
@@ -654,7 +655,7 @@ Reglas CHECK de coherencia por tipo:
 | `ShippingCost` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Tarifa cobrada (0, 49, 99) **congelada** al comprar |
 | `Total` | `DECIMAL(10,2)` | | | `CK_Orders_Total`: `Total = Subtotal + ShippingCost` |
 | `TaxRate` | `DECIMAL(5,4)` | | | IVA vigente al comprar (0.1600). Copia de `Settings.IvaRate`. `CK_Orders_TaxRate`: `BETWEEN 0 AND 1` |
-| `TaxIncluded` | `AS (ROUND(Total - Total / (1 + TaxRate), 2)) PERSISTED` | | | IVA incluido, informativo (`DESIGN` §4.4). Para el reporte del contador |
+| `TaxIncluded` | `AS (CAST(ROUND(Total - Total / (1 + TaxRate), 2) AS DECIMAL(10,2))) PERSISTED` | | | IVA incluido, informativo (`DESIGN` §4.4). Para el reporte del contador. v0.4.3: el `CAST` deja la columna en `DECIMAL(10,2)` (sin él, SQL Server la tipa con 9 decimales) |
 | `GiftWrap` | `BIT` | | `1` | Furoshiki, **true por defecto** y sin costo (`DESIGN` §4.4) |
 | `InternalNote` | `NVARCHAR(500)` | N | | Nota del personal; nunca se expone al cliente |
 | `CreatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | Base del cálculo "atrasado +48 h" |
@@ -960,6 +961,8 @@ Las operaciones que tocan `Stock`/`Reserved` desde la tienda o al surtir **no** 
 ## 5. Datos semilla
 
 La semilla corre en la fase de EF Core (idempotente, solo en Development salvo catálogos y configuración). Fechas de semilla en UTC.
+
+**Implementación (v0.4.3):** §5.1–§5.3, §5.5 y §5.6 van en la migración `InitialCreate` (`HasData`, todos los ambientes). §5.4, §5.4a y §5.7 los aplica `DevelopmentDataSeeder` con `UseSeeding` al correr `dotnet ef database update` en Development. Por eso la migración deja `Settings.FeaturedProductId = NULL` y el *seeder* lo apunta a la pieza 7; en producción lo elige el Dueño desde el panel.
 
 ### 5.1 `Colors` (8)
 
@@ -1276,5 +1279,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.4 | 2026-10-26 | `said/catalog-v04` | Said | Catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13): tablas nuevas `Brands`, `ProductTypes` y `Collections` (§3.5a–§3.5c, numeradas así para no mover las referencias existentes); `Tones` → `Colors`; `Sizes` por sistema; `Products` con `Line`, `Slug`, `BrandId`, `ProductTypeId`, `CollectionId`, `UnitsPerPack`; `ProductVariants` con `ColorCode`, `SizeId`, `UnitCost`, `Barcode` y SKU con 4 prefijos; `Users.PreferredSizeId`; enums de §1.6 (línea, tipo de colección, sistema de tallas, unidad); reglas R-28…R-32; contratos `GET /api/products` y `GET /api/catalog/nav`; `BrandService`, `ProductTypeService`, `CollectionService` y `PricingService`; semilla con 14 productos y 64 SKU; P-12…P-17 y D-26…D-35 |
 | 0.4.1 | 2026-10-26 | `said/catalog-v04` | Said | P-14 resuelto: la pretemporada cuenta como fuera de temporada (T-07 sin cambios); R-28 lo dice explícitamente |
 | 0.4.2 | 2026-10-26 | `said/catalog-v04` | Said | Temporadas recurrentes: `Collections` con ventana anual (`StartMonth`/`StartDay`/`EndMonth`/`EndDay`, inclusiva, cruza de año), algoritmo y casos de "¿está en temporada?", R-28/R-29, índice y semillas (Navidad 1-nov → 6-ene, Halloween 1-oct → 2-nov). P-15 (licencias como marca, "Sin marca" con `ShowInFilters = 0`), P-16 (`Users.PreferredSizeId` aceptado; `DECISIONES_CATALOGO` §5 corregido) y P-17 (`GetEffectivePrice` en `CatalogService`; sin `PricingService`) resueltos. D-36…D-38 |
+| 0.4.3 | 2026-10-29 | `carlos/db-efcore` | Carlos | Implementación en EF Core (Prompt 4): `IS NOT NULL` en `CK_InventoryMovements_NoteRequired`, `CAST` a `DECIMAL(10,2)` en `Orders.TaxIncluded`, intercalación binaria en los `CHECK` de *slugs* y código de barras, y reparto de la semilla entre la migración y el *seeder* de Development (§5) |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.
