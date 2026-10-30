@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Sokko.Api.Data;
 using Sokko.Api.Data.Seed;
@@ -12,7 +14,9 @@ builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.Environment
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+// Enums en JSON con los códigos de API de DESIGN_DB §1.6.
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)));
 
 // SQL Server vía EF Core (DESIGN_DB.md). En producción la cadena llega por ConnectionStrings__Sokko (Azure SQL).
 builder.Services.AddDbContext<SokkoDbContext>(options =>
@@ -74,3 +78,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Visible para WebApplicationFactory en las pruebas de integración.
+public partial class Program;
