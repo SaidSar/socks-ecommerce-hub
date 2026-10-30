@@ -97,6 +97,25 @@ jobs:
     needs: changes
     if: needs.changes.outputs.api-service == 'true'
     runs-on: ubuntu-latest
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      # Contraseña de un contenedor desechable: solo existe durante este job.
+      MSSQL_SA_PASSWORD: Sokko_CI_2026!
+      ConnectionStrings__Sokko: Server=localhost,1433;Database=Sokko;User Id=sa;Password=Sokko_CI_2026!;TrustServerCertificate=True
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Sokko_CI_2026!
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Sokko_CI_2026!' -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 20s
     defaults:
       run:
         working-directory: apps/api-service
@@ -109,6 +128,9 @@ jobs:
       # Se nombra el .csproj porque la carpeta también tiene un .slnx.
       - run: dotnet restore Sokko.Api.csproj
       - run: dotnet build Sokko.Api.csproj --no-restore -c Release
+      # Crea la BD y aplica la semilla de Development que usan las pruebas de integración.
+      - run: dotnet tool restore
+      - run: dotnet ef database update --project Sokko.Api.csproj
       - name: dotnet test
         if: hashFiles('apps/api-service.Tests/*.csproj') != ''
         working-directory: apps/api-service.Tests
