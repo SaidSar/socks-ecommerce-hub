@@ -358,13 +358,14 @@ public class AuthRateLimitTests(LimitedAuthApiFactory factory) : IClassFixture<L
 
     [Theory]
     [InlineData("/api/auth/login")]
+    [InlineData("/api/auth/register")]
     [InlineData("/api/auth/forgot-password")]
     [InlineData("/api/auth/reset-password")]
     [InlineData("/api/admin/auth/login")]
     public async Task Third_request_in_the_window_returns_429_with_problem_details(string url)
     {
         var client = factory.CreateClient();
-        var body = new { email = "nadie@sokko.mx", password = "Equivocada1", token = "x", newPassword = "Nueva2026" };
+        var body = new { email = "nadie@sokko.mx", password = "Equivocada1", token = "x", newPassword = "Nueva2026", firstName = "" };
 
         await client.PostAsJsonAsync(url, body, Ct);
         await client.PostAsJsonAsync(url, body, Ct);

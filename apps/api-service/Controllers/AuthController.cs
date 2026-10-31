@@ -32,9 +32,11 @@ public class AuthController(
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(AuthLimits.Policy)]
     [ProducesResponseType<AuthResponseDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<AuthResponseDto>> Register(RegisterRequestDto request, CancellationToken cancellationToken)
     {
         var user = await registerCustomer.RegisterAsync(
