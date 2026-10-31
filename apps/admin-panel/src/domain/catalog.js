@@ -100,8 +100,8 @@ export function validateProduct(form, { brands, colors, barcodeOwners = {} }) {
 }
 
 /**
- * DTO de producto por rol (§2.2): `unitCost` y `margin` solo llegan con `costs.view` (Dueño).
- * No basta con ocultarlos en la UI: Operaciones nunca los recibe.
+ * DTO de producto por rol (§2.2): `price`, `offSeasonPrice`, `unitCost` y `margin` solo llegan al Dueño.
+ * No basta con ocultarlos en la UI: Operaciones nunca recibe cifras en pesos (R-24).
  */
 export function productDto(product, { brand, type, collection, colors, sizes, inventory, today, canSeeCosts }) {
   const pricing = effectivePrice(product.price, collection, today)
@@ -121,14 +121,14 @@ export function productDto(product, { brand, type, collection, colors, sizes, in
     type: { code: type.code, name: type.name, unit: type.unit, sizeSystem: type.sizeSystem },
     unitsPerPack: product.unitsPerPack ?? 1,
     collection: collection ? { slug: collection.slug, name: collection.name, kind: collection.kind, inSeason: isInSeason(collection, today) } : null,
-    price: product.price,
-    offSeasonPrice: pricing.offSeason ? pricing.price : null,
     colors: product.colors.map((code) => colors.find((c) => c.code === code)),
     variants,
     stock: variants.reduce((a, v) => a + v.stock, 0),
     sold: product.sold ?? 0,
   }
   if (canSeeCosts) {
+    dto.price = product.price
+    dto.offSeasonPrice = pricing.offSeason ? pricing.price : null
     dto.unitCost = product.unitCost ?? null
     dto.margin = marginOf(product.price, product.unitCost)
   }

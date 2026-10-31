@@ -28,7 +28,7 @@ public class AdminTaxonomyController(
 
     private static AdminProductTypeDto? TypeOf(AdminCatalogView view, string? code) => view.Types.FirstOrDefault(t => t.Code == code);
 
-    private static AdminCollectionDto? CollectionOf(AdminCatalogView view, string? slug) => view.Collections.FirstOrDefault(c => c.Slug == slug);
+    private static AdminCollectionView? CollectionOf(AdminCatalogView view, string? slug) => view.Collections.FirstOrDefault(c => c.Owner.Slug == slug);
 
     // ---------------------------------------------------------------- Marcas
 
@@ -85,19 +85,29 @@ public class AdminTaxonomyController(
     // ---------------------------------------------------------------- Colecciones
 
     [HttpGet("collections")]
-    public async Task<IActionResult> Collections(CancellationToken cancellationToken) =>
-        Ok((await catalog.GetCatalogAsync(cancellationToken)).Collections);
+    public async Task<IActionResult> Collections(CancellationToken cancellationToken)
+    {
+        var all = (await catalog.GetCatalogAsync(cancellationToken)).Collections;
+        return IsOwner ? Ok(all.Select(c => c.ToOwner()).ToList()) : Ok(all.Select(c => c.ToOperations()).ToList());
+    }
 
     [HttpGet("collections/{slug}")]
-    public async Task<IActionResult> Collection(string slug, CancellationToken cancellationToken) =>
-        CollectionOf(await catalog.GetCatalogAsync(cancellationToken), slug) is { } collection ? Ok(collection) : NotFound();
+    public async Task<IActionResult> Collection(string slug, CancellationToken cancellationToken)
+    {
+        var collection = CollectionOf(await catalog.GetCatalogAsync(cancellationToken), slug);
+        if (collection is null)
+        {
+            return NotFound();
+        }
+        return IsOwner ? Ok(collection.ToOwner()) : Ok(collection.ToOperations());
+    }
 
     [HttpPost("collections")]
     [Authorize(Policy = Permissions.CollectionsEdit)]
     public async Task<IActionResult> CreateCollection(CollectionRequestDto request, CancellationToken cancellationToken)
     {
         var result = await collections.CreateAsync(request, cancellationToken);
-        return await Saved(result, true, "/api/admin/collections", view => CollectionOf(view, result.Value), cancellationToken);
+        return await Saved(result, true, "/api/admin/collections", view => CollectionOf(view, result.Value)?.ToOwner(), cancellationToken);
     }
 
     [HttpPut("collections/{slug}")]
@@ -105,6 +115,6 @@ public class AdminTaxonomyController(
     public async Task<IActionResult> UpdateCollection(string slug, CollectionRequestDto request, CancellationToken cancellationToken)
     {
         var result = await collections.UpdateAsync(slug, request, cancellationToken);
-        return await Saved(result, false, "/api/admin/collections", view => CollectionOf(view, result.Value), cancellationToken);
+        return await Saved(result, false, "/api/admin/collections", view => CollectionOf(view, result.Value)?.ToOwner(), cancellationToken);
     }
 }

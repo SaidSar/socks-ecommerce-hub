@@ -72,7 +72,7 @@ type CatalogNav = {
 
 ### 2.2 Forma de los datos (panel)
 
-Igual que la tienda, más los campos admin. `unitCost` y `margin` **solo** llegan si `role === "owner"`: el servicio construye un DTO distinto para cada rol, no basta con ocultarlos en la UI.
+Igual que la tienda, más los campos admin. `price`, `offSeasonPrice`, `unitCost` y `margin` **solo** llegan si `role === "owner"`: Operaciones no recibe ninguna cifra en pesos (R-24). El servicio construye un DTO distinto para cada rol, no basta con ocultarlos en la UI.
 
 ---
 
@@ -213,10 +213,10 @@ Si Operaciones intenta editar, la API mock responde 403.
 ### 4.3 Productos
 
 - **Filtro segmentado por línea con contadores**, más búsqueda por nombre.
-- **Columnas:** Producto (swatches + nombre) · Línea · Marca · Tipo · unidad · Colección (+ pill Activa/Fuera) · Precio · **Costo** · **Margen** · Stock. Costo y Margen solo para Dueño.
+- **Columnas:** Producto (swatches + nombre) · Línea · Marca · Tipo · unidad · Colección (+ pill Activa/Fuera) · **Precio** · **Costo** · **Margen** · Stock. Precio, Costo y Margen solo para Dueño.
 - **Costo nulo** → pill `Falta`. **Margen menor a 30 %** → texto en tono warn.
 - **Stock de 4 o menos** → pill crit.
-- **Operaciones:** banner "Como Operaciones ves stock y datos del catálogo. El costo y el margen solo los ve el Dueño."
+- **Operaciones:** banner "Como Operaciones ves stock y datos del catálogo. El precio, el costo y el margen solo los ve el Dueño."
 
 **Formulario lateral** (560 px; pantalla completa en móvil):
 - **Línea:** control segmentado. Al cambiarla se ajustan:
@@ -229,7 +229,7 @@ Si Operaciones intenta editar, la API mock responde 403.
   - Tipo, con la ayuda "Tallas: {sistema} (S / M / L) · se cuenta por {unidad}".
   - Colección (\* en Especiales; con temporada, la ayuda dice la ventana y el descuento).
   - Unidades por paquete (ayuda: "Se vende como Paquete de N…, cuenta como 1 unidad de stock").
-  - Precio.
+  - **Precio** (solo Dueño; para Operaciones, campo bloqueado "Solo Dueño").
   - **Costo** (solo Dueño; ayuda con margen en $ y %; para Operaciones, campo bloqueado "Solo Dueño").
 - **Variantes:** se generan por color × talla del sistema.
   - **Columnas:** SKU automático `{PREFIJO}-{id3}-{COLOR}-{TALLA}` en monoespaciada, Color, Talla con medida, Código de barras (placeholder "UPC del proveedor" en Marcas) y Stock en solo lectura.
@@ -263,9 +263,9 @@ Si Operaciones intenta editar, la API mock responde 403.
   - **Inicia y Termina:** día (1–31) y mes (enero…diciembre).
     - Error si el día no existe en el mes: "Ese día no existe en el mes elegido (el 29 de febrero no se acepta)."
   - **Barra anual:** 12 meses, la ventana en matcha (con dos segmentos si cruza de año) y una marca laca en el día de hoy. `aria-hidden`; la información también está en texto.
-  - **Descuento fuera de temporada:** deslizador de 0 a 60 % en pasos de 5, con el valor y el ejemplo "$199 → ${precio}".
+  - **Descuento fuera de temporada:** deslizador de 0 a 60 % en pasos de 5, con el valor y, solo para el Dueño, el ejemplo "$199 → ${precio}".
   - **Comprobación:** inicio, fin, 31-dic y 7-ene → "en temporada / fuera". Indica "(cruza de año)" cuando aplica.
-  - **Productos en la colección**, con el precio fuera de temporada cuando aplica.
+  - **Productos en la colección**; solo el Dueño ve el precio y el precio fuera de temporada.
   - Botones: Descartar · **Guardar colección**.
 - La lógica de "en temporada hoy" es **la misma función** que usa la tienda (`isInSeason(window, date)`), con zona `America/Mazatlan`.
 

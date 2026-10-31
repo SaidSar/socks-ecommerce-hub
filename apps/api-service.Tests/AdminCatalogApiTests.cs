@@ -10,6 +10,8 @@ namespace Sokko.Api.Tests;
 
 public class AdminCatalogApiTests(AdminApiFactory factory) : AdminApiTestBase(factory), IClassFixture<AdminApiFactory>, IAsyncLifetime
 {
+    private static readonly string[] MoneyWords = ["price", "cost", "margin", "revenue", "sales", "profit", "income", "total", "amount"];
+
     private readonly List<string> _slugs = [];
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
@@ -83,32 +85,52 @@ public class AdminCatalogApiTests(AdminApiFactory factory) : AdminApiTestBase(fa
     }
 
     [Fact]
-    public async Task Owner_sees_cost_and_margin_and_operations_never_receives_them()
+    public async Task Owner_sees_money_and_operations_never_receives_it()
     {
         var owner = await Json(await Get("/api/admin/products/tabi-origami-noche", Owner));
+        Assert.Equal(420m, owner.GetProperty("price").GetDecimal());
         Assert.Equal(168m, owner.GetProperty("unitCost").GetDecimal());
         Assert.Equal(0.6m, owner.GetProperty("margin").GetDecimal());
+        var navidad = await Json(await Get("/api/admin/collections/navidad", Owner));
+        Assert.True(navidad.GetProperty("products")[0].TryGetProperty("price", out _));
 
-        foreach (var url in new[] { "/api/admin/products/tabi-origami-noche", "/api/admin/products", "/api/admin/catalog" })
+        foreach (var url in new[] { "/api/admin/products/tabi-origami-noche", "/api/admin/products", "/api/admin/catalog", "/api/admin/collections", "/api/admin/collections/navidad", "/api/admin/brands", "/api/admin/product-types" })
         {
-            var body = await (await Get(url, Operations)).Content.ReadAsStringAsync(Ct);
-            Assert.DoesNotContain("unitCost", body, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("margin", body, StringComparison.OrdinalIgnoreCase);
+            var response = await Get(url, Operations);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            // Las claves, no los valores: un nombre o material puede contener esas letras sin ser un importe.
+            var keys = JsonKeys(await Json(response)).Distinct().ToList();
+            Assert.NotEmpty(keys);
+            Assert.DoesNotContain(keys, key => MoneyWords.Any(word => key.Contains(word, StringComparison.OrdinalIgnoreCase)));
         }
     }
 
     [Theory]
     [InlineData(typeof(OperationsProductDto))]
-    [InlineData(typeof(AdminCatalogDto<OperationsProductDto>))]
-    public void Operations_dtos_have_no_money_reserved_to_the_owner(Type type)
+    [InlineData(typeof(OperationsCollectionDto))]
+    [InlineData(typeof(AdminCatalogDto<OperationsProductDto, OperationsCollectionDto>))]
+    public void Operations_dtos_have_no_money(Type type)
     {
-        // R-24: el tipo no tiene esos campos; no basta con dejarlos en null. §4.3 mantiene el precio de venta visible.
-        var forbidden = new[] { "cost", "margin", "revenue", "sales", "profit", "income" };
-        foreach (var property in AllProperties(type, []))
+        // R-24: el tipo no tiene esos campos; no basta con dejarlos en null. Tampoco hay ningún importe de tipo decimal,
+        // salvo el descuento, que es un porcentaje.
+        var properties = AllProperties(type, []).ToList();
+        Assert.NotEmpty(properties);
+        foreach (var property in properties)
         {
-            Assert.DoesNotContain(forbidden, word => property.Name.Contains(word, StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(MoneyWords, word => property.Name.Contains(word, StringComparison.OrdinalIgnoreCase));
+            if (Nullable.GetUnderlyingType(property.PropertyType) == typeof(decimal) || property.PropertyType == typeof(decimal))
+            {
+                Assert.Equal("OffSeasonDiscountPct", property.Name);
+            }
         }
     }
+
+    private static IEnumerable<string> JsonKeys(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => element.EnumerateObject().SelectMany(p => JsonKeys(p.Value).Prepend(p.Name)),
+        JsonValueKind.Array => element.EnumerateArray().SelectMany(JsonKeys),
+        _ => [],
+    };
 
     private static IEnumerable<PropertyInfo> AllProperties(Type type, HashSet<Type> seen)
     {
@@ -125,11 +147,11 @@ public class AdminCatalogApiTests(AdminApiFactory factory) : AdminApiTestBase(fa
     }
 
     [Fact]
-    public void Owner_dto_is_the_one_that_adds_cost_and_margin()
+    public void Owner_dto_is_the_one_that_adds_the_money()
     {
         var owner = typeof(OwnerProductDto).GetProperties().Select(p => p.Name).ToHashSet();
         var operations = typeof(OperationsProductDto).GetProperties().Select(p => p.Name).ToHashSet();
-        Assert.Equal(["Margin", "UnitCost"], owner.Except(operations).Order());
+        Assert.Equal(["Margin", "OffSeasonPrice", "Price", "UnitCost"], owner.Except(operations).Order());
     }
 
     [Fact]

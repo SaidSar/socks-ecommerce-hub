@@ -308,7 +308,7 @@ Tablas que esto agrega al esquema: `Roles`, `UserRoles` (o `Users.Role`), `Order
 | Configuración | `GET /settings` · `PUT /settings` (con `localZones`) | `settings.manage` |
 | Usuarios | `GET /users` · `POST /users/invitations` | `settings.manage` |
 
-- **R-24:** el Dueño recibe `OwnerProductDto` y Operaciones `OperationsProductDto`, que no tiene `unitCost` ni `margin`. Operaciones sí ve el precio de venta (`DESIGN_CATALOG_UI` §4.3).
+- **R-24:** el Dueño recibe `OwnerProductDto` y `OwnerCollectionDto`. Operaciones recibe `OperationsProductDto` y `OperationsCollectionDto`, que no tienen ninguna cifra en pesos: ni precio, ni costo, ni margen. El descuento de una colección es un porcentaje y sí lo recibe.
 - **Costo:** el panel lo captura por producto y se aplica a todas sus variantes.
 - **Invitación:** `{ firstName, lastName, email, role }`, con `role` = `dueno` u `operaciones`. Crea la cuenta sin contraseña utilizable y envía un enlace de un solo uso a `/cuenta/restablecer` de la tienda, válido `Users:InvitationHours` (72) horas.
 

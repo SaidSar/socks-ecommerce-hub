@@ -9,27 +9,39 @@ using Sokko.Api.Models.Enums;
 namespace Sokko.Api.Services;
 
 /// <summary>Producto completo dentro del servicio. Sale a la API solo por <see cref="ToOwner"/> o <see cref="ToOperations"/> (R-24).</summary>
-public record AdminProductView(OperationsProductDto Base, decimal? UnitCost, decimal? Margin)
+public record AdminProductView(OperationsProductDto Base, decimal Price, decimal? OffSeasonPrice, decimal? UnitCost, decimal? Margin)
 {
     public OperationsProductDto ToOperations() => Base;
 
     public OwnerProductDto ToOwner() => new(
         Base.Slug, Base.Line, Base.PieceNumber, Base.Name, Base.NameJp, Base.Material, Base.Brand, Base.Type, Base.UnitsPerPack, Base.Collection,
-        Base.Price, Base.OffSeasonPrice, Base.Colors, Base.Variants, Base.Stock, Base.Sold, Base.IsActive, Base.RowVersion, UnitCost, Margin);
+        Price, OffSeasonPrice, Base.Colors, Base.Variants, Base.Stock, Base.Sold, Base.IsActive, Base.RowVersion, UnitCost, Margin);
+}
+
+/// <summary>Colección completa dentro del servicio; sale a la API solo por el DTO de cada rol (R-24).</summary>
+public record AdminCollectionView(OwnerCollectionDto Owner)
+{
+    public OwnerCollectionDto ToOwner() => Owner;
+
+    public OperationsCollectionDto ToOperations() => new(
+        Owner.Slug, Owner.Name, Owner.Kind, Owner.StartMonth, Owner.StartDay, Owner.EndMonth, Owner.EndDay, Owner.OffSeasonDiscountPct, Owner.IsActive,
+        Owner.Products.Select(p => new OperationsCollectionProductDto(p.Slug, p.Name)).ToList(), Owner.RowVersion);
 }
 
 public record AdminCatalogView(
     AdminToday Today,
     IReadOnlyList<AdminProductView> Products,
     IReadOnlyList<AdminBrandDto> Brands,
-    IReadOnlyList<AdminCollectionDto> Collections,
+    IReadOnlyList<AdminCollectionView> Collections,
     IReadOnlyList<AdminProductTypeDto> Types,
     IReadOnlyDictionary<string, IReadOnlyList<AdminSizeDto>> Sizes,
     IReadOnlyList<AdminColorDto> Colors)
 {
-    public AdminCatalogDto<OwnerProductDto> ToOwner() => new(Today, Products.Select(p => p.ToOwner()).ToList(), Brands, Collections, Types, Sizes, Colors);
+    public AdminCatalogDto<OwnerProductDto, OwnerCollectionDto> ToOwner() =>
+        new(Today, Products.Select(p => p.ToOwner()).ToList(), Brands, Collections.Select(c => c.ToOwner()).ToList(), Types, Sizes, Colors);
 
-    public AdminCatalogDto<OperationsProductDto> ToOperations() => new(Today, Products.Select(p => p.ToOperations()).ToList(), Brands, Collections, Types, Sizes, Colors);
+    public AdminCatalogDto<OperationsProductDto, OperationsCollectionDto> ToOperations() =>
+        new(Today, Products.Select(p => p.ToOperations()).ToList(), Brands, Collections.Select(c => c.ToOperations()).ToList(), Types, Sizes, Colors);
 }
 
 /// <summary>Servicio de entidad: productos del panel (DESIGN_CATALOG_UI §4.3). Las variantes las escribe <see cref="IInventoryService"/>.</summary>
@@ -125,14 +137,14 @@ public class CatalogAdminService(
                 new AdminTypeRefDto(p.ProductType.Code, p.ProductType.Name, p.ProductType.UnitLabel, p.ProductType.SizeSystem),
                 p.UnitsPerPack,
                 p.Collection is null ? null : new AdminCollectionRefDto(p.Collection.Slug, p.Collection.Name, p.Collection.Kind, catalog.IsInSeason(p, today)),
-                p.Price,
-                price.OffSeason ? price.FinalPrice : null,
                 variants.Select(v => v.Color).DistinctBy(c => c.Code).Select(ColorDto).ToList(),
                 variants.Select(v => new AdminVariantDto(v.Sku, v.ColorCode, v.Size.Code, v.Size.Label, v.Barcode, v.Stock)).ToList(),
                 variants.Sum(v => v.Stock),
                 sold,
                 p.IsActive,
                 p.RowVersion),
+            p.Price,
+            price.OffSeason ? price.FinalPrice : null,
             unitCost,
             margin);
     }
@@ -180,10 +192,10 @@ public class CatalogAdminService(
             .ToList();
 
         var collectionDtos = (await db.Collections.AsNoTracking().OrderBy(c => c.Id).ToListAsync(cancellationToken))
-            .Select(c => new AdminCollectionDto(
+            .Select(c => new AdminCollectionView(new OwnerCollectionDto(
                 c.Slug, c.Name, c.Kind, c.StartMonth, c.StartDay, c.EndMonth, c.EndDay, c.OffSeasonDiscountPct, c.IsActive,
-                active.Where(p => p.Base.Collection?.Slug == c.Slug).Select(p => new AdminCollectionProductDto(p.Base.Slug, p.Base.Name, p.Base.Price, p.Base.OffSeasonPrice)).ToList(),
-                c.RowVersion))
+                active.Where(p => p.Base.Collection?.Slug == c.Slug).Select(p => new OwnerCollectionProductDto(p.Base.Slug, p.Base.Name, p.Price, p.OffSeasonPrice)).ToList(),
+                c.RowVersion)))
             .ToList();
 
         var types = (await db.ProductTypes.AsNoTracking().OrderBy(t => t.SortOrder).ToListAsync(cancellationToken))

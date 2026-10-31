@@ -320,7 +320,7 @@ function invalid(errors) {
   return err
 }
 
-/** DTO de cada producto para el rol: unitCost y margin solo con `costs.view` (§2.2). */
+/** DTO de cada producto para el rol: las cifras en pesos solo con `costs.view` (§2.2, R-24). */
 function catalogProducts(role) {
   const { catalog, inventory } = db()
   const today = catalogToday()

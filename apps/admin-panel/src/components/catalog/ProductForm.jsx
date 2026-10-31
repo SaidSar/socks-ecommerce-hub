@@ -26,7 +26,7 @@ function initialForm(product) {
     type: product.type.code,
     collection: product.collection?.slug ?? null,
     unitsPerPack: String(product.unitsPerPack),
-    price: String(product.price),
+    price: product.price == null ? '' : String(product.price),
     unitCost: product.unitCost == null ? '' : String(product.unitCost),
     colors: product.colors.map((c) => c.code),
     barcodes: Object.fromEntries(product.variants.filter((v) => v.barcode).map((v) => [v.sku, v.barcode])),
@@ -234,9 +234,19 @@ export default function ProductForm({ product, catalog, canEdit, canSeeCosts, on
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Field id={id('price')} label="Precio (IVA incluido)" error={errors.price}>
-                {(p) => <input {...p} className={`${p.className} tnum`} type="number" min="0" step="0.01" inputMode="decimal" value={form.price} onChange={(e) => set({ price: e.target.value })} />}
-              </Field>
+              {canSeeCosts ? (
+                <Field id={id('price')} label="Precio (IVA incluido)" error={errors.price}>
+                  {(p) => <input {...p} className={`${p.className} tnum`} type="number" min="0" step="0.01" inputMode="decimal" value={form.price} onChange={(e) => set({ price: e.target.value })} />}
+                </Field>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[12px] font-medium text-ink-soft">Precio</span>
+                  <p className={`${FIELD} flex items-center gap-2 border-line bg-linen text-ink-soft`}>
+                    <Icon name="lock" className="h-4 w-4" />
+                    Solo Dueño
+                  </p>
+                </div>
+              )}
               {canSeeCosts ? (
                 <Field
                   id={id('cost')}
