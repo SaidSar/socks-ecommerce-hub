@@ -786,7 +786,7 @@ Las zonas locales no viajan en `/api/config`: la tienda cotiza por CP con `POST 
 | `type` | `guantes` | Filtra por `ProductTypes.Code` |
 | `collection` | `halloween` | Filtra por `Collections.Slug` |
 | `section` | `home` | Selección del Home: hero SOKKO (`Settings.FeaturedProductId`), "Temporada" (solo con colección activa), "Marcas favoritas", "Completa tu look" |
-| `q` | `navidad` | Búsqueda por nombre, material, marca y colección (sin distinguir mayúsculas ni acentos, §1.2; con la intercalación española, `ñ` y `n` son letras distintas) |
+| `q` | `navidad` | Búsqueda por nombre, material, marca, tipo, colección y línea, sin distinguir mayúsculas ni acentos (`navideno` encuentra "Copo Navideño"; compara con `Latin1_General_100_CI_AI`) |
 | `page`, `pageSize` | `1`, `24` | Paginación; `pageSize` máximo 48 |
 
 - **Sin `q`**: aplica R-28 y excluye los productos de colecciones de temporada fuera de fecha, además de los inactivos.
