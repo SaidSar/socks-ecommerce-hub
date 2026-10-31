@@ -5,6 +5,7 @@ import AuthTabs from '../components/auth/AuthTabs'
 import ForgotForm from '../components/auth/ForgotForm'
 import LoginForm from '../components/auth/LoginForm'
 import RegisterForm from '../components/auth/RegisterForm'
+import ResetForm from '../components/auth/ResetForm'
 import Welcome from '../components/auth/Welcome'
 import { useAuth } from '../hooks/useAuth'
 
@@ -12,6 +13,7 @@ const TITLES = {
   login: 'Iniciar sesión',
   register: 'Crear cuenta',
   forgot: 'Restablecer contraseña',
+  reset: 'Crear contraseña nueva',
   welcome: 'Bienvenida',
 }
 
@@ -28,7 +30,7 @@ function safeRedirect(value) {
   return value
 }
 
-/** Acceso de cuenta (DESIGN_AUTH.md §1). `view`: 'login' | 'register' | 'forgot' | 'welcome'. */
+/** Acceso de cuenta (DESIGN_AUTH.md §1). `view`: 'login' | 'register' | 'forgot' | 'reset' | 'welcome'. */
 export default function Account({ view }) {
   const { isAuthenticated } = useAuth()
   const [searchParams] = useSearchParams()
@@ -70,7 +72,7 @@ export default function Account({ view }) {
       {view !== 'welcome' && (
         <h1
           className={
-            view === 'forgot' ? 'mb-6 font-serif text-[clamp(32px,3.6vw,44px)] leading-tight font-light' : 'sr-only'
+            view === 'forgot' || view === 'reset' ? 'mb-6 font-serif text-[clamp(32px,3.6vw,44px)] leading-tight font-light' : 'sr-only'
           }
         >
           {TITLES[view]}
@@ -85,6 +87,7 @@ export default function Account({ view }) {
         {view === 'login' && <LoginForm onAuthStart={setAuthMode} search={location.search} />}
         {view === 'register' && <RegisterForm onAuthStart={setAuthMode} search={location.search} />}
         {view === 'forgot' && <ForgotForm />}
+        {view === 'reset' && <ResetForm />}
         {view === 'welcome' && <Welcome mode={location.state?.mode} />}
       </div>
 

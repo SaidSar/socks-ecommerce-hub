@@ -1,9 +1,13 @@
-// Autenticación simulada (DESIGN_AUTH.md §5.3). Única capa que sabrá hablar con /api/auth/* cuando exista;
-// hoy guarda usuarios en localStorage para que el flujo completo se pueda revisar sin backend.
-// TODO(api): reemplazar cada función por fetch(`${API_URL}/api/auth/...`) según el contrato de DESIGN_AUTH.md §8.
+// Autenticación (DESIGN_AUTH.md §5.3 y §8). Única capa que habla con /api/auth/*. Con USE_API usa la API;
+// sin ella guarda usuarios en localStorage para que el flujo completo se pueda revisar sin backend.
+import { API_URL, USE_API } from './api'
 
 const USERS_KEY = 'sokko.users.v1'
 export const SESSION_KEY = 'sokko.session.v1'
+const TOKEN_KEY = 'sokko.token.v1'
+
+/** Se emite cuando la API responde 401: la sesión guardada ya no sirve. */
+export const SESSION_EXPIRED_EVENT = 'sokko:session-expired'
 
 export const DEMO_ACCOUNT = { email: 'hola@sokko.mx', password: 'Kyoto2026' }
 
@@ -31,7 +35,7 @@ const SEED = [
 ]
 
 export class AuthError extends Error {
-  /** @param {'INVALID_CREDENTIALS' | 'EMAIL_TAKEN'} code */
+  /** @param {'INVALID_CREDENTIALS' | 'EMAIL_TAKEN' | 'INVALID_RESET_TOKEN'} code */
   constructor(code) {
     super(code)
     this.name = 'AuthError'
@@ -101,16 +105,66 @@ function saveUsers(users) {
   writeJSON('localStorage', USERS_KEY, users)
 }
 
-function saveSession(user, remember) {
+function saveSession(user, remember, accessToken) {
   // remember → sobrevive al cierre del navegador; si no, solo dura la pestaña.
-  removeKey(remember ? 'sessionStorage' : 'localStorage', SESSION_KEY)
-  writeJSON(remember ? 'localStorage' : 'sessionStorage', SESSION_KEY, user)
+  const [target, other] = remember ? ['localStorage', 'sessionStorage'] : ['sessionStorage', 'localStorage']
+  removeKey(other, SESSION_KEY)
+  removeKey(other, TOKEN_KEY)
+  writeJSON(target, SESSION_KEY, user)
+  if (accessToken) writeJSON(target, TOKEN_KEY, accessToken)
+}
+
+function clearSession() {
+  for (const storage of ['localStorage', 'sessionStorage']) {
+    removeKey(storage, SESSION_KEY)
+    removeKey(storage, TOKEN_KEY)
+  }
+}
+
+const getToken = () => readJSON('localStorage', TOKEN_KEY) ?? readJSON('sessionStorage', TOKEN_KEY)
+
+const postJson = (path, body) =>
+  fetch(`${API_URL}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
+/** Petición autenticada con el token de la sesión. Un 401 la cierra y avisa a la app. */
+export async function authFetch(path, options = {}) {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${getToken()}` },
+  })
+  if (response.status === 401) {
+    clearSession()
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+  }
+  return response
+}
+
+/** Con la API, confirma al cargar que el token sigue vigente y refresca el usuario. Un fallo de red no cierra la sesión. */
+export async function verifySession() {
+  if (!USE_API || !getToken()) return getSession()
+  try {
+    const response = await authFetch('/api/auth/me')
+    if (!response.ok) return null
+    const { user } = await response.json()
+    saveSession(user, readJSON('localStorage', TOKEN_KEY) !== null)
+    return user
+  } catch {
+    return getSession()
+  }
 }
 
 // --- API pública ---
 
 /** @returns {Promise<{ user: object }>} */
 export async function login({ email, password, remember = true }) {
+  if (USE_API) {
+    const response = await postJson('/api/auth/login', { email, password })
+    if (response.status === 401) throw new AuthError('INVALID_CREDENTIALS')
+    if (!response.ok) throw new Error(`API respondió ${response.status}`)
+    const { accessToken, user } = await response.json()
+    saveSession(user, remember, accessToken)
+    return { user }
+  }
   await latency()
   const users = await loadUsers()
   const found = users.find((u) => u.email === normalizeEmail(email))
@@ -122,7 +176,15 @@ export async function login({ email, password, remember = true }) {
 }
 
 /** @returns {Promise<{ user: object }>} */
-export async function register({ firstName, lastName, email, password, preferredSize = null, marketingOptIn = false }) {
+export async function register({ firstName, lastName, email, password, preferredSize = null, marketingOptIn = false, acceptedTerms = false }) {
+  if (USE_API) {
+    const response = await postJson('/api/auth/register', { firstName, lastName, email, password, preferredSize, marketingOptIn, acceptedTerms })
+    if (response.status === 409) throw new AuthError('EMAIL_TAKEN')
+    if (!response.ok) throw new Error(`API respondió ${response.status}`)
+    const { accessToken, user } = await response.json()
+    saveSession(user, true, accessToken)
+    return { user }
+  }
   await latency()
   const users = await loadUsers()
   const normalized = normalizeEmail(email)
@@ -144,19 +206,35 @@ export async function register({ firstName, lastName, email, password, preferred
 }
 
 /** Siempre resuelve igual, exista o no la cuenta, para no revelar qué correos están registrados. */
-// TODO(api): POST /api/auth/forgot-password { email } → 202 siempre.
-// eslint-disable-next-line no-unused-vars
 export async function requestPasswordReset(email) {
+  if (USE_API) {
+    const response = await postJson('/api/auth/forgot-password', { email })
+    if (!response.ok) throw new Error(`API respondió ${response.status}`)
+    return
+  }
   await latency()
 }
 
+/** Contraseña nueva con el token del enlace. Sin API no hay tokens: el mock solo exige que venga uno. */
+export async function resetPassword({ token, newPassword }) {
+  if (USE_API) {
+    const response = await postJson('/api/auth/reset-password', { token, newPassword })
+    if (response.status === 400) throw new AuthError('INVALID_RESET_TOKEN')
+    if (!response.ok) throw new Error(`API respondió ${response.status}`)
+    return
+  }
+  await latency()
+  if (!token) throw new AuthError('INVALID_RESET_TOKEN')
+}
+
 export async function logout() {
-  removeKey('localStorage', SESSION_KEY)
-  removeKey('sessionStorage', SESSION_KEY)
+  clearSession()
 }
 
 /** Sesión guardada (síncrono para hidratar sin parpadeo). @returns {object | null} */
 export function getSession() {
+  // Con la API, una sesión sin token (por ejemplo, la que dejó el mock) no vale.
+  if (USE_API && !getToken()) return null
   const user = readJSON('localStorage', SESSION_KEY) ?? readJSON('sessionStorage', SESSION_KEY)
   return user && typeof user.email === 'string' ? user : null
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useShake } from '../../hooks/useShake'
-import { emailError } from '../../utils/authValidation'
+import { MESSAGES, emailError } from '../../utils/authValidation'
 import AuthField, { AuthSubmit } from './AuthField'
 
 /**
@@ -36,10 +36,13 @@ export default function ForgotForm() {
     setLoading(true)
     try {
       await requestPasswordReset(email.trim())
-    } finally {
-      // TODO(api): con API real, distinguir un fallo de red de la respuesta 202.
-      setLoading(false)
       setSent(true)
+    } catch {
+      // Un fallo de red o el límite de intentos no se confunden con la confirmación.
+      setError(MESSAGES.network)
+      shake()
+    } finally {
+      setLoading(false)
     }
   }
 

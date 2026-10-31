@@ -73,6 +73,7 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
         password: f.pw,
         preferredSize: f.size || null,
         marketingOptIn: f.news,
+        acceptedTerms: f.terms,
       })
     } catch (err) {
       setLoading(false)

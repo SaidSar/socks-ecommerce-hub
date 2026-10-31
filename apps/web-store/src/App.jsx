@@ -28,6 +28,7 @@ function App() {
               <Route path="/cuenta" element={<Account view="login" />} />
               <Route path="/cuenta/registro" element={<Account view="register" />} />
               <Route path="/cuenta/recuperar" element={<Account view="forgot" />} />
+              <Route path="/cuenta/restablecer" element={<Account view="reset" />} />
               <Route path="/cuenta/bienvenida" element={<Account view="welcome" />} />
             </Routes>
           </BrowserRouter>
