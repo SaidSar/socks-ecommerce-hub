@@ -459,6 +459,9 @@ public class OrdersApiTests(OrdersApiFactory factory) : IClassFixture<OrdersApiF
             b.UseEnvironment("Production");
             b.UseSetting("Jwt:SigningKey", new string('k', 40));
             b.UseSetting("Frontend:WebStoreUrl", "http://tienda.test");
+            b.UseSetting("Email:Provider", EmailSetup.AzureProvider);
+            b.UseSetting("Email:ConnectionString", "endpoint=https://prueba.communication.azure.com/;accesskey=a2V5");
+            b.UseSetting("Email:SenderAddress", "DoNotReply@prueba.azurecomm.net");
             // No llega a conectarse: la ruta responde antes de tocar la BD.
             b.UseSetting("ConnectionStrings:Sokko", "Server=localhost;Database=SinUso;Trusted_Connection=True;TrustServerCertificate=True");
         });

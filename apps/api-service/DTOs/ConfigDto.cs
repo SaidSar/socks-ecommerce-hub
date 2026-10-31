@@ -7,4 +7,5 @@ public record ConfigDto(
     decimal LocalShippingCost,
     bool LocalFreeShipping,
     int FewUnitsThreshold,
-    decimal IvaRate);
+    decimal IvaRate,
+    bool PaymentsDemoMode = false);
