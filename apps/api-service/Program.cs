@@ -65,6 +65,8 @@ builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
 builder.Services.AddHostedService<OxxoExpiryJob>();
 
 builder.Services.AddScoped<ICatalogAdminService, CatalogAdminService>();
+builder.Services.AddScoped<IBrandService, BrandService>();
+builder.Services.AddScoped<IProductTypeService, ProductTypeService>();
 
 builder.Services.AddSokkoAuth();
 builder.Services.AddAuthRateLimiting();

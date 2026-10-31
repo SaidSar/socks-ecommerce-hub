@@ -14,7 +14,7 @@ public class SeasonTests
 
     private static readonly ConfigDto AnyConfig = new(799m, 99m, 49m, true, 4, 0.16m);
 
-    private readonly CollectionService _collections = new(TestDbContext.Create());
+    private readonly CollectionService _collections = new(TestDbContext.Create(), new FakeClock(new DateOnly(2026, 10, 26)));
     private readonly CatalogService _catalog;
 
     public SeasonTests()

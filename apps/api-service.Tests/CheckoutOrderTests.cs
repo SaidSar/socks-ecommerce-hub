@@ -131,7 +131,7 @@ public class CheckoutOrderTests
         var gateway = new SpyGateway();
         var clock = new FakeClock(today ?? new DateOnly(2026, 12, 15));
         var settings = new FakeSettingsService(new ConfigDto(799m, 99m, 49m, true, 4, 0.16m), LocalCp);
-        var catalog = new CatalogService(TestDbContext.Create(), new CollectionService(TestDbContext.Create()), settings, clock);
+        var catalog = new CatalogService(TestDbContext.Create(), new CollectionService(TestDbContext.Create(), new FakeClock(new DateOnly(2026, 10, 26))), settings, clock);
         return new Sut(new CheckoutOrder(work, inventory, orders, catalog, settings, new QuoteShipping(settings), gateway, clock), work, inventory, orders, gateway);
     }
 
