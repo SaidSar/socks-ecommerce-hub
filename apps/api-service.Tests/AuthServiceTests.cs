@@ -140,6 +140,8 @@ public class AuthTaskTests
 
         public Task SendInvitationAsync(string email, string link, CancellationToken cancellationToken = default) =>
             SendPasswordResetAsync(email, link, cancellationToken);
+
+        public Task SendOrderConfirmationAsync(OrderConfirmationEmail order, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private static readonly FakeClock Clock = new(new DateOnly(2026, 10, 30));
