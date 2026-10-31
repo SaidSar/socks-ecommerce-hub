@@ -1,0 +1,110 @@
+# Despliegue a Azure: corre después de que CI pase en un push a main. Entra por OIDC, sin secretos guardados.
+# Variables del ambiente "production": ver infra/README.md. Sin ellas, el job se salta.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+# Dos despliegues nunca corren a la vez; las migraciones no se interrumpen a medias.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # El commit que CI aprobó, no lo último de main.
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Publicar la API
+        working-directory: apps/api-service
+        run: dotnet publish Sokko.Api.csproj -c Release -o "$RUNNER_TEMP/api"
+
+      - name: Generar el bundle de migraciones
+        working-directory: apps/api-service
+        env:
+          # Solo para armar el bundle en el runner; no se conecta a nada.
+          ASPNETCORE_ENVIRONMENT: Development
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle --project Sokko.Api.csproj --configuration Release --self-contained -r linux-x64 -o "$RUNNER_TEMP/efbundle"
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Antes de publicar: la API nueva nunca corre contra un esquema viejo. En Production no se siembra nada de Development.
+      - name: Aplicar las migraciones
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings__Sokko: Server=tcp:${{ vars.SQL_SERVER_FQDN }},1433;Database=Sokko;Authentication=Active Directory Default;Encrypt=True;Connection Timeout=120
+        run: |
+          "$RUNNER_TEMP/efbundle" --connection "$ConnectionStrings__Sokko"
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.API_NAME }}
+          package: ${{ runner.temp }}/api
+
+      - name: Compilar la tienda
+        working-directory: apps/web-store
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Compilar el panel
+        working-directory: apps/admin-panel
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Pedir los tokens de Static Web Apps
+        id: swa
+        run: |
+          store=$(az staticwebapp secrets list --name "${{ vars.STORE_SITE_NAME }}" --query properties.apiKey -o tsv)
+          panel=$(az staticwebapp secrets list --name "${{ vars.PANEL_SITE_NAME }}" --query properties.apiKey -o tsv)
+          echo "::add-mask::$store"
+          echo "::add-mask::$panel"
+          echo "store=$store" >> "$GITHUB_OUTPUT"
+          echo "panel=$panel" >> "$GITHUB_OUTPUT"
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.store }}
+          action: upload
+          app_location: apps/web-store/dist
+          skip_app_build: true
+          skip_api_build: true
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.panel }}
+          action: upload
+          app_location: apps/admin-panel/dist
+          skip_app_build: true
+          skip_api_build: true

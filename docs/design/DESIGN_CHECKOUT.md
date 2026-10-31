@@ -209,6 +209,8 @@ Invitado o `Authorization: Bearer`. Encabezado `Idempotency-Key` (opcional, hast
 
 `OxxoExpiryJob` (`BackgroundService`) cancela cada `Orders:OxxoExpiryCheckMinutes` (5) los pedidos OXXO sin pagar con más de `Orders:OxxoExpiryHours` (72) horas, usando `IClock`. Libera lo apartado (R-10) y escribe el historial con la nota "Referencia OXXO vencida". Cada pedido va en su propia transacción, y la cancelación se condiciona a que siga sin pagar, así que no choca con un pago simultáneo. P-03 sigue por confirmar con el cliente.
 
+**En producción la revisión corre una vez al día** (`Orders__OxxoExpiryCheckMinutes=1440`, en `infra/main.bicep`), porque cada revisión despierta la BD serverless y no dejaría que se pause. Un pedido vencido puede cancelarse hasta 24 h después de las 72 h, y sus piezas siguen apartadas en ese tiempo. Si el pago llega dentro de ese retraso, se acepta, porque el pedido todavía no se canceló.
+
 ### 6.5 Esquema (`DESIGN_DB` v0.4.5)
 
 `Orders.IdempotencyKey VARCHAR(64) NULL` con índice único filtrado y `Orders.IdempotencyHash BINARY(32) NULL` (SHA-256 de los datos del pedido). La referencia OXXO ya tiene columna (`PaymentReference`).

@@ -120,6 +120,10 @@ cd apps/admin-panel && npm run build
 cd apps/api-service && dotnet build
 ```
 
+## Despliegue en Azure
+
+Infraestructura en [`infra/`](infra/README.md) y workflow en [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). **Todavía no se despliega:** faltan los pasos de [`infra/README.md`](infra/README.md).
+
 ## CI
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) corre en cada PR hacia `main` y en cada push a `main`. Un push nuevo al mismo PR cancela la ejecución anterior.
