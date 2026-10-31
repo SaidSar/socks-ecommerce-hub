@@ -86,28 +86,22 @@ export const saveCollection = (form) =>
 
 // ---------------------------------------------------------------- Configuración
 
-// El formulario de Configuración no maneja la versión del registro: se recuerda la de la última lectura (R-25).
-let settingsVersion = null
+export const getSettings = () => request('GET', '/api/admin/settings')
 
-const rememberVersion = (settings) => {
-  settingsVersion = settings.rowVersion
-  return settings
-}
-
-export const getSettings = async () => rememberVersion(await request('GET', '/api/admin/settings'))
-
-export const saveSettings = async (settings) =>
-  rememberVersion(
-    await request('PUT', '/api/admin/settings', {
-      freeShippingThreshold: settings.freeShippingThreshold,
-      parcelShippingCost: settings.parcelShippingCost,
-      localShippingCost: settings.localShippingCost,
-      localFreeShipping: settings.localFreeShipping,
-      fewUnitsThreshold: settings.fewUnitsThreshold,
-      localZones: settings.localZones,
-      rowVersion: settingsVersion,
-    }),
-  )
+/**
+ * `settings.rowVersion` es la versión que el formulario leyó al abrirse (R-25). Las recargas de la página no la
+ * cambian: invitar a alguien recarga los datos, y un cambio ajeno a Configuración debe seguir dando 409.
+ */
+export const saveSettings = (settings) =>
+  request('PUT', '/api/admin/settings', {
+    freeShippingThreshold: settings.freeShippingThreshold,
+    parcelShippingCost: settings.parcelShippingCost,
+    localShippingCost: settings.localShippingCost,
+    localFreeShipping: settings.localFreeShipping,
+    fewUnitsThreshold: settings.fewUnitsThreshold,
+    localZones: settings.localZones,
+    rowVersion: settings.rowVersion,
+  })
 
 // ---------------------------------------------------------------- Usuarios
 

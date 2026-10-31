@@ -161,4 +161,24 @@ public class AdminSettingsApiTests(AdminApiFactory factory) : AdminApiTestBase(f
         Assert.Contains("Otra persona", (await Json(stale)).GetProperty("title").GetString());
         Assert.Equal(600m, (await Current()).GetProperty("freeShippingThreshold").GetDecimal());
     }
+
+    [Fact]
+    public async Task Inviting_someone_does_not_hide_a_foreign_change()
+    {
+        var email = $"invitado-{Guid.NewGuid():N}@sokko.test";
+        var form = await Current();
+
+        var invited = await Post("/api/admin/users/invitations", Owner, new { firstName = "Ivana", lastName = "Prueba", email, role = "operaciones" });
+        Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
+        Assert.Equal(form.GetProperty("rowVersion").GetString(), (await Current()).GetProperty("rowVersion").GetString());
+
+        Assert.Equal(HttpStatusCode.OK, (await Put(Url, Owner, Body(await Current(), threshold: 600m))).StatusCode);
+        var stale = await Put(Url, Owner, Body(form, threshold: 700m));
+
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        Assert.Equal(600m, (await Current()).GetProperty("freeShippingThreshold").GetDecimal());
+
+        using var scope = Factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<SokkoDbContext>().Users.Where(u => u.Email == email).ExecuteDeleteAsync(Ct);
+    }
 }

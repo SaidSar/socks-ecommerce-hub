@@ -1,5 +1,24 @@
-import { describe, expect, it } from 'vitest'
-import { normalizeErrors, problemToError, productBody } from './adminCatalogApi'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { getSettings, normalizeErrors, problemToError, productBody, saveSettings } from './adminCatalogApi'
+
+afterEach(() => vi.unstubAllGlobals())
+
+describe('versión de Configuración (R-25)', () => {
+  it('una recarga posterior no cambia la versión con la que guarda el formulario', async () => {
+    const bodies = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url, options) => {
+        if (options.method === 'PUT') bodies.push(JSON.parse(options.body))
+        return new Response(JSON.stringify({ rowVersion: 'ajena' }), { headers: { 'content-type': 'application/json' } })
+      }),
+    )
+    // Invitar a alguien recarga los datos de la página: la lectura trae la versión que dejó otra persona.
+    await getSettings()
+    await saveSettings({ freeShippingThreshold: 799, rowVersion: 'del-formulario' })
+    expect(bodies[0].rowVersion).toBe('del-formulario')
+  })
+})
 
 describe('errores de la API', () => {
   it('validación: campos en camelCase, primer mensaje y aviso general', () => {

@@ -68,7 +68,7 @@ function SettingsForm({ initial, users }) {
     }
     setBusy(true)
     try {
-      const res = await api.saveSettings(next)
+      const res = await api.saveSettings({ ...next, rowVersion: saved.rowVersion })
       setSaved(res)
       setDraft(toDraft(res))
       setStatus('Cambios guardados. La tienda los toma de GET /api/config.')
