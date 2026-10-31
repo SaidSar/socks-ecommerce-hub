@@ -9,7 +9,7 @@ import { useCart } from '../hooks/useCart'
 import { useConfig } from '../hooks/useConfig'
 import { useShake } from '../hooks/useShake'
 import { OrderError, placeOrder, quoteShipping } from '../services/orderService'
-import { tokenizeCard } from '../services/paymentToken'
+import { TEST_CARDS, tokenizeCard } from '../services/paymentToken'
 import { formatMXN, formatPrice } from '../utils/currency'
 
 // Orden de foco ante errores = orden visual del formulario.
@@ -121,7 +121,7 @@ function Summary({ cart, shippingCost, total, ivaRate }) {
 export default function Checkout() {
   const cart = useCart()
   const { user, isAuthenticated } = useAuth()
-  const { ivaRate } = useConfig()
+  const { ivaRate, paymentsDemoMode } = useConfig()
   const navigate = useNavigate()
   const [contact, setContact] = useState({
     firstName: user?.firstName ?? '',
@@ -282,6 +282,15 @@ export default function Checkout() {
         <header>
           <p className={EYEBROW}>Último paso</p>
           <h1 className="mt-3 font-serif text-[clamp(34px,4vw,48px)] leading-[1.05] font-light">Complete su pedido</h1>
+          {paymentsDemoMode && (
+            <div role="note" className="mt-5 border-l-2 border-moss bg-paper px-4 py-3 text-[13px]">
+              <p className="font-medium">Tienda de demostración: no se realizan cobros reales</p>
+              <p className="mt-1 text-ink-soft">
+                Tarjetas de prueba: <span className="tnum">{TEST_CARDS.approved}</span> (aprobada), <span className="tnum">{TEST_CARDS.declined}</span> (rechazada) y{' '}
+                <span className="tnum">{TEST_CARDS.insufficientFunds}</span> (sin fondos). Con cualquier vencimiento futuro y CVC.
+              </p>
+            </div>
+          )}
           <p className="mt-4 text-[14px] text-ink-soft">
             {isAuthenticated ? (
               <>Comprando como <span className="text-ink">{user.firstName}</span>.</>
@@ -357,7 +366,7 @@ export default function Checkout() {
 
           {paymentMethod === 'tarjeta' ? (
             <div className="mt-7">
-              <p className="mb-6 border-l-2 border-moss pl-3 text-[13px] text-ink-soft">Modo de prueba: no escriba los datos de una tarjeta real.</p>
+              {!paymentsDemoMode && <p className="mb-6 border-l-2 border-moss pl-3 text-[13px] text-ink-soft">Modo de prueba: no escriba los datos de una tarjeta real.</p>}
               <div className="grid gap-7 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <AuthField id="checkout-cardNumber" label="Número de tarjeta" value={card.number} onChange={setField(setCard, 'number', 'cardNumber')} error={errors.cardNumber} autoComplete="cc-number" />

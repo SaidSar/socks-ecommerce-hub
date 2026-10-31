@@ -7,4 +7,5 @@ export const DEFAULT_CONFIG = Object.freeze({
   localFreeShipping: true, // el umbral también aplica a la entrega local
   fewUnitsThreshold: 4, // stock <= umbral → "Pocos ejemplares en almacén"
   ivaRate: 0.16, // IVA incluido en precio (solo informativo en el desglose)
+  paymentsDemoMode: false, // Payments:DemoMode: la tienda avisa que no hay cobros reales
 })
