@@ -34,6 +34,16 @@ const PANEL = {
     ),
     tone: 'matcha',
   },
+  reset: {
+    kanji: '鍵',
+    eyebrow: 'Recuperar acceso',
+    title: (
+      <>
+        Un nuevo <em className="italic">comienzo</em>.
+      </>
+    ),
+    tone: 'matcha',
+  },
   welcome: {
     kanji: '迎',
     eyebrow: 'Bienvenida',

@@ -5,7 +5,7 @@ using Sokko.Api.Data;
 using Sokko.Api.Data.Seed;
 using Sokko.Api.Services;
 
-const string WebStoreCorsPolicy = "AllowWebStore";
+const string FrontendCorsPolicy = "AllowFrontends";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,12 +40,32 @@ builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<IQuoteShipping, QuoteShipping>();
+builder.Services.AddSingleton(_ => JwtOptions.FromConfiguration(builder.Configuration, builder.Environment.IsDevelopment()));
+builder.Services.AddSingleton(_ => new ResetLinkOptions(
+    builder.Configuration["Frontend:WebStoreUrl"] ?? throw new InvalidOperationException("Falta Frontend:WebStoreUrl.")));
+builder.Services.AddSingleton<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRegisterCustomer, RegisterCustomer>();
+builder.Services.AddScoped<IResetPassword, ResetPassword>();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, UnconfiguredEmailSender>();
+}
 
-// CORS: permite que apps/web-store (Vite) consuma este servicio.
+builder.Services.AddSokkoAuth();
+builder.Services.AddAuthRateLimiting();
+// Errores y respuestas sin cuerpo (401, 403, 404…) como ProblemDetails.
+builder.Services.AddProblemDetails();
+
+// CORS: permite que apps/web-store y apps/admin-panel (Vite) consuman este servicio.
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(WebStoreCorsPolicy, policy =>
-        policy.WithOrigins("http://localhost:5173")
+    options.AddPolicy(FrontendCorsPolicy, policy =>
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
@@ -55,7 +75,14 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Sin clave de firma o sin URL de la tienda, falla al arrancar y no en la primera petición.
+_ = app.Services.GetRequiredService<JwtOptions>();
+_ = app.Services.GetRequiredService<ResetLinkOptions>();
+
 // Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
 if (app.Environment.IsDevelopment())
 {
     // Documento OpenAPI en /openapi/v1.json y Swagger UI en /swagger
@@ -71,8 +98,10 @@ else
     app.UseHttpsRedirection();
 }
 
-app.UseCors(WebStoreCorsPolicy);
+app.UseCors(FrontendCorsPolicy);
 
+app.UseRateLimiter();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

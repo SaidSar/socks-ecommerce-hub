@@ -12,8 +12,18 @@ export function AuthProvider({ children }) {
     const onStorage = (e) => {
       if (e.key === authService.SESSION_KEY) setUser(authService.getSession())
     }
+    const onExpired = () => setUser(null)
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    window.addEventListener(authService.SESSION_EXPIRED_EVENT, onExpired)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener(authService.SESSION_EXPIRED_EVENT, onExpired)
+    }
+  }, [])
+
+  // La sesión guardada se hidrata al instante; aquí se confirma contra la API (un 401 la cierra).
+  useEffect(() => {
+    authService.verifySession().then((next) => setUser(next))
   }, [])
 
   // Envuelve una llamada al servicio con el estado de carga; los AuthError se propagan al formulario.
@@ -48,6 +58,8 @@ export function AuthProvider({ children }) {
 
   const requestPasswordReset = useCallback((email) => run(() => authService.requestPasswordReset(email)), [run])
 
+  const resetPassword = useCallback((data) => run(() => authService.resetPassword(data)), [run])
+
   const logout = useCallback(async () => {
     await authService.logout()
     setUser(null)
@@ -64,8 +76,9 @@ export function AuthProvider({ children }) {
       register,
       logout,
       requestPasswordReset,
+      resetPassword,
     }
-  }, [user, status, login, register, logout, requestPasswordReset])
+  }, [user, status, login, register, logout, requestPasswordReset, resetPassword])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

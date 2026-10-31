@@ -131,6 +131,11 @@ public class CatalogApiTests(CatalogApiFactory factory) : IClassFixture<CatalogA
     [InlineData("POKEMON", "pokemon-pikachu")]
     [InlineData("NAVIDEÑO", "copo-navideno")]
     [InlineData("uv400", "lentes-de-sol-polarizados")]
+    [InlineData("navideno", "copo-navideno")]
+    [InlineData("telarana", "telarana-nocturna")]
+    [InlineData("bufandas", "bufanda-de-lana")]
+    [InlineData("marcas", "ua-heatgear-crew")]
+    [InlineData("japon", "lino-komorebi")]
     public async Task Search_ignores_case_and_accents_and_reads_material(string term, string expected) =>
         Assert.Contains(expected, Slugs(await GetJson($"/api/products?q={Uri.EscapeDataString(term)}")));
 

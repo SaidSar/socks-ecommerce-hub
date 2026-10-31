@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import logoHorizontal from '../assets/brand/sokko-logo-horizontal.svg'
 import Icon from '../components/ui/Icon'
 import { useAdminAuth } from '../hooks/useAdminAuth'
-import { DEMO_ACCOUNTS } from '../services/adminAuth'
+import { AuthError, DEMO_ACCOUNTS } from '../services/adminAuth'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
@@ -52,8 +52,12 @@ export default function Login() {
     try {
       await login(email, password)
       navigate(redirect, { replace: true })
-    } catch {
-      setFormError('El correo o la contraseña no coinciden.')
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setFormError(err.code === 'FORBIDDEN' ? 'Esta cuenta no tiene acceso al panel.' : 'El correo o la contraseña no coinciden.')
+      } else {
+        setFormError('No pudimos conectar. Intente de nuevo en un momento.')
+      }
       setBusy(false)
       passwordRef.current?.select()
     }

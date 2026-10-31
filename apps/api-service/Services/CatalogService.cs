@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Sokko.Api.Data;
 using Sokko.Api.DTOs;
@@ -38,6 +40,14 @@ public class CatalogService(
         (ProductLine.Especiales, "Especiales"),
         (ProductLine.Accesorios, "Accesorios"),
     ];
+
+    private const string SearchCollation = "Latin1_General_100_CI_AI";
+
+    /// <summary>Sin mayúsculas ni acentos, para comparar con las etiquetas de línea, que no están en la BD.</summary>
+    private static string Normalize(string text) =>
+        new string(text.Normalize(NormalizationForm.FormD)
+            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            .ToArray()).ToLowerInvariant();
 
     public bool IsInSeason(Product product, DateOnly date) => collections.IsInWindow(product.Collection, date);
 
@@ -80,13 +90,16 @@ public class CatalogService(
         }
         else
         {
-            // La intercalación de la BD ignora mayúsculas y acentos (DESIGN_DB §1.2).
+            // La intercalación de la BD distingue ñ de n; esta no, igual que el buscador de la tienda.
             var term = query.Q.Trim();
+            var lines = Lines.Where(l => Normalize(l.Label).Contains(Normalize(term))).Select(l => l.Line).ToList();
             products = products.Where(p =>
-                p.Name.Contains(term)
-                || p.Material.Contains(term)
-                || p.Brand.Name.Contains(term)
-                || (p.Collection != null && p.Collection.Name.Contains(term)));
+                EF.Functions.Collate(p.Name, SearchCollation).Contains(term)
+                || EF.Functions.Collate(p.Material, SearchCollation).Contains(term)
+                || EF.Functions.Collate(p.Brand.Name, SearchCollation).Contains(term)
+                || EF.Functions.Collate(p.ProductType.Name, SearchCollation).Contains(term)
+                || (p.Collection != null && EF.Functions.Collate(p.Collection.Name, SearchCollation).Contains(term))
+                || lines.Contains(p.Line));
         }
 
         var total = await products.CountAsync(cancellationToken);
