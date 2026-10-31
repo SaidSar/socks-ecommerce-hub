@@ -130,18 +130,16 @@ export default function AccountMenu() {
               </Link>
             </li>
             <li role="none">
-              {/* TODO(api): habilitar con GET /api/orders cuando exista el historial de pedidos. */}
-              <button
+              <Link
                 ref={(el) => (itemsRef.current[1] = el)}
-                type="button"
                 role="menuitem"
-                aria-disabled="true"
+                to="/cuenta/pedidos"
                 tabIndex={-1}
-                className={`${itemClass} cursor-default text-ink-soft focus-visible:bg-sand`}
+                onClick={() => setOpen(false)}
+                className={`${itemClass} hover:bg-sand focus-visible:bg-sand`}
               >
                 Mis pedidos
-                <span className="text-[10.5px] tracking-[.18em] text-ink-soft uppercase">Próximamente</span>
-              </button>
+              </Link>
             </li>
             <li role="separator" className="mx-4 my-1 border-t border-ink/10" />
             <li role="none">

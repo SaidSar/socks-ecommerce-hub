@@ -44,6 +44,16 @@ const PANEL = {
     ),
     tone: 'matcha',
   },
+  orders: {
+    kanji: '包',
+    eyebrow: 'Su cuenta',
+    title: (
+      <>
+        Sus pedidos, <em className="italic">paso a paso</em>.
+      </>
+    ),
+    tone: 'laca',
+  },
   welcome: {
     kanji: '迎',
     eyebrow: 'Bienvenida',

@@ -113,6 +113,8 @@ Mientras no haya cotización, el resumen muestra el envío como "—" y el total
 | Fondos insuficientes (`402`) | La tarjeta no tiene fondos suficientes. Pruebe con otra o elija OXXO Pay. |
 | Sin existencias (`409`) | Por línea: "{nombre}: {solo quedan n \| ya no hay piezas}". Botón "Ajustar mi bolsa" |
 | Precio cambió (`409`) | El total de su pedido cambió a {total}. Revíselo y confirme de nuevo. |
+| Misma llave con otros datos (`422`) | Su pedido cambió desde el último intento. Revíselo y confirme de nuevo. |
+| Sesión vencida (`401`) | Su sesión venció. Inicie sesión de nuevo o continúe como invitado. |
 | Red o `5xx` | No pudimos conectar con el atelier. Intente de nuevo en un momento. |
 | Demasiados intentos (`429`) | Demasiados intentos. Espere un momento e inténtelo de nuevo. |
 
@@ -221,13 +223,13 @@ Sin `VITE_API_URL`, `services/orderService.js` simula lo mismo con el catálogo 
 
 ## 8. Definición de terminado
 
-- [ ] Compra como invitado con tarjeta: pedido `Pagado`, apartado y bolsa vacía.
-- [ ] Compra con sesión por OXXO: datos prellenados, referencia, vencimiento y pago simulado.
-- [ ] Tarjeta rechazada: mensaje, bolsa intacta y nada apartado.
-- [ ] Sin existencias a mitad del checkout: mensaje por línea y "Ajustar mi bolsa".
-- [ ] Doble clic: un solo pedido.
-- [ ] Dos compras por la última unidad: solo una gana; `Reserved` y el kárdex cuadran.
-- [ ] Un OXXO vencido se cancela y libera lo apartado.
-- [ ] Mis pedidos muestra los pedidos del usuario y nunca los de otro.
-- [ ] Sin errores en consola en los flujos correctos; capturas a 1440 y 390 px en `docs/design/screenshots/checkout/`.
-- [ ] Teclado y lector de pantalla: foco visible, errores asociados con `aria-describedby`, objetivos de 44 px.
+- [x] Compra como invitado con tarjeta: pedido `Pagado`, apartado y bolsa vacía.
+- [x] Compra con sesión por OXXO: datos prellenados, referencia, vencimiento y pago simulado.
+- [x] Tarjeta rechazada: mensaje, bolsa intacta y nada apartado.
+- [x] Sin existencias a mitad del checkout: mensaje por línea y "Ajustar mi bolsa".
+- [x] Doble clic: un solo pedido.
+- [x] Dos compras por la última unidad: solo una gana; `Reserved` y el kárdex cuadran.
+- [x] Un OXXO vencido se cancela y libera lo apartado.
+- [x] Mis pedidos muestra los pedidos del usuario y nunca los de otro.
+- [x] Sin errores en consola en los flujos correctos; capturas a 1440 y 390 px en `docs/design/screenshots/checkout/`.
+- [x] Teclado y lector de pantalla: foco visible, errores asociados con `aria-describedby`, objetivos de 44 px.

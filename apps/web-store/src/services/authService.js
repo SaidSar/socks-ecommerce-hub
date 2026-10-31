@@ -128,11 +128,13 @@ const postJson = (path, body) =>
 
 /** Petición autenticada con el token de la sesión. Un 401 la cierra y avisa a la app. */
 export async function authFetch(path, options = {}) {
+  // Sin sesión viaja sin encabezado: el checkout también atiende a invitados.
+  const token = getToken()
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: { ...options.headers, Authorization: `Bearer ${getToken()}` },
+    headers: { ...options.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   })
-  if (response.status === 401) {
+  if (response.status === 401 && token) {
     clearSession()
     if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
   }
