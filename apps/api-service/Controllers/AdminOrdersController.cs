@@ -8,7 +8,7 @@ namespace Sokko.Api.Controllers;
 /// <summary>Pedidos del panel (DESIGN_ADMIN §7 y §9). Los dos roles los surten; los importes solo van al Dueño (R-24).</summary>
 [Route("api/admin/orders")]
 [Authorize(Policy = Permissions.OrdersManage)]
-public class AdminOrdersController(IOrderAdminService orders, IUserService users) : AdminControllerBase
+public class AdminOrdersController(IOrderAdminService orders, IFulfillOrder fulfill, IUserService users) : AdminControllerBase
 {
     private IActionResult OrderOf(AdminOrderView order) => IsOwner ? Ok(order.ToOwner()) : Ok(order.ToOperations());
 
@@ -62,6 +62,29 @@ public class AdminOrdersController(IOrderAdminService orders, IUserService users
             return Unauthorized();
         }
         var result = await orders.MarkPaidAsync(folio, request.RowVersion, actor, cancellationToken);
+        return result.Outcome == AdminOutcome.Ok ? OrderOf(result.Value!) : FailureOf(result);
+    }
+
+    [HttpPost("{folio}/transitions")]
+    public async Task<IActionResult> Transition(string folio, OrderTransitionRequestDto request, CancellationToken cancellationToken)
+    {
+        if (await ActorAsync(users, cancellationToken) is not { } actor)
+        {
+            return Unauthorized();
+        }
+        var command = new TransitionCommand(folio, request.Status!.Value, request.Carrier, request.Tracking, request.Courier, request.RowVersion, actor);
+        var result = await fulfill.AdvanceAsync(command, cancellationToken);
+        return result.Outcome == AdminOutcome.Ok ? OrderOf(result.Value!) : FailureOf(result);
+    }
+
+    [HttpPost("{folio}/cancel")]
+    public async Task<IActionResult> Cancel(string folio, OrderCancelRequestDto request, CancellationToken cancellationToken)
+    {
+        if (await ActorAsync(users, cancellationToken) is not { } actor)
+        {
+            return Unauthorized();
+        }
+        var result = await fulfill.CancelAsync(folio, request.Note, request.RowVersion, actor, cancellationToken);
         return result.Outcome == AdminOutcome.Ok ? OrderOf(result.Value!) : FailureOf(result);
     }
 }

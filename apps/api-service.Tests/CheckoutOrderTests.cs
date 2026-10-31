@@ -57,6 +57,11 @@ public class CheckoutOrderTests
         }
 
         public Task ReleaseAsync(IEnumerable<StockLine> lines, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<int> FindVariantIdAsync(string sku, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public Task<bool> SetStockAsync(StockChange change, StaffActor actor, DateTime at, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task ApplyCatalogFieldsAsync(int variantId, int productId, decimal? unitCost, string? barcode, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> TryReleaseAsync(IEnumerable<StockLine> lines, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<bool> ShipAsync(IReadOnlyList<StockLine> lines, int orderId, string note, StaffActor actor, DateTime at, CancellationToken cancellationToken = default) => Task.FromResult(true);
         public Task<IReadOnlyList<string>> SyncVariantsAsync(int productId, IReadOnlyList<VariantSpec> variants, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<string>>([]);
     }
 

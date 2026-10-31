@@ -50,6 +50,18 @@ public interface IOrderAdminService
 
     /// <summary>Repartidores para la entrega local: el personal activo.</summary>
     Task<IReadOnlyList<string>> ListCouriersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Pedido con sus líneas y su envío, para cambiarlo dentro de una transacción.</summary>
+    Task<Order?> FindForUpdateAsync(string folio, CancellationToken cancellationToken = default);
+
+    /// <summary>¿La versión guardada ya no es <paramref name="rowVersion"/>? Lee directo de la BD, sin el seguimiento de cambios.</summary>
+    Task<bool> HasChangedAsync(int orderId, byte[] rowVersion, CancellationToken cancellationToken = default);
+
+    /// <summary>Envío nuevo con el método del pedido (R-12). El repartidor que sea del personal queda ligado a su usuario; otro nombre es externo.</summary>
+    Task<Shipment> BuildShipmentAsync(Order order, string? carrier, string? tracking, string? courier, DateTime at, CancellationToken cancellationToken = default);
+
+    /// <summary>Cambia el estado y escribe el historial, comprobando <c>RowVersion</c> (R-25). Al cancelar un pedido pagado lo marca reembolsado.</summary>
+    Task ApplyStatusAsync(Order order, OrderStatus status, byte[] rowVersion, Shipment? shipment, string? note, StaffActor actor, DateTime at, CancellationToken cancellationToken = default);
 }
 
 public class OrderAdminService(SokkoDbContext db, IUserService users, IClock clock) : IOrderAdminService
@@ -280,7 +292,56 @@ public class OrderAdminService(SokkoDbContext db, IUserService users, IClock clo
         return AdminResult<AdminOrderView>.Ok((await GetAsync(folio, cancellationToken))!);
     }
 
-    /// <summary>Repartidores para la entrega local: el personal activo.</summary>
     public async Task<IReadOnlyList<string>> ListCouriersAsync(CancellationToken cancellationToken = default) =>
         (await users.ListInternalAsync(cancellationToken)).Select(u => $"{u.FirstName} {u.LastName}").ToList();
+
+    public Task<Order?> FindForUpdateAsync(string folio, CancellationToken cancellationToken = default) =>
+        db.Orders.Include(o => o.Items).Include(o => o.Shipment).FirstOrDefaultAsync(o => o.Folio == folio, cancellationToken);
+
+    public async Task<bool> HasChangedAsync(int orderId, byte[] rowVersion, CancellationToken cancellationToken = default)
+    {
+        var current = await db.Orders.AsNoTracking().Where(o => o.Id == orderId).Select(o => o.RowVersion).SingleAsync(cancellationToken);
+        return !current.SequenceEqual(rowVersion);
+    }
+
+    public async Task<Shipment> BuildShipmentAsync(Order order, string? carrier, string? tracking, string? courier, DateTime at, CancellationToken cancellationToken = default)
+    {
+        var shipment = new Shipment { DeliveryMethod = order.DeliveryMethod, ShippedAt = at };
+        if (order.DeliveryMethod == DeliveryMethod.Paqueteria)
+        {
+            shipment.Carrier = CarrierCodes.Parse(carrier);
+            shipment.TrackingNumber = tracking!.Trim();
+            return shipment;
+        }
+
+        var name = courier!.Trim();
+        var staff = await users.ListInternalAsync(cancellationToken);
+        shipment.CourierUserId = staff.FirstOrDefault(u => string.Equals($"{u.FirstName} {u.LastName}", name, StringComparison.OrdinalIgnoreCase))?.Id;
+        shipment.CourierName = name;
+        return shipment;
+    }
+
+    public async Task ApplyStatusAsync(Order order, OrderStatus status, byte[] rowVersion, Shipment? shipment, string? note, StaffActor actor, DateTime at, CancellationToken cancellationToken = default)
+    {
+        db.Entry(order).Property(o => o.RowVersion).OriginalValue = rowVersion;
+        order.Status = status;
+        order.UpdatedAt = at;
+        if (shipment is not null)
+        {
+            order.Shipment = shipment;
+        }
+        if (status == OrderStatus.Entregado && order.Shipment is not null)
+        {
+            order.Shipment.DeliveredAt = at;
+        }
+        if (status == OrderStatus.Cancelado && order.PaymentStatus == PaymentStatus.Pagado)
+        {
+            order.PaymentStatus = PaymentStatus.Reembolsado;
+        }
+        db.OrderStatusHistory.Add(new OrderStatusHistory
+        {
+            OrderId = order.Id, Status = status, ChangedAt = at, ChangedByUserId = actor.Id, ChangedByName = actor.Name, Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }

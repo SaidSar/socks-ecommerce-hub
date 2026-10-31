@@ -114,3 +114,26 @@ public class OrderVersionRequestDto
 {
     public byte[]? RowVersion { get; init; }
 }
+
+/// <summary>El estado al que se quiere pasar: si otra persona ya lo avanzó, no se aplica otro paso por accidente.</summary>
+public class OrderTransitionRequestDto
+{
+    [Required(ErrorMessage = "Falta el estado siguiente.")]
+    public OrderStatus? Status { get; init; }
+
+    public string? Carrier { get; init; }
+
+    public string? Tracking { get; init; }
+
+    public string? Courier { get; init; }
+
+    public byte[]? RowVersion { get; init; }
+}
+
+public class OrderCancelRequestDto
+{
+    [StringLength(250, ErrorMessage = "El motivo admite hasta 250 caracteres.")]
+    public string? Note { get; init; }
+
+    public byte[]? RowVersion { get; init; }
+}
