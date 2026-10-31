@@ -47,6 +47,7 @@ builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRegisterCustomer, RegisterCustomer>();
 builder.Services.AddScoped<IResetPassword, ResetPassword>();
+builder.Services.AddScoped<IInviteUser, InviteUser>();
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IEmailSender, LogEmailSender>();

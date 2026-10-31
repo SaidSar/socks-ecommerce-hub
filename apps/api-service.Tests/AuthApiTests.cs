@@ -35,6 +35,9 @@ internal sealed class CapturingEmailSender : IEmailSender
         }
         return Task.CompletedTask;
     }
+
+    public Task SendInvitationAsync(string email, string link, CancellationToken cancellationToken = default) =>
+        SendPasswordResetAsync(email, link, cancellationToken);
 }
 
 /// <summary>API real contra la BD de Development; el correo se captura y el límite se ajusta por prueba.</summary>

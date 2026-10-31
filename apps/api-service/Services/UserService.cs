@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Sokko.Api.Data;
@@ -20,6 +21,12 @@ public interface IUserService
 
     /// <summary><c>null</c> si el correo ya tiene una cuenta (R-01).</summary>
     Task<User?> CreateCustomerAsync(NewCustomer customer, CancellationToken cancellationToken = default);
+
+    /// <summary>Dueño y Operaciones activos, para Configuración.</summary>
+    Task<IReadOnlyList<User>> ListInternalAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Alta de un miembro del equipo sin contraseña utilizable. <c>null</c> si el correo ya tiene una cuenta.</summary>
+    Task<User?> CreateInternalAsync(string firstName, string lastName, string email, UserRole role, CancellationToken cancellationToken = default);
 
     /// <summary>Guarda el hash del token e invalida los anteriores del usuario.</summary>
     Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default);
@@ -106,6 +113,41 @@ public class UserService(SokkoDbContext db, IAuthService auth, IClock clock) : I
         catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: SqlUniqueIndexViolation or SqlUniqueConstraintViolation })
         {
             // Dos registros simultáneos con el mismo correo: la BD decide (R-01).
+            db.Entry(user).State = EntityState.Detached;
+            return null;
+        }
+        return user;
+    }
+
+    public async Task<IReadOnlyList<User>> ListInternalAsync(CancellationToken cancellationToken = default) =>
+        await db.Users
+            .AsNoTracking()
+            .Where(u => u.IsActive && u.Role != UserRole.Customer)
+            .OrderBy(u => u.Id)
+            .ToListAsync(cancellationToken);
+
+    public async Task<User?> CreateInternalAsync(string firstName, string lastName, string email, UserRole role, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeEmail(email);
+        if (await db.Users.AnyAsync(u => u.Email == normalized, cancellationToken))
+        {
+            return null;
+        }
+
+        var now = clock.UtcNow;
+        var user = new User
+        {
+            FirstName = firstName.Trim(), LastName = lastName.Trim(), Email = normalized, Role = role, CreatedAt = now, UpdatedAt = now,
+        };
+        // Nadie conoce esta contraseña: la cuenta se estrena con el enlace de la invitación.
+        user.PasswordHash = auth.HashPassword(user, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+        db.Users.Add(user);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: SqlUniqueIndexViolation or SqlUniqueConstraintViolation })
+        {
             db.Entry(user).State = EntityState.Detached;
             return null;
         }
