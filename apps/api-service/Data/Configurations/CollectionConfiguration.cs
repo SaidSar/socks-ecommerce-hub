@@ -25,6 +25,7 @@ public class CollectionConfiguration : IEntityTypeConfiguration<Collection>
             t.HasCheckConstraint("CK_Collections_Discount", "[OffSeasonDiscountPct] >= 0 AND [OffSeasonDiscountPct] < 1");
         });
 
+        b.Property(x => x.RowVersion).IsRowVersion();
         b.Property(x => x.Name).HasMaxLength(80);
         b.Property(x => x.Slug).HasAsciiColumn(80);
         b.Property(x => x.Kind).HasEnumColumn(10);

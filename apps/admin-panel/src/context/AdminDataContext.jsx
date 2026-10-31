@@ -50,9 +50,10 @@ export function AdminDataProvider({ user, children }) {
       getCatalogSummary: () => adminApi.getCatalogSummary(role),
       saveProduct: mutate((form) => adminApi.saveProduct(form, user)),
       addBrand: mutate((name) => adminApi.addBrand(name, user)),
-      setBrandVisibility: mutate((slug, show) => adminApi.setBrandVisibility(slug, show, user)),
+      setBrandVisibility: mutate((slug, show, rowVersion) => adminApi.setBrandVisibility(slug, show, user, rowVersion)),
       saveCollection: mutate((form) => adminApi.saveCollection(form, user)),
       getInternalUsers: () => adminApi.getInternalUsers(),
+      inviteUser: mutate((invitation) => adminApi.inviteUser(invitation, user)),
       getCouriers: () => adminApi.getCouriers(),
       resetDemoData: mutate(() => adminApi.resetDemoData()),
     }

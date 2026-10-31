@@ -70,7 +70,7 @@ export default function Products() {
           </div>
           <SearchField id="prod-q" value={q} onChange={setQ} placeholder="Buscar producto" className="sm:ml-auto" />
         </div>
-        {!canSeeCosts && <Banner>Como Operaciones ves stock y datos del catálogo. El costo y el margen solo los ve el Dueño.</Banner>}
+        {!canSeeCosts && <Banner>Como Operaciones ves stock y datos del catálogo. El precio, el costo y el margen solo los ve el Dueño.</Banner>}
         <p role="status" className="text-[13px] text-matcha empty:hidden">
           {status}
         </p>
@@ -87,7 +87,7 @@ export default function Products() {
                   <th className={TH}>Marca</th>
                   <th className={TH}>Tipo · unidad</th>
                   <th className={TH}>Colección</th>
-                  <th className={`${TH} text-right`}>Precio</th>
+                  {canSeeCosts && <th className={`${TH} text-right`}>Precio</th>}
                   {canSeeCosts && <th className={`${TH} text-right`}>Costo</th>}
                   {canSeeCosts && <th className={`${TH} text-right`}>Margen</th>}
                   <th className={`${TH} text-right`}>Stock</th>
@@ -135,10 +135,12 @@ export default function Products() {
                           <span className="text-ink-soft">—</span>
                         )}
                       </td>
+                      {canSeeCosts && (
                       <td className={`${TD} tnum text-right whitespace-nowrap`}>
                         {formatMXN(p.price)}
                         {p.offSeasonPrice != null && <span className="block text-[12px] text-ocre-ink">fuera {formatMXN(p.offSeasonPrice, 2)}</span>}
                       </td>
+                      )}
                       {canSeeCosts && <td className={`${TD} tnum text-right`}>{p.unitCost == null ? <Pill tone="warn">Falta</Pill> : formatMXN(p.unitCost)}</td>}
                       {canSeeCosts && (
                         <td className={`${TD} tnum text-right`}>

@@ -235,7 +235,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 - `StockPanel`: resumen 3 cifras, formulario de movimiento (§5.3) y kárdex.
 - Botón "Importar desde CSV" (solo Dueño) → `ImportCsvModal` (§5.4).
 
-**Configuración (`/configuracion`, solo Dueño):** tarjetas Envíos, Zona de entrega local, Inventario y Usuarios internos (lista de solo lectura; "Invitar" deshabilitado con `TODO(api)`). "Guardar cambios" valida (montos enteros ≥ 0; umbral > 0; al menos un CP en la zona) y muestra "Cambios guardados. La tienda los toma de GET /api/config." Cambios sin guardar → aviso al salir de la página.
+**Configuración (`/configuracion`, solo Dueño):** tarjetas Envíos, Zona de entrega local, Inventario y Usuarios internos (lista e "Invitar", que envía un enlace para crear la contraseña). "Guardar cambios" valida (montos enteros ≥ 0; umbral > 0; al menos un CP en la zona) y muestra "Cambios guardados. La tienda los toma de GET /api/config." Cambios sin guardar → aviso al salir de la página.
 
 ---
 
@@ -275,7 +275,9 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 
 ---
 
-## 9. Contrato esperado de la API (siguiente iteración, no implementar)
+## 9. Contrato de la API
+
+**Implementado** en `apps/api-service`: Sesión, Catálogo, Marcas, Tipos, Colecciones, Configuración y Usuarios (detalle abajo). **Pendiente:** Dashboard, Pedidos, Inventario e Importación, que siguen con el mock.
 
 Todos bajo `/api/admin`, con `Authorization: Bearer` y `[Authorize(Roles = "...")]`.
 
@@ -290,6 +292,26 @@ Todos bajo `/api/admin`, con `Authorization: Bearer` y `[Authorize(Roles = "..."
 | Usuarios | `GET /users` · `POST /users/invitations` · `PUT /users/{id}/role` | Dueño |
 
 Tablas que esto agrega al esquema: `Roles`, `UserRoles` (o `Users.Role`), `OrderStatusHistory`, `Shipments` (método, paquetería, guía, repartidor, costo cobrado), `InventoryMovements` (kárdex), `Settings`, `LocalDeliveryZones`, `AuditLogs` (P2).
+**Catálogo, configuración y usuarios (implementado).** Errores con `ProblemDetails`; los `400` traen `errors` por campo y los `409` llevan el mensaje para el usuario en `title`. No hay `DELETE`: la baja es lógica (`isActive`). Toda edición envía `rowVersion`; si otra persona guardó antes, responde `409` (R-25).
+
+| Recurso | Endpoints | Permiso |
+|---|---|---|
+| Catálogo | `GET /catalog` | `catalog.view` |
+| Productos | `GET /products` · `GET /products/{slug}` | `catalog.view` |
+| | `POST /products` · `PUT /products/{slug}` | `catalog.edit` |
+| Marcas | `GET /brands` · `GET /brands/{slug}` | `catalog.view` |
+| | `POST /brands` · `PUT /brands/{slug}` | `brands.edit` |
+| Tipos | `GET /product-types` · `GET /product-types/{code}` | `catalog.view` |
+| | `POST /product-types` · `PUT /product-types/{code}` | `types.edit` |
+| Colecciones | `GET /collections` · `GET /collections/{slug}` | `catalog.view` |
+| | `POST /collections` · `PUT /collections/{slug}` | `collections.edit` |
+| Configuración | `GET /settings` · `PUT /settings` (con `localZones`) | `settings.manage` |
+| Usuarios | `GET /users` · `POST /users/invitations` | `settings.manage` |
+
+- **R-24:** el Dueño recibe `OwnerProductDto` y `OwnerCollectionDto`. Operaciones recibe `OperationsProductDto` y `OperationsCollectionDto`, que no tienen ninguna cifra en pesos: ni precio, ni costo, ni margen. El descuento de una colección es un porcentaje y sí lo recibe.
+- **Costo:** el panel lo captura por producto y se aplica a todas sus variantes.
+- **Invitación:** `{ firstName, lastName, email, role }`, con `role` = `dueno` u `operaciones`. Crea la cuenta sin contraseña utilizable y envía un enlace de un solo uso a `/cuenta/restablecer` de la tienda, válido `Users:InvitationHours` (72) horas.
+
 Clasificación SOA: Pedidos, Inventario, Configuración = **servicios de entidad**; `FulfillOrder`, `AdjustInventory`, `ImportInventory` = **servicios de tarea**; Auth/RBAC, Auditoría, Exportación = **servicios de utilidad**.
 
 ---

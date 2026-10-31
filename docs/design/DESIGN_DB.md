@@ -3,7 +3,7 @@
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
 > **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, `DECISIONES_CATALOGO.md` (catálogo multilínea, v0.4), y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** ✅ Aprobado (v0.4.5) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
+> **Estado:** ✅ Aprobado (v0.4.6) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
 
 ---
 
@@ -476,6 +476,7 @@ Convención de las tablas: **N** = acepta `NULL`. Las columnas sin **N** son `NO
 | `ImageUrl` | `NVARCHAR(500)` | N | | |
 | `IsActive` | `BIT` | | `1` | Producto publicado (R-28 decide además si se lista) |
 | `CreatedAt` / `UpdatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
+| `RowVersion` | `ROWVERSION` | | | v0.4.6. Dos ediciones del panel sobre el mismo producto: la segunda recibe `409` (R-25). También en `Brands`, `ProductTypes` y `Collections` |
 
 - `CK_Products_CollectionRequired`: `Line <> 'Especiales' OR CollectionId IS NOT NULL` (T-06, R-31). Las demás líneas pueden tener colección o no (por ejemplo, una gorra navideña en Accesorios).
 - `UQ_Products_Line_PieceNumber` (`Line`, `PieceNumber`) · `UQ_Products_Slug`.
@@ -937,7 +938,7 @@ SQL Server **no** indexa las FK por sí solo; EF Core sí crea por convención u
 | R-21 | CP de 5 dígitos; rango con inicio ≤ fin | ADMIN §5.2 | `CK` de formato y `From <= To` | Valida y además evita rangos encimados |
 | R-22 | Configuración: montos enteros ≥ 0, umbral > 0, al menos una zona | ADMIN §7 | `CK` de `Settings` | "Al menos un CP" y enteros (la BD admite centavos) |
 | R-23 | Una sola fila de configuración | — | `CK_Settings_Singleton` | — |
-| R-24 | Operaciones no ve montos en pesos | ADMIN §3 | — | Los DTOs de Operaciones omiten montos |
+| R-24 | Operaciones no ve montos en pesos, tampoco el precio de venta en el panel | ADMIN §3 | — | Los DTOs de Operaciones omiten montos: son tipos sin esos campos (`OperationsProductDto`, `OperationsCollectionDto`) |
 | R-25 | Concurrencia: dos operadores sobre el mismo pedido o SKU desde el panel | — | `ROWVERSION` | Captura `DbUpdateConcurrencyException` → `409` con mensaje. El checkout y la salida no usan este mecanismo (§4.1) |
 | R-26 | Cliente registrado acepta términos | AUTH §4.3 | `CK_Users_CustomerAcceptedTerms` | Rechaza el registro sin `acceptedTerms` |
 | R-27 | Merma ≤ `Stock − Reserved`; Conteo físico o importación por debajo de `Reserved` se rechaza | ADMIN §5.3, §5.4 | `CK_ProductVariants_ReservedLeStock` (red de seguridad) | Valida antes de escribir y responde `409`/`422` con mensaje claro, **nunca 500** (§3.6). El panel se alinea en un PR aparte del frontend |
@@ -1263,5 +1264,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.4.3 | 2026-10-30 | `carlos/db-efcore` (PR #10) | Said (revisión de arquitectura) | Revisión y aprobación de la v0.4.3 con el merge del PR #10. Decisiones en Propuesta pasan a Aprobada |
 | 0.4.4 | 2026-10-30 | `said/seed-align` | Said | Semilla alineada con `apps/web-store/src/data/catalogSeed.js`: migración `AlignCatalogWithStore` (14 colores, Marvel, Superhéroes, etiquetas de talla) y 24 productos con 120 SKU (§5). §3.12 documenta el contrato real: `colors`, `sizes`, `featuredSlug`, paginación, cotización de envío y `variants[].stock` como disponible por combinación |
 | 0.4.5 | 2026-10-30 | `said/checkout` | Said | Migración `AddOrderIdempotency`: `Orders.IdempotencyKey` e `IdempotencyHash` (§3.8), para la idempotencia de `POST /api/orders` (`DESIGN_CHECKOUT` §6). La referencia OXXO usa `PaymentReference`, que ya existía |
+| 0.4.6 | 2026-10-30 | `said/api-admin-catalog` | Said | Migración `AddCatalogRowVersions`: `RowVersion` en `Products`, `Brands`, `ProductTypes` y `Collections`, para R-25 en las ediciones del panel |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.

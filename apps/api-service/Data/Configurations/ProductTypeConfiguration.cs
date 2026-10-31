@@ -18,6 +18,7 @@ public class ProductTypeConfiguration : IEntityTypeConfiguration<ProductType>
             t.HasCheckConstraint("CK_ProductTypes_UnitLabel", SqlIn<UnitLabel>("UnitLabel"));
         });
 
+        b.Property(x => x.RowVersion).IsRowVersion();
         b.Property(x => x.Code).HasAsciiColumn(20);
         b.Property(x => x.Name).HasMaxLength(40);
         b.Property(x => x.SizeSystem).HasEnumColumn(10);

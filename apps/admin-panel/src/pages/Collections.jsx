@@ -82,7 +82,7 @@ function DateField({ legend, month, day, onChange }) {
 }
 
 /** Editor de la colección seleccionada (§4.5). Se monta de nuevo (key) al cambiar de colección o al guardar. */
-function Editor({ collection, today, canEdit, onSave }) {
+function Editor({ collection, today, canEdit, canSeeMoney, onSave }) {
   const [form, setForm] = useState(collection)
   const [saving, setSaving] = useState(false)
   const [serverError, setServerError] = useState('')
@@ -164,10 +164,12 @@ function Editor({ collection, today, canEdit, onSave }) {
                 />
                 <span className="tnum w-12 text-right font-medium">{pct(form.offSeasonDiscountPct)}</span>
               </div>
-              <p className="text-[12px] text-ink-soft">
-                Ejemplo: {formatMXN(199)} → {formatMXN(roundMoney(199 * (1 - form.offSeasonDiscountPct)), 2)} en el buscador mientras la temporada no esté
-                activa.
-              </p>
+              {canSeeMoney && (
+                <p className="text-[12px] text-ink-soft">
+                  Ejemplo: {formatMXN(199)} → {formatMXN(roundMoney(199 * (1 - form.offSeasonDiscountPct)), 2)} en el buscador mientras la temporada no esté
+                  activa.
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1 rounded-md bg-linen px-3 py-2.5 text-[12.5px]">
               <span className="text-ink-soft">Comprobación de la ventana{crossesYear(form) ? ' (cruza de año)' : ''}</span>
@@ -192,14 +194,16 @@ function Editor({ collection, today, canEdit, onSave }) {
         <span className="text-[12px] font-medium text-ink-soft">Productos en la colección · {collection.products.length}</span>
         <ul className="flex flex-col divide-y divide-line rounded-md border border-line">
           {collection.products.map((p) => {
-            const price = effectivePrice(p.price, form, today)
+            const price = canSeeMoney ? effectivePrice(p.price, form, today) : null
             return (
               <li key={p.slug} className="flex justify-between gap-3 px-3 py-2 text-[13px]">
                 <span className="truncate">{p.name}</span>
-                <span className="tnum shrink-0 text-ink-soft">
-                  {formatMXN(p.price)}
-                  {price.offSeason && <span className="text-ocre-ink"> → {formatMXN(price.price, 2)}</span>}
-                </span>
+                {price && (
+                  <span className="tnum shrink-0 text-ink-soft">
+                    {formatMXN(p.price)}
+                    {price.offSeason && <span className="text-ocre-ink"> → {formatMXN(price.price, 2)}</span>}
+                  </span>
+                )}
               </li>
             )
           })}
@@ -242,6 +246,7 @@ export default function Collections() {
   const [selected, setSelected] = useState('navidad')
   const [status, setStatus] = useState('')
   const canEdit = can('collections.edit')
+  const canSeeMoney = can('money.view')
   const current = data?.collections.find((c) => c.slug === selected) ?? data?.collections[0]
 
   const save = async (form) => {
@@ -304,7 +309,7 @@ export default function Collections() {
                 </tbody>
               </table>
             </Card>
-            <Editor key={editorKey(current)} collection={current} today={data.today} canEdit={canEdit} onSave={save} />
+            <Editor canSeeMoney={canSeeMoney} key={editorKey(current)} collection={current} today={data.today} canEdit={canEdit} onSave={save} />
           </div>
         )}
       </div>

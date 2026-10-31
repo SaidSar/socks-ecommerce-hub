@@ -1,4 +1,5 @@
 using Sokko.Api.Models;
+using Sokko.Api.Models.Enums;
 
 namespace Sokko.Api.Services;
 
@@ -13,6 +14,32 @@ public class RegisterCustomer(IUserService users) : IRegisterCustomer
 {
     public Task<User?> RegisterAsync(NewCustomer customer, CancellationToken cancellationToken = default) =>
         users.CreateCustomerAsync(customer, cancellationToken);
+}
+
+/// <summary>Servicio de tarea: da de alta a un miembro del equipo y le envía el enlace para crear su contraseña.</summary>
+public interface IInviteUser
+{
+    /// <summary><c>null</c> si el correo ya tiene una cuenta.</summary>
+    Task<User?> InviteAsync(string firstName, string lastName, string email, UserRole role, CancellationToken cancellationToken = default);
+}
+
+public class InviteUser(IUserService users, IAuthService auth, IEmailSender email, IClock clock, ResetLinkOptions link, IConfiguration configuration) : IInviteUser
+{
+    public async Task<User?> InviteAsync(string firstName, string lastName, string address, UserRole role, CancellationToken cancellationToken = default)
+    {
+        var user = await users.CreateInternalAsync(firstName, lastName, address, role, cancellationToken);
+        if (user is null)
+        {
+            return null;
+        }
+
+        var token = auth.CreateResetToken();
+        var lifetime = TimeSpan.FromHours(configuration.GetValue("Users:InvitationHours", 72));
+        await users.AddResetTokenAsync(user.Id, token.Hash, clock.UtcNow.Add(lifetime), cancellationToken);
+        var url = $"{link.WebStoreUrl.TrimEnd('/')}/cuenta/restablecer?token={Uri.EscapeDataString(token.Value)}";
+        await email.SendInvitationAsync(user.Email, url, cancellationToken);
+        return user;
+    }
 }
 
 /// <summary>Dirección pública de la tienda, para armar el enlace del correo.</summary>

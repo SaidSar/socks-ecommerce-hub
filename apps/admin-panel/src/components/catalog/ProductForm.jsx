@@ -17,13 +17,16 @@ function initialForm(product) {
   if (!product) return { slug: null, line: 'especiales', name: '', brand: 'sin-marca', type: 'calcetas', collection: null, unitsPerPack: '1', price: '199', unitCost: '', colors: ['ROJ'], barcodes: {} }
   return {
     slug: product.slug,
+    rowVersion: product.rowVersion,
     line: product.line,
     name: product.name,
+    nameJp: product.nameJp ?? '',
+    material: product.material ?? '',
     brand: product.brand.slug,
     type: product.type.code,
     collection: product.collection?.slug ?? null,
     unitsPerPack: String(product.unitsPerPack),
-    price: String(product.price),
+    price: product.price == null ? '' : String(product.price),
     unitCost: product.unitCost == null ? '' : String(product.unitCost),
     colors: product.colors.map((c) => c.code),
     barcodes: Object.fromEntries(product.variants.filter((v) => v.barcode).map((v) => [v.sku, v.barcode])),
@@ -153,6 +156,17 @@ export default function ProductForm({ product, catalog, canEdit, canSeeCosts, on
             </Field>
 
             <div className="grid gap-4 sm:grid-cols-2">
+              {form.line === 'sokko' && (
+                <Field id={id('nameJp')} label="Nombre en japonés *" error={errors.nameJp}>
+                  {(p) => <input {...p} lang="ja" value={form.nameJp ?? ''} onChange={(e) => set({ nameJp: e.target.value })} placeholder="Ej. 折紙・夜" />}
+                </Field>
+              )}
+              <Field id={id('material')} label="Material" error={errors.material}>
+                {(p) => <input {...p} value={form.material ?? ''} onChange={(e) => set({ material: e.target.value })} placeholder="Ej. Algodón peinado" />}
+              </Field>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field id={id('brand')} label="Marca" error={errors.brand}>
                 {(p) => (
                   <select {...p} value={form.brand} onChange={(e) => set({ brand: e.target.value })}>
@@ -220,9 +234,19 @@ export default function ProductForm({ product, catalog, canEdit, canSeeCosts, on
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Field id={id('price')} label="Precio (IVA incluido)" error={errors.price}>
-                {(p) => <input {...p} className={`${p.className} tnum`} type="number" min="0" step="0.01" inputMode="decimal" value={form.price} onChange={(e) => set({ price: e.target.value })} />}
-              </Field>
+              {canSeeCosts ? (
+                <Field id={id('price')} label="Precio (IVA incluido)" error={errors.price}>
+                  {(p) => <input {...p} className={`${p.className} tnum`} type="number" min="0" step="0.01" inputMode="decimal" value={form.price} onChange={(e) => set({ price: e.target.value })} />}
+                </Field>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[12px] font-medium text-ink-soft">Precio</span>
+                  <p className={`${FIELD} flex items-center gap-2 border-line bg-linen text-ink-soft`}>
+                    <Icon name="lock" className="h-4 w-4" />
+                    Solo Dueño
+                  </p>
+                </div>
+              )}
               {canSeeCosts ? (
                 <Field
                   id={id('cost')}

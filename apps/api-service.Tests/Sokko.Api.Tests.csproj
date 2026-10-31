@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Las pruebas comparten una BD: las que cambian la configuración no pueden correr junto a las que la leen. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../api-service/Sokko.Api.csproj" />
   </ItemGroup>
 

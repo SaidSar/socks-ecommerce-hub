@@ -54,6 +54,12 @@ namespace Sokko.Api.Data.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("nvarchar(60)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<bool>("ShowInFilters")
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
@@ -201,6 +207,12 @@ namespace Sokko.Api.Data.Migrations
                         .HasPrecision(5, 4)
                         .HasColumnType("decimal(5,4)")
                         .HasDefaultValue(0.30m);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -757,8 +769,7 @@ namespace Sokko.Api.Data.Migrations
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(64)
                         .IsUnicode(false)
-                        .HasColumnType("varchar(64)")
-                        .IsFixedLength(false);
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("InternalNote")
                         .HasMaxLength(500)
@@ -1143,6 +1154,12 @@ namespace Sokko.Api.Data.Migrations
                     b.Property<int>("ProductTypeId")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -1227,6 +1244,12 @@ namespace Sokko.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("SizeSystem")
                         .IsRequired()
