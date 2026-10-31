@@ -39,6 +39,9 @@ public interface IOrderAdminService
 
     Task<AdminOrderSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Los últimos pedidos, para el dashboard.</summary>
+    Task<IReadOnlyList<AdminOrderView>> ListRecentAsync(int limit, CancellationToken cancellationToken = default);
+
     Task<AdminOrderView?> GetAsync(string folio, CancellationToken cancellationToken = default);
 
     Task<PackingListDto?> GetPackingListAsync(string folio, CancellationToken cancellationToken = default);
@@ -146,7 +149,7 @@ public class OrderAdminService(SokkoDbContext db, IUserService users, IClock clo
             .ToListAsync(cancellationToken))
         .ToDictionary(x => x.Email, x => x.Orders, StringComparer.OrdinalIgnoreCase);
 
-    public async Task<IReadOnlyList<AdminOrderView>> ToViewsAsync(IReadOnlyList<Order> orders, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<AdminOrderView>> ToViewsAsync(IReadOnlyList<Order> orders, CancellationToken cancellationToken)
     {
         var byEmail = await OrdersByEmailAsync(orders.Select(o => o.CustomerEmail).Distinct().ToList(), cancellationToken);
         return orders.Select(o => ToView(o, byEmail)).ToList();
@@ -216,6 +219,9 @@ public class OrderAdminService(SokkoDbContext db, IUserService users, IClock clo
             await all.CountAsync(o => o.Status == OrderStatus.PorPreparar, cancellationToken),
             await Late(all, clock.UtcNow).CountAsync(cancellationToken));
     }
+
+    public async Task<IReadOnlyList<AdminOrderView>> ListRecentAsync(int limit, CancellationToken cancellationToken = default) =>
+        await ToViewsAsync(await WithDetails().OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id).Take(limit).ToListAsync(cancellationToken), cancellationToken);
 
     public async Task<AdminOrderView?> GetAsync(string folio, CancellationToken cancellationToken = default)
     {

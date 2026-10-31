@@ -66,6 +66,7 @@ builder.Services.AddScoped<IInventoryAdminService, InventoryAdminService>();
 builder.Services.AddScoped<IAdjustInventory, AdjustInventory>();
 builder.Services.AddScoped<IImportInventory, ImportInventory>();
 builder.Services.AddScoped<IExportService, ExportService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ICheckoutOrder, CheckoutOrder>();
 builder.Services.AddScoped<IExpireOxxoOrders, ExpireOxxoOrders>();
 builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
