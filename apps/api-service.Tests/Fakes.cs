@@ -18,4 +18,8 @@ internal sealed class FakeSettingsService(ConfigDto config, params string[] loca
 
     public Task<bool> IsLocalPostalCodeAsync(string postalCode, CancellationToken cancellationToken = default) =>
         Task.FromResult(localPostalCodes.Contains(postalCode));
+
+    public Task<AdminSettingsDto> GetAdminAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task<AdminResult<AdminSettingsDto>> SaveAdminAsync(AdminSettingsRequestDto request, int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
