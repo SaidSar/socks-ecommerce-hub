@@ -6,7 +6,7 @@ import Icon from '../ui/Icon'
 export default function LimitedEditions({ editions }) {
   return (
     <Card className="min-w-0">
-      <CardHead title="Ediciones limitadas" sub="Pares restantes del tiraje" />
+      <CardHead title="Ediciones limitadas" sub="Unidades restantes del tiraje" />
       <ul className="px-5 pb-5 space-y-4">
         {editions.map((e) => (
           <li key={e.id}>

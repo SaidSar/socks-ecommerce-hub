@@ -35,7 +35,7 @@ export default function KpiRow({ kpis, showMoney, catalog, queue, few }) {
         { k: 'Margen bruto', v: catalog?.grossMargin == null ? '—' : `${Math.round(catalog.grossMargin * 100)} %`, note: 'con costo registrado' },
       ]
     : [
-        { k: 'Unidades vendidas', v: catalog ? formatInt(catalog.unitsSold) : '—', note: 'ventas de ejemplo del catálogo' },
+        { k: 'Unidades vendidas', v: catalog ? formatInt(catalog.unitsSold) : '—', note: 'en el periodo, sin cancelados' },
         orders,
         { k: 'Por preparar', v: queue.toPrepare, note: queue.late ? `${queue.late} ${queue.late === 1 ? 'atrasado' : 'atrasados'}` : 'sin atrasos' },
         { k: 'Pocas unidades', v: catalog ? catalog.fewUnits.length : '—', note: `${few} o menos en stock` },

@@ -129,3 +129,23 @@ label:has(> input[type='search']:focus-visible),
     scroll-behavior: auto !important;
   }
 }
+
+/* Lista de empaque: solo se imprime su contenido. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: fixed;
+    inset: 0;
+    padding: 24px;
+    background: #fff;
+  }
+  .no-print {
+    display: none;
+  }
+}

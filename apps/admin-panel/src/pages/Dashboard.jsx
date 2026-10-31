@@ -26,10 +26,10 @@ const greeting = (d) => {
 /** Dashboard (DESIGN_ADMIN.md §5.5 y DESIGN_CATALOG_UI.md §4.2): abre en "Hoy" con Ventas primero, la cola de trabajo y el catálogo por línea. */
 export default function Dashboard() {
   const { user, can } = useAdminAuth()
-  const { api, summary } = useAdminData()
+  const { api, summary, usesApi } = useAdminData()
   const [range, setRange] = useState('hoy')
   const { data, error } = useAdminQuery(() => api.getDashboard(range), [range])
-  const { data: catalog } = useAdminQuery(() => api.getCatalogSummary(), [])
+  const catalog = data?.catalog
   const showMoney = can('money.view')
   const firstName = user.name.split(' ')[0]
 
@@ -37,7 +37,7 @@ export default function Dashboard() {
     <>
       <PageHeader
         title={data ? `${greeting(data.now)}, ${firstName}` : `Hola, ${firstName}`}
-        sub={data ? `${formatLongDate(data.now)} · datos de ejemplo` : ''}
+        sub={data ? `${formatLongDate(data.now)}${usesApi ? '' : ' · datos de ejemplo'}` : ''}
       >
         <Segmented options={RANGES} value={range} onChange={setRange} label="Periodo" />
       </PageHeader>

@@ -55,6 +55,8 @@ export default function ImportCsvModal({ onClose }) {
     setReadError('')
     try {
       setPreview(await api.previewImport(text))
+    } catch (e) {
+      setReadError(e.message)
     } finally {
       setBusy(false)
     }
@@ -82,8 +84,11 @@ export default function ImportCsvModal({ onClose }) {
   const apply = async () => {
     setBusy(true)
     try {
-      const { applied } = await api.applyImport(preview.valid)
-      setResult({ applied, skipped: preview.invalid.length })
+      // Solo se envían las válidas; el servidor vuelve a validar y dice cuántas de ellas omitió.
+      const { applied, skipped = 0 } = await api.applyImport(preview.valid)
+      setResult({ applied, skipped: preview.invalid.length + skipped })
+    } catch (e) {
+      setReadError(e.message)
     } finally {
       setBusy(false)
     }
@@ -138,7 +143,7 @@ export default function ImportCsvModal({ onClose }) {
               Opcionales, después de Stock: <span className="font-mono">{EXTRA_COLUMNS.join(', ')}</span>. Celda vacía = no cambia. Se validan con las
               mismas reglas que el formulario de producto.
             </p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={async () => download('plantilla-inventario-sokko.csv', await api.getTemplateCsv())}>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => api.getTemplateCsv().then((csv) => download('plantilla-inventario-sokko.csv', csv), (e) => setReadError(e.message))}>
               <Icon name="download" className="w-4 h-4" />
               Descargar plantilla
             </Button>
@@ -160,7 +165,7 @@ export default function ImportCsvModal({ onClose }) {
             {import.meta.env.DEV && !preview && (
               <button
                 type="button"
-                onClick={async () => loadText('inventario-sokko-octubre.csv', demoCsv(await api.getTemplateCsv()))}
+                onClick={() => api.getTemplateCsv().then((csv) => loadText('inventario-sokko-octubre.csv', demoCsv(csv)), (e) => setReadError(e.message))}
                 className="mt-2 text-[12.5px] text-ai hover:underline min-h-11 lg:min-h-0"
               >
                 Probar con un archivo de ejemplo

@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { CARRIER_LABELS, label, PAYMENT_METHOD_LABELS } from '../../domain/enums'
-import { isLate } from '../../domain/orders'
+import { isLate, nextStatus } from '../../domain/orders'
 import { useAdminData, useAdminQuery } from '../../hooks/useAdminData'
 import { formatDate, formatMXN, formatTime } from '../../utils/format'
 import Button from '../ui/Button'
@@ -16,6 +16,7 @@ function NoteField({ order, onSave }) {
   const [note, setNote] = useState(order.note || '')
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const id = useId()
   return (
     <section>
@@ -28,6 +29,7 @@ function NoteField({ order, onSave }) {
         onChange={(e) => {
           setNote(e.target.value)
           setSaved(false)
+          setError('')
         }}
         rows="2"
         placeholder="Solo la ve el equipo"
@@ -40,9 +42,15 @@ function NoteField({ order, onSave }) {
           disabled={busy}
           onClick={async () => {
             setBusy(true)
-            await onSave(note)
-            setBusy(false)
-            setSaved(true)
+            setError('')
+            try {
+              await onSave(note)
+              setSaved(true)
+            } catch (e) {
+              setError(e.message)
+            } finally {
+              setBusy(false)
+            }
           }}
         >
           Guardar nota
@@ -50,6 +58,11 @@ function NoteField({ order, onSave }) {
         <span role="status" className="text-[12px] text-matcha">
           {saved ? 'Nota guardada' : ''}
         </span>
+        {error && (
+          <span role="alert" className="text-[12px] text-laca">
+            {error}
+          </span>
+        )}
       </div>
     </section>
   )
@@ -58,7 +71,7 @@ function NoteField({ order, onSave }) {
 function OrderBody({ order, showMoney, now, couriers }) {
   const { api } = useAdminData()
   const isLocal = order.delivery === 'local'
-  const shippingText = order.shipping ? formatMXN(order.shipping) : 'gratis'
+  const shippingText = showMoney ? (order.shipping ? formatMXN(order.shipping) : 'gratis') : order.freeShipping ? 'gratis' : 'con costo'
 
   return (
     <div className="px-5 py-5 space-y-6">
@@ -67,8 +80,8 @@ function OrderBody({ order, showMoney, now, couriers }) {
           key={order.status}
           order={order}
           couriers={couriers}
-          onAdvance={(payload) => api.advanceOrder(order.id, payload)}
-          onMarkPaid={() => api.markOrderPaid(order.id)}
+          onAdvance={(payload) => api.advanceOrder(order.id, { ...payload, status: nextStatus(order), rowVersion: order.rowVersion })}
+          onMarkPaid={() => api.markOrderPaid(order.id, order.rowVersion)}
         />
       )}
 
@@ -145,11 +158,11 @@ function OrderBody({ order, showMoney, now, couriers }) {
         {!showMoney && order.pay && <p className="text-[13px] mt-1 text-ink-soft">Pago: {label(PAYMENT_METHOD_LABELS, order.pay)}</p>}
       </section>
 
-      <NoteField key={order.id} order={order} onSave={(note) => api.saveOrderNote(order.id, note)} />
+      <NoteField key={order.id} order={order} onSave={(note) => api.saveOrderNote(order.id, note, order.rowVersion)} />
 
       <OrderHistory history={order.history} />
 
-      <CancelOrder key={`${order.id}-${order.status}`} order={order} showMoney={showMoney} onCancel={() => api.cancelOrder(order.id)} />
+      <CancelOrder key={`${order.id}-${order.status}`} order={order} showMoney={showMoney} onCancel={() => api.cancelOrder(order.id, order.rowVersion)} />
       {isLate(order, now) && <span className="sr-only">Pedido atrasado</span>}
     </div>
   )

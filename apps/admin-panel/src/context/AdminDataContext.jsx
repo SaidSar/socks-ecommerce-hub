@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as adminApi from '../services/adminApi'
+import { USE_API } from '../services/api'
 import { AdminDataContext } from './admin-data-context'
 
 /**
@@ -13,7 +14,8 @@ export function AdminDataProvider({ user, children }) {
 
   useEffect(() => {
     let alive = true
-    adminApi.getSummary().then((s) => alive && setSummary(s))
+    // El resumen es secundario: si falla, la campana conserva su último número y la pantalla da su propio error.
+    adminApi.getSummary().then((s) => alive && setSummary(s), () => {})
     return () => {
       alive = false
     }
@@ -33,9 +35,10 @@ export function AdminDataProvider({ user, children }) {
       getOrders: (params) => adminApi.getOrders(params, role),
       getOrder: (id) => adminApi.getOrder(id, role),
       advanceOrder: mutate((id, payload) => adminApi.advanceOrder(id, payload, user)),
-      cancelOrder: mutate((id) => adminApi.cancelOrder(id, user)),
-      markOrderPaid: mutate((id) => adminApi.markOrderPaid(id, user)),
-      saveOrderNote: mutate((id, note) => adminApi.saveOrderNote(id, note, user)),
+      cancelOrder: mutate((id, rowVersion) => adminApi.cancelOrder(id, user, rowVersion)),
+      markOrderPaid: mutate((id, rowVersion) => adminApi.markOrderPaid(id, user, rowVersion)),
+      saveOrderNote: mutate((id, note, rowVersion) => adminApi.saveOrderNote(id, note, user, rowVersion)),
+      getPackingList: (id) => adminApi.getPackingList(id),
       getInventory: (params) => adminApi.getInventory(params),
       getStockRow: (sku) => adminApi.getStockRow(sku),
       getMovements: (sku) => adminApi.getMovements(sku),
@@ -47,7 +50,6 @@ export function AdminDataProvider({ user, children }) {
       saveSettings: mutate((s) => adminApi.saveSettings(s)),
       validateSettings: adminApi.validateSettings,
       getCatalog: () => adminApi.getCatalog(role),
-      getCatalogSummary: () => adminApi.getCatalogSummary(role),
       saveProduct: mutate((form) => adminApi.saveProduct(form, user)),
       addBrand: mutate((name) => adminApi.addBrand(name, user)),
       setBrandVisibility: mutate((slug, show, rowVersion) => adminApi.setBrandVisibility(slug, show, user, rowVersion)),
@@ -59,6 +61,6 @@ export function AdminDataProvider({ user, children }) {
     }
   }, [user, refresh])
 
-  const value = useMemo(() => ({ api, version, summary, refresh }), [api, version, summary, refresh])
+  const value = useMemo(() => ({ api, version, summary, refresh, usesApi: USE_API }), [api, version, summary, refresh])
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>
 }

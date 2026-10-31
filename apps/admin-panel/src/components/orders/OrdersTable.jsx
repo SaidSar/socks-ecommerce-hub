@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useAdminData } from '../../hooks/useAdminData'
 import { CARRIER_LABELS, label, PAYMENT_METHOD_LABELS } from '../../domain/enums'
 import { isLate, itemCount } from '../../domain/orders'
 import { formatDate, formatMXN, formatTime } from '../../utils/format'
@@ -9,6 +10,7 @@ const cityShort = (city) => city.split(',')[0]
 
 /** Tabla de pedidos. La columna Total solo aparece con `showMoney` (Dueño). */
 export default function OrdersTable({ orders, total, openId, showMoney, now, hrefFor, onOpen }) {
+  const { usesApi } = useAdminData()
   return (
     <Card className="min-w-0 overflow-hidden">
       <div className="relative overflow-x-auto">
@@ -79,7 +81,7 @@ export default function OrdersTable({ orders, total, openId, showMoney, now, hre
                 <td className="py-3">
                   <StatusChip status={o.status} late={isLate(o, now)} />
                 </td>
-                <td className={`py-3 text-right tnum text-ink-soft ${showMoney ? '' : 'pr-5'}`}>{o.shipping ? formatMXN(o.shipping) : 'Gratis'}</td>
+                <td className={`py-3 text-right tnum text-ink-soft ${showMoney ? '' : 'pr-5'}`}>{showMoney ? (o.shipping ? formatMXN(o.shipping) : 'Gratis') : o.freeShipping ? 'Gratis' : 'Con costo'}</td>
                 {showMoney && <td className="px-5 py-3 text-right tnum font-medium">{formatMXN(o.total)}</td>}
               </tr>
             ))}
@@ -88,7 +90,7 @@ export default function OrdersTable({ orders, total, openId, showMoney, now, hre
         {!orders.length && <p className="px-5 py-14 text-center text-ink-soft">No hay pedidos con este filtro. Pruebe con “Todos” o borre la búsqueda.</p>}
       </div>
       <p className="px-5 py-3 text-[12px] text-ink-soft border-t border-line tnum">
-        {orders.length} de {total} pedidos · datos de ejemplo
+        {orders.length} de {total} pedidos{usesApi ? '' : ' · datos de ejemplo'}
       </p>
     </Card>
   )

@@ -4,7 +4,7 @@ import { seasonStatus } from '../domain/catalog'
 import { authFetch } from './adminAuth'
 import { ApiError } from './apiError'
 
-const NETWORK_MESSAGE = 'No pudimos conectar con el servidor. Intente de nuevo en un momento.'
+export const NETWORK_MESSAGE = 'No pudimos conectar con el servidor. Intente de nuevo en un momento.'
 
 /** "PostalCode" → "postalCode"; la API puede mandar un mensaje o una lista de mensajes por campo. */
 export function normalizeErrors(errors) {
@@ -22,7 +22,7 @@ export function problemToError(status, problem) {
   return err
 }
 
-async function request(method, path, body) {
+export async function request(method, path, body) {
   let response
   try {
     response = await authFetch(path, {

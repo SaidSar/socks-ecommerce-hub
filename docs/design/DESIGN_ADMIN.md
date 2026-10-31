@@ -277,7 +277,7 @@ Cada función lleva su `// TODO(api):` con el endpoint de §9. Los componentes s
 
 ## 9. Contrato de la API
 
-**Implementado** en `apps/api-service`: Sesión, Catálogo, Marcas, Tipos, Colecciones, Configuración y Usuarios (detalle abajo). **Pendiente:** Dashboard, Pedidos, Inventario e Importación, que siguen con el mock.
+**Implementado** en `apps/api-service`: todo lo de esta sección (detalle abajo). Con `VITE_API_URL` definida, ninguna pantalla lee el mock.
 
 Todos bajo `/api/admin`, con `Authorization: Bearer` y `[Authorize(Roles = "...")]`.
 
@@ -311,6 +311,22 @@ Tablas que esto agrega al esquema: `Roles`, `UserRoles` (o `Users.Role`), `Order
 - **R-24:** el Dueño recibe `OwnerProductDto` y `OwnerCollectionDto`. Operaciones recibe `OperationsProductDto` y `OperationsCollectionDto`, que no tienen ninguna cifra en pesos: ni precio, ni costo, ni margen. El descuento de una colección es un porcentaje y sí lo recibe.
 - **Costo:** el panel lo captura por producto y se aplica a todas sus variantes.
 - **Invitación:** `{ firstName, lastName, email, role }`, con `role` = `dueno` u `operaciones`. Crea la cuenta sin contraseña utilizable y envía un enlace de un solo uso a `/cuenta/restablecer` de la tienda, válido `Users:InvitationHours` (72) horas.
+
+**Pedidos, inventario y dashboard (implementado).** Las transiciones, la cancelación, la nota, el pago y los movimientos envían `rowVersion`.
+
+| Recurso | Endpoints | Permiso |
+|---|---|---|
+| Pedidos | `GET /orders?status=&q=` (`status` también acepta `late` y `oxxo`) · `GET /orders/summary` · `GET /orders/couriers` · `GET /orders/{folio}` · `GET /orders/{folio}/packing-list` · `PUT /orders/{folio}/note` | `orders.manage` |
+| FulfillOrder | `POST /orders/{folio}/transitions` (`{ status, carrier, tracking, courier, rowVersion }`) · `POST /orders/{folio}/cancel` | `orders.manage` |
+| Pago manual | `POST /orders/{folio}/payment` | `payments.confirm` |
+| Inventario | `GET /inventory?state=&q=` · `GET /inventory/{sku}` · `GET /inventory/{sku}/movements` · `POST /inventory/{sku}/movements` | `inventory.adjust` |
+| Importación | `GET /inventory/import/template` · `POST /inventory/import/preview` · `POST /inventory/import` (`{ csv }`) | `inventory.import` |
+| Dashboard | `GET /dashboard?range=hoy\|7d\|30d` | cualquier miembro del equipo |
+
+- **R-24:** `OperationsOrderDto` y `OperationsDashboardDto` no tienen importes. De la tarifa de envío, Operaciones solo recibe `freeShipping`.
+- **R-27:** una merma mayor que lo disponible o un conteo por debajo de lo apartado responden `400` con el mensaje en `errors.qty`.
+- **Devolución:** además de `note` y `folio`, el pedido debe llevar ese SKU y haber salido de bodega.
+- **Lista de empaque:** JSON que el panel muestra para imprimir, nunca con importes. No hay PDF en v1.
 
 Clasificación SOA: Pedidos, Inventario, Configuración = **servicios de entidad**; `FulfillOrder`, `AdjustInventory`, `ImportInventory` = **servicios de tarea**; Auth/RBAC, Auditoría, Exportación = **servicios de utilidad**.
 

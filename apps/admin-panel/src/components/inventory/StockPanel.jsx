@@ -41,7 +41,7 @@ export default function StockPanel({ sku, canAdjust, onClose, returnFocus }) {
             ))}
           </dl>
 
-          {canAdjust && <MovementForm row={current} onSubmit={(mv) => api.adjustStock(sku, mv)} onDone={() => setHighlight(true)} />}
+          {canAdjust && <MovementForm row={current} onSubmit={(mv) => api.adjustStock(sku, { ...mv, rowVersion: current.rowVersion })} onDone={() => setHighlight(true)} />}
 
           {movements ? <Kardex movements={movements} highlight={highlight} /> : <Loading label="Cargando kárdex…" />}
         </div>

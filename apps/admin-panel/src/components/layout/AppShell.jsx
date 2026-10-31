@@ -32,7 +32,7 @@ export default function AppShell() {
   const [menu, setMenu] = useState(false)
   const [toast, setToast] = useState('')
   const { user, logout, can } = useAdminAuth()
-  const { summary, api } = useAdminData()
+  const { summary, api, usesApi } = useAdminData()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
@@ -55,7 +55,8 @@ export default function AppShell() {
     logout()
     navigate('/login', { replace: true })
   }
-  const onResetDemo = import.meta.env.DEV
+  // Con la API, la semilla se restablece en la BD: este botón solo reinicia el mock.
+  const onResetDemo = import.meta.env.DEV && !usesApi
     ? async () => {
         await api.resetDemoData()
         setToast('Datos demo restablecidos.')
