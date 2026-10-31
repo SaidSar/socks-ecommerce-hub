@@ -33,6 +33,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(p => p.IsActive).HasDbDefault(true);
         b.Property(p => p.CreatedAt).HasUtcNowDefault();
         b.Property(p => p.UpdatedAt).HasUtcNowDefault();
+        b.Property(p => p.RowVersion).IsRowVersion();
 
         b.HasIndex(p => new { p.Line, p.PieceNumber }).IsUnique().HasDatabaseName("UQ_Products_Line_PieceNumber");
         b.HasIndex(p => p.Slug).IsUnique().HasDatabaseName("UQ_Products_Slug");

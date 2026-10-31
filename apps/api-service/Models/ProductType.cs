@@ -13,6 +13,8 @@ public class ProductType
     public UnitLabel UnitLabel { get; set; } = UnitLabel.Pieza;
     public byte SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
+    /// <summary>Concurrencia optimista de las ediciones del panel (R-25).</summary>
+    public byte[] RowVersion { get; set; } = null!;
 
     public ICollection<Product> Products { get; set; } = [];
 }

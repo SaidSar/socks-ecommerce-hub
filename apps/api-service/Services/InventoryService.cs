@@ -8,6 +8,8 @@ public record StockLine(int VariantId, int Quantity);
 
 public record StockShortage(int VariantId, int Requested, int Available);
 
+public record VariantSpec(string Sku, string ColorCode, int SizeId, string? Barcode, decimal? UnitCost);
+
 /// <summary>Servicio de entidad: único escritor de <c>ProductVariants</c> (DESIGN_DB §4.1 y §6).</summary>
 public interface IInventoryService
 {
@@ -22,6 +24,12 @@ public interface IInventoryService
 
     /// <summary>Libera lo apartado, en el mismo orden (R-10). Una fila no afectada es una inconsistencia.</summary>
     Task ReleaseAsync(IEnumerable<StockLine> lines, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deja las variantes del producto como pide el catálogo: alta con stock 0, reactivación, costo y código de barras; las que ya
+    /// no van pasan a inactivas (baja lógica). Devuelve los SKU que no se pueden dar de baja porque tienen apartados.
+    /// </summary>
+    Task<IReadOnlyList<string>> SyncVariantsAsync(int productId, IReadOnlyList<VariantSpec> variants, CancellationToken cancellationToken = default);
 }
 
 public class InventoryService(SokkoDbContext db) : IInventoryService
@@ -54,6 +62,39 @@ public class InventoryService(SokkoDbContext db) : IInventoryService
             }
         }
         return shortages;
+    }
+
+    public async Task<IReadOnlyList<string>> SyncVariantsAsync(int productId, IReadOnlyList<VariantSpec> variants, CancellationToken cancellationToken = default)
+    {
+        var existing = await db.ProductVariants.Where(v => v.ProductId == productId).ToListAsync(cancellationToken);
+        var wanted = variants.Select(v => v.Sku).ToHashSet();
+        var blocked = existing.Where(v => v.IsActive && v.Reserved > 0 && !wanted.Contains(v.Sku)).Select(v => v.Sku).ToList();
+        if (blocked.Count > 0)
+        {
+            return blocked;
+        }
+
+        foreach (var variant in existing.Where(v => !wanted.Contains(v.Sku)))
+        {
+            variant.IsActive = false;
+        }
+        foreach (var spec in variants)
+        {
+            var variant = existing.FirstOrDefault(v => v.Sku == spec.Sku);
+            if (variant is null)
+            {
+                db.ProductVariants.Add(new ProductVariant
+                {
+                    ProductId = productId, ColorCode = spec.ColorCode, SizeId = spec.SizeId, Sku = spec.Sku, Barcode = spec.Barcode, UnitCost = spec.UnitCost,
+                });
+                continue;
+            }
+            variant.IsActive = true;
+            variant.Barcode = spec.Barcode;
+            variant.UnitCost = spec.UnitCost;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return [];
     }
 
     public async Task ReleaseAsync(IEnumerable<StockLine> lines, CancellationToken cancellationToken = default)

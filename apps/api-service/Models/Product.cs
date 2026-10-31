@@ -26,6 +26,8 @@ public class Product
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    /// <summary>Concurrencia optimista de las ediciones del panel (R-25).</summary>
+    public byte[] RowVersion { get; set; } = null!;
 
     public Brand Brand { get; set; } = null!;
     public ProductType ProductType { get; set; } = null!;

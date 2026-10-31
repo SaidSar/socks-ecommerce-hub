@@ -11,6 +11,8 @@ public class Brand
     public bool ShowInFilters { get; set; } = true;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
+    /// <summary>Concurrencia optimista de las ediciones del panel (R-25).</summary>
+    public byte[] RowVersion { get; set; } = null!;
 
     public ICollection<Product> Products { get; set; } = [];
 }

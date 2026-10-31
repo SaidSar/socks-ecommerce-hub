@@ -13,6 +13,7 @@ public class BrandConfiguration : IEntityTypeConfiguration<Brand>
     {
         b.ToTable("Brands", t => t.HasCheckConstraint("CK_Brands_Slug", SqlSlug("Slug")));
 
+        b.Property(x => x.RowVersion).IsRowVersion();
         b.Property(x => x.Name).HasMaxLength(60);
         b.Property(x => x.Slug).HasAsciiColumn(60);
         b.Property(x => x.IsOwnBrand).HasDbDefault(false);

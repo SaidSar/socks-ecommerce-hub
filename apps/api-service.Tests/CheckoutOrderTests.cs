@@ -57,6 +57,7 @@ public class CheckoutOrderTests
         }
 
         public Task ReleaseAsync(IEnumerable<StockLine> lines, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<string>> SyncVariantsAsync(int productId, IReadOnlyList<VariantSpec> variants, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<string>>([]);
     }
 
     private sealed class FakeOrders : IOrderService
