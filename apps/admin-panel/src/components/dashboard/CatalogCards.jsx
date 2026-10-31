@@ -23,7 +23,7 @@ function LineBars({ lines, owner }) {
       <CardHead
         id="lines-title"
         title={owner ? 'Ventas por línea' : 'Unidades por línea'}
-        sub={`${owner ? formatMXN(total) : `${formatInt(total)} unidades`} · ventas de ejemplo del catálogo`}
+        sub={`${owner ? formatMXN(total) : `${formatInt(total)} unidades`} · en el periodo`}
       />
       <ul className="flex flex-col gap-3 px-5 pb-5">
         {lines.map((l) => {

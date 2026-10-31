@@ -1,9 +1,11 @@
 import { useId, useState } from 'react'
 import { CARRIER_LABELS, label } from '../../domain/enums'
+import { useAdminData } from '../../hooks/useAdminData'
 import { CARRIERS, isPaymentPending, nextLabel, nextStatus, PAYMENT_PENDING_ERROR, validateAdvance } from '../../domain/orders'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 import MarkPaid from './MarkPaid'
+import PackingListModal from './PackingListModal'
 
 /**
  * Siguiente paso del pedido (DESIGN_ADMIN.md §5.1): paquetería + guía para enviar, repartidor para salir a ruta.
@@ -11,6 +13,7 @@ import MarkPaid from './MarkPaid'
  * Con pago pendiente, el Dueño puede confirmarlo con `onMarkPaid()`.
  */
 export default function NextStepBox({ order, couriers, onAdvance, onMarkPaid }) {
+  const { usesApi } = useAdminData()
   const [carrier, setCarrier] = useState(order.carrier || CARRIERS[0])
   const [courier, setCourier] = useState(order.courier || couriers[0] || '')
   const [tracking, setTracking] = useState(order.tracking || '')
@@ -39,7 +42,8 @@ export default function NextStepBox({ order, couriers, onAdvance, onMarkPaid }) 
     try {
       await onAdvance(payload)
     } catch (e) {
-      setError(e.message)
+      // Un error de validación trae su mensaje por campo.
+      setError(Object.values(e.errors ?? {})[0] ?? e.message)
       setBusy(false)
     }
   }
@@ -116,15 +120,15 @@ export default function NextStepBox({ order, couriers, onAdvance, onMarkPaid }) 
           <Icon name="check" className="w-4 h-4" />
           {busy ? 'Guardando…' : nextLabel(order)}
         </Button>
-        {order.status === 'por_preparar' && (
-          // TODO(api): PDF de la lista de empaque (GET /api/admin/orders/{folio}/packing-list).
-          <Button variant="outline" onClick={() => setPacking(true)} aria-describedby={packing ? `${ids.err}-pack` : undefined}>
+        {(order.status === 'por_preparar' || order.status === 'preparando') && (
+          <Button variant="outline" onClick={() => setPacking(true)} aria-describedby={packing && !usesApi ? `${ids.err}-pack` : undefined}>
             <Icon name="box" className="w-4 h-4" />
             Lista de empaque
           </Button>
         )}
       </div>
-      {packing && (
+      {packing && usesApi && <PackingListModal order={order} onClose={() => setPacking(false)} />}
+      {packing && !usesApi && (
         <p id={`${ids.err}-pack`} role="status" className="text-[12px] text-ink-soft">
           Disponible al conectar la API.
         </p>

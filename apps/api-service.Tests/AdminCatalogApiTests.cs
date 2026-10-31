@@ -163,7 +163,8 @@ public class AdminCatalogApiTests(AdminApiFactory factory) : AdminApiTestBase(fa
         var product = catalog.GetProperty("products").EnumerateArray().Single(p => p.GetProperty("slug").GetString() == "kintsugi-washi");
         Assert.Equal("sokko", product.GetProperty("line").GetString());
         Assert.Equal("par", product.GetProperty("type").GetProperty("unit").GetString());
-        Assert.Equal(3, product.GetProperty("stock").GetInt32());
+        // Los pedidos demo solo mueven SOKKO: Marvel conserva el stock de la semilla.
+        Assert.Equal(3, catalog.GetProperty("products").EnumerateArray().Single(p => p.GetProperty("slug").GetString() == "marvel-avengers").GetProperty("stock").GetInt32());
         Assert.Equal("WAS", product.GetProperty("colors")[0].GetProperty("code").GetString());
         Assert.Equal("washi", product.GetProperty("colors")[0].GetProperty("apiCode").GetString());
         Assert.Equal("SKK-003-WAS-S", product.GetProperty("variants")[0].GetProperty("sku").GetString());

@@ -34,8 +34,7 @@ export const NAV = [
     to: '/envios',
     icon: 'truck',
     perm: 'shipping.view',
-    ready: false,
-    soon: ['Guías Estafeta / DHL y rutas de entrega local', 'Costo real contra costo cobrado', 'Pedidos atrasados por paquetería o repartidor'],
+    ready: true,
   },
   {
     key: 'promociones',

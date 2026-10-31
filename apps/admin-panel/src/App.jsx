@@ -13,6 +13,7 @@ import Orders from './pages/Orders'
 import Products from './pages/Products'
 import ProductTypes from './pages/ProductTypes'
 import Settings from './pages/Settings'
+import Shipments from './pages/Shipments'
 
 const guard = (section, element) => <RequirePermission section={section}>{element}</RequirePermission>
 
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: 'pedidos', element: guard('pedidos', <Orders />) },
       { path: 'pedidos/:folio', element: guard('pedidos', <Orders />) },
       { path: 'inventario', element: guard('inventario', <Inventory />) },
+      { path: 'envios', element: guard('envios', <Shipments />) },
       { path: 'catalogo/productos', element: guard('productos', <Products />) },
       { path: 'catalogo/marcas', element: guard('marcas', <Brands />) },
       { path: 'catalogo/colecciones', element: guard('colecciones', <Collections />) },

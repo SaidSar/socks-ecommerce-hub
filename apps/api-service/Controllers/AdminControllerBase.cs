@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Sokko.Api.Models.Enums;
 using Sokko.Api.Services;
 
@@ -11,6 +13,14 @@ public abstract class AdminControllerBase : ControllerBase
 {
     /// <summary>R-24: el rol elige el DTO, no qué campos se ponen en <c>null</c>.</summary>
     protected bool IsOwner => User.IsInRole(nameof(UserRole.Owner));
+
+    /// <summary>Quien hace el cambio, para el historial y el kárdex. <c>null</c> si su cuenta se dio de baja con el token aún vigente.</summary>
+    protected async Task<StaffActor?> ActorAsync(IUserService users, CancellationToken cancellationToken)
+    {
+        var id = int.Parse(User.FindFirstValue(JwtRegisteredClaimNames.Sub)!);
+        var user = await users.GetActiveByIdAsync(id, cancellationToken);
+        return user is null ? null : StaffActor.From(user);
+    }
 
     protected IActionResult FailureOf<T>(AdminResult<T> result)
     {

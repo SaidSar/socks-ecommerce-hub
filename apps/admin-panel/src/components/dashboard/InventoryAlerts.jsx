@@ -24,7 +24,7 @@ export default function InventoryAlerts({ alerts, few }) {
               <span className="w-3 h-3 rounded-full border border-line shrink-0" style={{ background: a.toneHex }} aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 <span className="block text-[13px] truncate">
-                  {a.piece} · {a.toneName.split(' ')[1]} · {a.size}
+                  {a.piece} · {a.toneName.split(' ').at(-1)} · {a.size}
                 </span>
                 <span className="block text-[11.5px] text-ink-soft tnum">{a.sku}</span>
               </span>

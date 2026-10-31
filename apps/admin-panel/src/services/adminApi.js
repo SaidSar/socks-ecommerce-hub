@@ -1,5 +1,5 @@
-// API del panel (DESIGN_ADMIN.md §6.2). Con USE_API, Catálogo, Configuración y Usuarios van a /api/admin/* (adminCatalogApi.js);
-// lo demás sigue simulado: estado en memoria persistido en localStorage y, si el almacenamiento falla, solo en memoria.
+// API del panel (DESIGN_ADMIN.md §6.2). Con USE_API, todo va a /api/admin/* (adminCatalogApi.js y adminOpsApi.js) y leer el mock lanza un error.
+// Sin ella, los datos son simulados: estado en memoria persistido en localStorage y, si el almacenamiento falla, solo en memoria.
 // Cada función devuelve copias: los componentes nunca mutan el estado ni ven seed.js.
 import { can } from '../config/roles'
 import { brandMargins, grossMargin, lineStats, productDto, seasonStatus, skuOf, validateCollection, validateProduct } from '../domain/catalog'
@@ -15,6 +15,7 @@ import { COLORS } from '../data/catalogSeed'
 import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
 import * as catalogApi from './adminCatalogApi'
+import * as opsApi from './adminOpsApi'
 import { USE_API } from './api'
 import { ApiError } from './apiError'
 
@@ -45,7 +46,14 @@ function save() {
   }
 }
 
-const db = () => (state ??= load())
+function assertMock() {
+  if (USE_API) throw new Error('Con USE_API ninguna pantalla debe leer el mock.')
+}
+
+const db = () => {
+  assertMock()
+  return (state ??= load())
+}
 const copy = (x) => structuredClone(x)
 const latency = () => new Promise((r) => setTimeout(r, import.meta.env.MODE === 'test' ? 0 : 200 + Math.random() * 300))
 
@@ -67,8 +75,8 @@ const withTone = (x) => ({ ...x, toneName: colorOf(x.tone)?.name ?? x.tone, tone
 function redactOrder(order, role) {
   const items = order.items.map(withTone)
   if (can(role, 'money.view')) return { ...order, items }
-  const { subtotal: _s, total: _t, ...rest } = order
-  return { ...rest, items: items.map(({ price: _p, ...it }) => it) }
+  const { subtotal: _s, total: _t, shipping, ...rest } = order
+  return { ...rest, freeShipping: !shipping, items: items.map(({ price: _p, ...it }) => it) }
 }
 
 const findOrder = (id) => {
@@ -86,8 +94,9 @@ const replaceRow = (r) => (db().inventory = db().inventory.map((x) => (x.sku ===
 
 // ---------------------------------------------------------------- Resumen (sidebar y campana)
 
-/** TODO(api): GET /api/admin/orders/summary */
+/** GET /api/admin/orders/summary */
 export async function getSummary() {
+  if (USE_API) return opsApi.getSummary()
   await latency()
   const { orders } = db()
   return { toPrepare: orders.filter((o) => o.status === 'por_preparar').length, late: orders.filter((o) => isLate(o, refNow())).length }
@@ -95,8 +104,9 @@ export async function getSummary() {
 
 // ---------------------------------------------------------------- Dashboard
 
-/** TODO(api): GET /api/admin/dashboard?range=hoy|7d|30d */
+/** GET /api/admin/dashboard?range=hoy|7d|30d */
 export async function getDashboard(range = 'hoy', role) {
+  if (USE_API) return opsApi.getDashboard(range)
   await latency()
   const { daily, orders, inventory, pieces, settings } = db()
   const data = buildDashboard({ daily, orders, inventory, pieces, sizes: SIZES, few: settings.fewUnitsThreshold, range, now: refNow() })
@@ -109,13 +119,15 @@ export async function getDashboard(range = 'hoy', role) {
     data.kpis.ticket = null
     data.daily = null
   }
+  data.catalog = await getCatalogSummary(role)
   return copy(data)
 }
 
 // ---------------------------------------------------------------- Pedidos
 
-/** TODO(api): GET /api/admin/orders?status=&q= */
+/** GET /api/admin/orders?status=&q= */
 export async function getOrders({ filter = 'todos', q = '' } = {}, role) {
+  if (USE_API) return opsApi.getOrders({ filter, q })
   await latency()
   const now = refNow()
   const all = [...db().orders].sort((a, b) => new Date(b.created) - new Date(a.created))
@@ -123,8 +135,9 @@ export async function getOrders({ filter = 'todos', q = '' } = {}, role) {
   return copy({ orders: list.map((o) => redactOrder(o, role)), counts: countByFilter(all, now), total: all.length, now: now.toISOString() })
 }
 
-/** TODO(api): GET /api/admin/orders/{folio} */
+/** GET /api/admin/orders/{folio} */
 export async function getOrder(id, role) {
+  if (USE_API) return opsApi.getOrder(id)
   await latency()
   return copy(redactOrder(findOrder(id), role))
 }
@@ -132,9 +145,10 @@ export async function getOrder(id, role) {
 /**
  * Avanza el pedido al siguiente estado. Al pasar a enviado/en_ruta descuenta stock y apartado
  * y escribe "Venta · Pedido {folio}" en el kárdex de cada SKU.
- * TODO(api): POST /api/admin/orders/{folio}/transitions
+ * POST /api/admin/orders/{folio}/transitions
  */
 export async function advanceOrder(id, payload, user) {
+  if (USE_API) return opsApi.advanceOrder(id, payload)
   await latency()
   const current = findOrder(id)
   const at = stamp()
@@ -154,10 +168,11 @@ export async function advanceOrder(id, payload, user) {
 
 /**
  * Marca como pagado un pedido con pago pendiente (OXXO Pay). Solo el Dueño.
- * TODO(api): POST /api/admin/orders/{folio}/payment. En producción el pago lo confirma el webhook de la pasarela
+ * POST /api/admin/orders/{folio}/payment. En producción el pago lo confirma el webhook de la pasarela
  * (OXXO Pay avisa al servidor cuando el cliente paga), no una persona; este botón queda solo como respaldo manual.
  */
-export async function markOrderPaid(id, user) {
+export async function markOrderPaid(id, user, rowVersion) {
+  if (USE_API) return opsApi.markOrderPaid(id, rowVersion)
   await latency()
   if (!can(user?.role, 'payments.confirm')) throw new ApiError('Solo el Dueño puede confirmar pagos.', 403)
   const { order, error } = markPaid(findOrder(id), by(user), stamp())
@@ -167,8 +182,9 @@ export async function markOrderPaid(id, user) {
   return copy(redactOrder(order, user?.role))
 }
 
-/** Cancela y libera los pares apartados. TODO(api): POST /api/admin/orders/{folio}/cancel */
-export async function cancelOrder(id, user) {
+/** Cancela y libera los pares apartados. POST /api/admin/orders/{folio}/cancel */
+export async function cancelOrder(id, user, rowVersion) {
+  if (USE_API) return opsApi.cancelOrder(id, rowVersion)
   await latency()
   const { order, error } = cancel(findOrder(id), by(user), stamp())
   if (error) throw new ApiError(error)
@@ -178,8 +194,9 @@ export async function cancelOrder(id, user) {
   return copy(redactOrder(order, user?.role))
 }
 
-/** TODO(api): PUT /api/admin/orders/{folio}/note */
-export async function saveOrderNote(id, note, user) {
+/** PUT /api/admin/orders/{folio}/note */
+export async function saveOrderNote(id, note, user, rowVersion) {
+  if (USE_API) return opsApi.saveOrderNote(id, note, rowVersion)
   await latency()
   const order = { ...findOrder(id), note: String(note ?? '').trim() }
   replaceOrder(order)
@@ -194,8 +211,15 @@ const decorate = (r, few, pieces) => {
   return withTone({ ...r, available: avail, state: stockState(avail, few), edition: pieces.find((p) => p.id === r.pieceId)?.edition ?? null })
 }
 
-/** TODO(api): GET /api/admin/inventory?state=&q= */
+/** Lista de empaque para imprimir: sin el servidor no hay qué imprimir. GET /api/admin/orders/{folio}/packing-list */
+export async function getPackingList(id) {
+  if (USE_API) return opsApi.getPackingList(id)
+  throw new ApiError('Disponible al conectar la API.', 501)
+}
+
+/** GET /api/admin/inventory?state=&q= */
 export async function getInventory({ filter = 'todos', q = '' } = {}) {
+  if (USE_API) return opsApi.getInventory({ filter, q })
   await latency()
   const { inventory, settings, pieces } = db()
   const few = settings.fewUnitsThreshold
@@ -214,20 +238,23 @@ export async function getInventory({ filter = 'todos', q = '' } = {}) {
 
 /** Una fila con su estado. */
 export async function getStockRow(sku) {
+  if (USE_API) return opsApi.getStockRow(sku)
   await latency()
   const { settings, pieces } = db()
   return copy(decorate(findRow(sku), settings.fewUnitsThreshold, pieces))
 }
 
-/** Kárdex del más reciente al más antiguo. TODO(api): GET /api/admin/inventory/{sku}/movements */
+/** Kárdex del más reciente al más antiguo. GET /api/admin/inventory/{sku}/movements */
 export async function getMovements(sku) {
+  if (USE_API) return opsApi.getMovements(sku)
   await latency()
   findRow(sku)
   return copy(sortMovements(db().movements.filter((m) => m.sku === sku)))
 }
 
-/** TODO(api): POST /api/admin/inventory/{sku}/movements */
-export async function adjustStock(sku, { type, qty, note, folio }, user) {
+/** POST /api/admin/inventory/{sku}/movements */
+export async function adjustStock(sku, { type, qty, note, folio, rowVersion }, user) {
+  if (USE_API) return opsApi.adjustStock(sku, { type, qty, note, folio, rowVersion })
   await latency()
   const orderExists = (code) => db().orders.some((o) => o.id === code)
   const res = applyMovement(findRow(sku), { type, qty, note, folio }, by(user), stamp(), { orderExists })
@@ -243,8 +270,9 @@ export async function adjustStock(sku, { type, qty, note, folio }, user) {
   return copy({ row: res.row, movement: res.movement })
 }
 
-/** TODO(api): POST /api/admin/inventory/import/preview */
+/** POST /api/admin/inventory/import/preview */
 export async function previewImport(csvText, role) {
+  if (USE_API) return opsApi.previewImport(csvText)
   await latency()
   return copy(previewCsv(csvText, db().inventory, db().catalog, { canSeeCosts: can(role, 'costs.view') }))
 }
@@ -253,9 +281,10 @@ export async function previewImport(csvText, role) {
  * Aplica solo filas válidas como "Inventario inicial · Importado desde CSV", y los datos de catálogo de las
  * columnas opcionales (marca, colección, unidades por paquete, costo solo del Dueño y código de barras).
  * El servidor vuelve a validar: lo que llega del navegador no se da por bueno.
- * TODO(api): POST /api/admin/inventory/import
+ * POST /api/admin/inventory/import
  */
 export async function applyImport(rows, user) {
+  if (USE_API) return opsApi.applyImport(rows)
   await latency()
   const { inventory, catalog } = db()
   const { valid } = previewCsv(rowsToCsv(rows), inventory, catalog, { canSeeCosts: can(user?.role, 'costs.view') })
@@ -291,6 +320,7 @@ const productSkus = (p) => {
 
 /** CSV con los SKU actuales, su stock y los datos del catálogo (unit_cost solo para el Dueño). */
 export async function getTemplateCsv(role) {
+  if (USE_API) return opsApi.getTemplateCsv()
   await latency()
   const { inventory, catalog } = db()
   const owner = can(role, 'costs.view')
@@ -577,14 +607,16 @@ export async function inviteUser(invitation, user) {
   return copy(created)
 }
 
-/** Repartidores para la entrega local. TODO(api): GET /api/admin/users?role=operaciones */
+/** Repartidores para la entrega local. GET /api/admin/orders/couriers */
 export async function getCouriers() {
+  if (USE_API) return opsApi.getCouriers()
   await latency()
   return [...COURIERS]
 }
 
 /** Solo DEV: vuelve a la semilla. */
 export async function resetDemoData() {
+  assertMock()
   await latency()
   state = { ...createSeed(), clock: { demo: DEMO_NOW.toISOString(), real: Date.now() } }
   save()
