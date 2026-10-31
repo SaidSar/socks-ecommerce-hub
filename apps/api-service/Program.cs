@@ -56,6 +56,13 @@ else
     builder.Services.AddSingleton<IEmailSender, UnconfiguredEmailSender>();
 }
 
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<ICheckoutOrder, CheckoutOrder>();
+builder.Services.AddScoped<IExpireOxxoOrders, ExpireOxxoOrders>();
+builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
+
 builder.Services.AddSokkoAuth();
 builder.Services.AddAuthRateLimiting();
 // Errores y respuestas sin cuerpo (401, 403, 404…) como ProblemDetails.

@@ -42,6 +42,10 @@ public class Order
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public byte[] RowVersion { get; set; } = null!;
+    /// <summary>Encabezado <c>Idempotency-Key</c> de la compra: un doble clic no crea dos pedidos.</summary>
+    public string? IdempotencyKey { get; set; }
+    /// <summary>SHA-256 de los datos del pedido: la misma llave con otros datos se rechaza.</summary>
+    public byte[]? IdempotencyHash { get; set; }
 
     public User? User { get; set; }
     public ICollection<OrderItem> Items { get; set; } = [];

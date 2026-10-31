@@ -749,6 +749,17 @@ namespace Sokko.Api.Data.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<byte[]>("IdempotencyHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)")
+                        .IsFixedLength();
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .IsFixedLength(false);
+
                     b.Property<string>("InternalNote")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -864,6 +875,11 @@ namespace Sokko.Api.Data.Migrations
                     b.HasIndex("FolioNumber")
                         .IsUnique()
                         .HasDatabaseName("UQ_Orders_FolioNumber");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Orders_IdempotencyKey")
+                        .HasFilter("[IdempotencyKey] IS NOT NULL");
 
                     b.HasIndex("Status", "CreatedAt")
                         .HasDatabaseName("IX_Orders_Status_CreatedAt");
