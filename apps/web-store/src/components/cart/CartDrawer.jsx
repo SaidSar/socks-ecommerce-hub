@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { PAYMENT_METHOD_LABELS } from '../../config/enums'
 import { useCart } from '../../hooks/useCart'
 import { useConfig } from '../../hooks/useConfig'
@@ -9,7 +10,6 @@ import { CloseIcon } from '../brand/Icons'
 import BrushProgress from './BrushProgress'
 import CartLine from './CartLine'
 
-const PAYING_MS = 2200
 const PAYMENT_METHODS_TEXT = Object.values(PAYMENT_METHOD_LABELS).join(' o ')
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -20,11 +20,10 @@ export default function CartDrawer() {
   const { freeShippingThreshold } = useConfig()
   const { isOpen, close, items, count, subtotal, shipping, total, ivaIncluded, progress, missing, isFree, giftWrap } =
     cart
-  const [paying, setPaying] = useState(false)
+  const navigate = useNavigate()
   const panelRef = useRef(null)
   const closeRef = useRef(null)
   const triggerRef = useRef(null)
-  const payTimer = useRef(null)
   const titleId = useId()
 
   useLockBodyScroll(isOpen)
@@ -66,13 +65,9 @@ export default function CartDrawer() {
     return () => document.removeEventListener('keydown', onKey)
   }, [isOpen, close])
 
-  useEffect(() => () => clearTimeout(payTimer.current), [])
-
-  const pay = () => {
-    // TODO(checkout): crear la orden vía POST /api/orders y redirigir a la pasarela de pago.
-    setPaying(true)
-    clearTimeout(payTimer.current)
-    payTimer.current = setTimeout(() => setPaying(false), PAYING_MS)
+  const goToCheckout = () => {
+    close()
+    navigate('/checkout')
   }
 
   return createPortal(
@@ -182,12 +177,11 @@ export default function CartDrawer() {
 
           <button
             type="button"
-            disabled={!items.length || paying}
-            onClick={pay}
-            aria-live="polite"
+            disabled={!items.length}
+            onClick={goToCheckout}
             className="mt-5 w-full bg-laca py-4 text-[12px] tracking-[.28em] text-linen uppercase transition-colors hover:bg-laca-hover disabled:cursor-not-allowed disabled:bg-sand-2 disabled:text-ink-soft"
           >
-            {paying ? 'Conectando con pago seguro…' : 'Proceder al Pago Seguro'}
+            Proceder al Pago Seguro
           </button>
           <p className="mt-3 text-center text-[11px] text-ink-soft">{PAYMENT_METHODS_TEXT}</p>
         </div>

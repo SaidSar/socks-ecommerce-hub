@@ -62,7 +62,13 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         b.Property(o => o.CreatedAt).HasUtcNowDefault();
         b.Property(o => o.UpdatedAt).HasUtcNowDefault();
         b.Property(o => o.RowVersion).IsRowVersion();
+        b.Property(o => o.IdempotencyKey).HasMaxLength(64).IsUnicode(false);
+        b.Property(o => o.IdempotencyHash).HasMaxLength(32).IsFixedLength();
 
+        b.HasIndex(o => o.IdempotencyKey)
+            .IsUnique()
+            .HasDatabaseName("UQ_Orders_IdempotencyKey")
+            .HasFilter("[IdempotencyKey] IS NOT NULL");
         b.HasIndex(o => o.FolioNumber).IsUnique().HasDatabaseName("UQ_Orders_FolioNumber");
         b.HasIndex(o => o.Folio).IsUnique().HasDatabaseName("UQ_Orders_Folio");
         b.HasIndex(o => new { o.Status, o.CreatedAt })

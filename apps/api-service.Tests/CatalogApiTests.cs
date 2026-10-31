@@ -22,6 +22,7 @@ public sealed class CatalogApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
         builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IClock>(Clock)));
     }
 }

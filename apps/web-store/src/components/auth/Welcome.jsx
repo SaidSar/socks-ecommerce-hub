@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { useAsync } from '../../hooks/useAsync'
 import { useAuth } from '../../hooks/useAuth'
 import { useCart } from '../../hooks/useCart'
+import { listMyOrders } from '../../services/orderService'
 
 /**
  * Bienvenida (DESIGN_AUTH.md §4.5). `mode` llega en el state de la navegación desde login/registro;
@@ -18,9 +20,10 @@ export default function Welcome({ mode = 'login' }) {
     headingRef.current?.focus()
   }, [])
 
+  const { data: orders } = useAsync(listMyOrders, user.email)
+
   const stats = [
-    // TODO(api): número real de pedidos desde GET /api/orders cuando exista.
-    ['0', 'pedidos'],
+    [orders ? String(orders.length) : '—', 'pedidos'],
     [user.preferredSize || '—', 'talla guardada'],
     [String(count), count === 1 ? 'par en su bolsa' : 'pares en su bolsa'],
   ]
@@ -86,6 +89,9 @@ export default function Welcome({ mode = 'login' }) {
           className="inline-flex h-[52px] items-center bg-laca px-9 text-[12px] tracking-[.28em] text-linen uppercase transition-colors hover:bg-laca-hover"
         >
           Volver al atelier
+        </Link>
+        <Link to="/cuenta/pedidos" className="inline-flex min-h-11 items-center font-serif text-[16px] italic underline decoration-ink/25 underline-offset-4 hover:text-ink">
+          Mis pedidos
         </Link>
         <button
           type="button"

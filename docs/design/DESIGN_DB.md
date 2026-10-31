@@ -3,7 +3,7 @@
 > **Propósito:** propuesta del esquema de **SQL Server** que respaldará `apps/api-service` (EF Core). Documento para **revisión de arquitectura (Said)** antes de escribir entidades, configuraciones o migraciones.
 > **Fuentes:** `CONTEXTO_MAESTRO.md`, `DESIGN.md` §4 y §9, `DESIGN_AUTH.md` §5 y §8, `DESIGN_ADMIN.md` §3, §5, §6 y §9, `DECISIONES_ADMIN.md`, `DECISIONES_CATALOGO.md` (catálogo multilínea, v0.4), y las reglas ejecutables de `apps/web-store/src/data/catalog.mock.js`, `apps/web-store/src/services/authService.js`, `apps/admin-panel/src/data/seed.js` y `apps/admin-panel/src/domain/*.js`.
 > **Alcance:** solo diseño. **No hay código C# ni migraciones en esta fase.** La fase siguiente (EF Core) toma este archivo como fuente de verdad.
-> **Estado:** ✅ Aprobado (v0.4.4) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
+> **Estado:** ✅ Aprobado (v0.4.5) · catálogo multilínea (`DECISIONES_CATALOGO.md` T-01…T-13). La v0.3.1 (pedidos, inventario, envíos, usuarios) sigue aprobada y no cambia.
 
 ---
 
@@ -661,6 +661,8 @@ Reglas CHECK de coherencia por tipo:
 | `CreatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | Base del cálculo "atrasado +48 h" |
 | `UpdatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
 | `RowVersion` | `ROWVERSION` | | | Evita que dos operadores avancen el mismo pedido a la vez |
+| `IdempotencyKey` | `VARCHAR(64)` | N | | v0.4.5. Encabezado `Idempotency-Key` de `POST /api/orders`: un doble clic no crea dos pedidos. **UQ** `UQ_Orders_IdempotencyKey`, filtrado `WHERE IdempotencyKey IS NOT NULL` |
+| `IdempotencyHash` | `BINARY(32)` | N | | v0.4.5. SHA-256 de los datos del pedido: la misma llave con otros datos responde `422` |
 
 CHECK de coherencia entre método de entrega y estado (`orders.js` → `nextStatus`):
 - `CK_Orders_StatusMatchesDelivery`: `NOT (Status = 'Enviado' AND DeliveryMethod = 'Local') AND NOT (Status = 'EnRuta' AND DeliveryMethod = 'Paqueteria')`.
@@ -1260,5 +1262,6 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.4.3 | 2026-10-29 | `carlos/db-efcore` | Carlos | Implementación en EF Core (Prompt 4): `IS NOT NULL` en `CK_InventoryMovements_NoteRequired`, `CAST` a `DECIMAL(10,2)` en `Orders.TaxIncluded`, intercalación binaria en los `CHECK` de *slugs* y código de barras, y reparto de la semilla entre la migración y el *seeder* de Development (§5) |
 | 0.4.3 | 2026-10-30 | `carlos/db-efcore` (PR #10) | Said (revisión de arquitectura) | Revisión y aprobación de la v0.4.3 con el merge del PR #10. Decisiones en Propuesta pasan a Aprobada |
 | 0.4.4 | 2026-10-30 | `said/seed-align` | Said | Semilla alineada con `apps/web-store/src/data/catalogSeed.js`: migración `AlignCatalogWithStore` (14 colores, Marvel, Superhéroes, etiquetas de talla) y 24 productos con 120 SKU (§5). §3.12 documenta el contrato real: `colors`, `sizes`, `featuredSlug`, paginación, cotización de envío y `variants[].stock` como disponible por combinación |
+| 0.4.5 | 2026-10-30 | `said/checkout` | Said | Migración `AddOrderIdempotency`: `Orders.IdempotencyKey` e `IdempotencyHash` (§3.8), para la idempotencia de `POST /api/orders` (`DESIGN_CHECKOUT` §6). La referencia OXXO usa `PaymentReference`, que ya existía |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.

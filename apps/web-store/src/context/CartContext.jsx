@@ -5,8 +5,8 @@ import { useConfig } from '../hooks/useConfig'
 import { getProductSync } from '../services/catalogService'
 import { CartContext } from './cart-context'
 
-// v2: líneas del catálogo multilínea (precio efectivo, precio de lista y unidad). Las de v1 se descartan.
-const STORAGE_KEY = 'sokko.cart.v2'
+// v3: cada línea lleva su SKU, que es lo que se compra en el checkout. Las versiones anteriores se descartan.
+const STORAGE_KEY = 'sokko.cart.v3'
 
 const lineKey = (slug, color, size) => `${slug}-${color}-${size}`
 const clamp = (q, max) => Math.min(q, max)
@@ -20,13 +20,15 @@ function devPreload() {
 /**
  * Línea de la bolsa a partir de la ficha (DESIGN_CATALOG_UI.md §3.8): guarda el precio efectivo que calculó el
  * servicio (`price`, con R-29 si aplica) y el de lista (`listPrice`), más la unidad de venta.
- * TODO(api): si cambia el día y una temporada se activa o termina, el checkout recalcula los precios en el servidor.
+ * Si cambia el día y una temporada se activa o termina, el servidor recalcula el precio y el checkout avisa antes de cobrar.
  */
 function toLine(product, color, size) {
   const swatch = product.colors.find((c) => c.code === color) ?? product.colors[0]
   const sizeLabel = product.sizes.find((s) => s.code === size)?.label ?? size
+  const variant = product.variants.find((v) => v.color === swatch.code && v.size === size)
   return {
     key: lineKey(product.slug, swatch.code, size),
+    sku: variant?.sku,
     slug: product.slug,
     line: product.line,
     name: product.name,
@@ -38,7 +40,7 @@ function toLine(product, color, size) {
     size,
     sizeLabel: product.type.sizeSystem === 'unitalla' ? sizeLabel : `Talla ${size}`,
     qty: 1,
-    max: product.variants.find((v) => v.color === swatch.code && v.size === size)?.stock ?? 0,
+    max: variant?.stock ?? 0,
   }
 }
 
@@ -87,6 +89,18 @@ function reducer(state, action) {
     }
     case 'REMOVE':
       return { ...state, items: state.items.filter((i) => i.key !== action.key) }
+    case 'CLEAR':
+      return { ...state, items: [], isOpen: false }
+    case 'APPLY_LIMITS': {
+      // Lo que el servidor dijo que queda: ajusta el tope y retira lo que ya no hay.
+      const available = Object.fromEntries(action.lines.map((l) => [l.sku, l.available]))
+      return {
+        ...state,
+        items: state.items
+          .map((i) => (i.sku in available ? { ...i, max: available[i.sku], qty: clamp(i.qty, available[i.sku]) } : i))
+          .filter((i) => i.qty > 0),
+      }
+    }
     case 'TOGGLE_GIFT':
       return { ...state, giftWrap: !state.giftWrap }
     case 'OPEN':
@@ -131,6 +145,8 @@ export function CartProvider({ children }) {
   const toggleGift = useCallback(() => dispatch({ type: 'TOGGLE_GIFT' }), [])
   const open = useCallback(() => dispatch({ type: 'OPEN' }), [])
   const close = useCallback(() => dispatch({ type: 'CLOSE' }), [])
+  const clear = useCallback(() => dispatch({ type: 'CLEAR' }), [])
+  const applyLimits = useCallback((lines) => dispatch({ type: 'APPLY_LIMITS', lines }), [])
 
   const value = useMemo(() => {
     const count = items.reduce((s, i) => s + i.qty, 0)
@@ -160,8 +176,10 @@ export function CartProvider({ children }) {
       toggleGift,
       open,
       close,
+      clear,
+      applyLimits,
     }
-  }, [items, giftWrap, isOpen, add, setQty, remove, toggleGift, open, close, freeShippingThreshold, parcelShippingCost, ivaRate])
+  }, [items, giftWrap, isOpen, add, setQty, remove, toggleGift, open, close, clear, applyLimits, freeShippingThreshold, parcelShippingCost, ivaRate])
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }
