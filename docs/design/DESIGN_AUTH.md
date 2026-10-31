@@ -221,15 +221,25 @@ getSession() → user | null
 
 ---
 
-## 8. Contrato esperado de la API (siguiente iteración, no implementar)
+## 8. Contrato de la API
+
+Implementado en `apps/api-service`. Los errores usan `ProblemDetails` (`application/problem+json`); los de validación traen `errors` por campo con los mensajes de §5.1.
 
 | Acción | Endpoint | Respuesta |
 |---|---|---|
-| Login | `POST /api/auth/login` `{ email, password }` | `200 { accessToken, expiresIn, user }` · `401` |
-| Registro | `POST /api/auth/register` `{ firstName, lastName, email, password, preferredSize?, marketingOptIn, acceptedTerms }` | `201 { accessToken, user }` · `409` |
-| Olvidé contraseña | `POST /api/auth/forgot-password` `{ email }` | `202` siempre |
-| Restablecer | `POST /api/auth/reset-password` `{ token, newPassword }` | `204` · `400` |
+| Login | `POST /api/auth/login` `{ email, password }` | `200 { accessToken, expiresIn, user }` · `400` · `401` · `429` |
+| Registro | `POST /api/auth/register` `{ firstName, lastName, email, password, preferredSize?, marketingOptIn, acceptedTerms }` | `201 { accessToken, expiresIn, user }` · `400` · `409` |
+| Olvidé contraseña | `POST /api/auth/forgot-password` `{ email }` | `202` siempre, sin cuerpo · `429` |
+| Restablecer | `POST /api/auth/reset-password` `{ token, newPassword }` | `204` · `400` · `429` |
 | Sesión actual | `GET /api/auth/me` (Bearer) | `200 { user }` · `401` |
+
+- `user = { id, firstName, lastName, email, preferredSize, marketingOptIn, memberSince }`; `id` es numérico. El login acepta a cualquier usuario activo (P-01), y un `401` nunca dice si falló el correo o la contraseña.
+- **Cambios frente al contrato inicial:** el registro también devuelve `expiresIn`, y `reset-password` responde `400` también si la contraseña es débil.
+- **JWT:** HS256, 2 horas, *claims* `sub`, `email` y `role` (`Owner`, `Operations`, `Customer`). La clave sale de `Jwt:SigningKey` (user-secrets en Development, `Jwt__SigningKey` en producción) y debe tener al menos 32 bytes. Sin clave, fuera de Development la API no arranca; en Development usa una temporal y las sesiones se pierden al reiniciar.
+- **Enlace de restablecimiento:** `{Frontend:WebStoreUrl}/cuenta/restablecer?token=…`, válido 30 minutos y de un solo uso; en BD va el SHA-256. Pedir uno nuevo invalida los anteriores. En Development el enlace se escribe en el log.
+- **Límite de intentos:** login, olvido y restablecimiento admiten 10 peticiones por minuto, por IP y ruta (`RateLimiting:AuthPermitLimit`); después, `429` con `Retry-After`.
+- **Panel (`DESIGN_ADMIN` §9):** `POST /api/admin/auth/login` responde `200 { accessToken, expiresIn, user }` con `user = { id, name, email, role }` y `role` = `dueno` u `operaciones`. `GET /api/admin/auth/me` responde `200 { user }`. Un cliente recibe `403`.
+- **Vista nueva en la tienda:** `/cuenta/restablecer?token=…` pide la contraseña nueva.
 
 BD: `Users(Id, FirstName, LastName, Email UNIQUE, PasswordHash, PreferredSize NULL, MarketingOptIn BIT, AcceptedTermsAt, EmailConfirmedAt NULL, MemberSince/CreatedAt)` y `PasswordResetTokens(Id, UserId FK, TokenHash, ExpiresAt, UsedAt NULL)`.
 Clasificación SOA: hash/JWT = **servicio de utilidad**; `Users` = **servicio de entidad**.
