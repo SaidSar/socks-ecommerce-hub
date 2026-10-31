@@ -1,5 +1,5 @@
-// API simulada del panel (DESIGN_ADMIN.md §6.2). Única capa que conocerá /api/admin/*.
-// Estado en memoria persistido en localStorage; si el almacenamiento falla, se trabaja solo en memoria.
+// API del panel (DESIGN_ADMIN.md §6.2). Con USE_API, Catálogo, Configuración y Usuarios van a /api/admin/* (adminCatalogApi.js);
+// lo demás sigue simulado: estado en memoria persistido en localStorage y, si el almacenamiento falla, solo en memoria.
 // Cada función devuelve copias: los componentes nunca mutan el estado ni ven seed.js.
 import { can } from '../config/roles'
 import { brandMargins, grossMargin, lineStats, productDto, seasonStatus, skuOf, validateCollection, validateProduct } from '../domain/catalog'
@@ -14,16 +14,13 @@ import { normalize } from '../utils/format'
 import { COLORS } from '../data/catalogSeed'
 import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
+import * as catalogApi from './adminCatalogApi'
+import { USE_API } from './api'
+import { ApiError } from './apiError'
 
 export const STORAGE_KEY = 'sokko.admin.data.v1'
 
-export class ApiError extends Error {
-  constructor(message, status = 400) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-  }
-}
+export { ApiError }
 
 let state = null
 
@@ -343,8 +340,9 @@ function catalogProducts(role) {
   })
 }
 
-/** Todo el catálogo para las pantallas de Productos, Marcas, Colecciones y Tipos. TODO(api): GET /api/admin/catalog */
+/** Todo el catálogo para las pantallas de Productos, Marcas, Colecciones y Tipos. GET /api/admin/catalog */
 export async function getCatalog(role) {
+  if (USE_API) return catalogApi.getCatalog()
   await latency()
   const { catalog } = db()
   const today = catalogToday()
@@ -399,9 +397,10 @@ const slugify = (s) =>
 /**
  * Alta o edición de producto (§4.3). 403 sin `catalog.edit`; 422 con `errors` por campo (R-30, R-31, R-32, código de barras).
  * Las variantes nuevas (color × talla) entran al inventario con stock 0: el stock se ajusta en Inventario.
- * TODO(api): POST/PUT /api/admin/products
+ * POST/PUT /api/admin/products
  */
 export async function saveProduct(form, user) {
+  if (USE_API) return catalogApi.saveProduct(form)
   await latency()
   forbidden(user, 'catalog.edit', 'Solo el Dueño puede editar productos.')
   const { catalog, inventory } = db()
@@ -450,8 +449,9 @@ export async function saveProduct(form, user) {
   return copy(catalogProducts(user?.role).find((p) => p.slug === product.slug))
 }
 
-/** Nueva marca (§4.4): sin duplicados, sin distinguir mayúsculas. TODO(api): POST /api/admin/brands */
+/** Nueva marca (§4.4): sin duplicados, sin distinguir mayúsculas. POST /api/admin/brands */
 export async function addBrand(name, user) {
+  if (USE_API) return catalogApi.addBrand(name)
   await latency()
   forbidden(user, 'brands.edit', 'Solo el Dueño puede crear marcas.')
   const clean = String(name ?? '').trim()
@@ -464,8 +464,9 @@ export async function addBrand(name, user) {
   return copy(brand)
 }
 
-/** Mostrar u ocultar una marca en el filtro de la tienda. La marca propia siempre es visible. TODO(api): PUT /api/admin/brands/{slug} */
-export async function setBrandVisibility(slug, showInFilters, user) {
+/** Mostrar u ocultar una marca en el filtro de la tienda. La marca propia siempre es visible. PUT /api/admin/brands/{slug} */
+export async function setBrandVisibility(slug, showInFilters, user, rowVersion) {
+  if (USE_API) return catalogApi.setBrandVisibility(slug, showInFilters, rowVersion)
   await latency()
   forbidden(user, 'brands.edit', 'Solo el Dueño puede editar marcas.')
   const { catalog } = db()
@@ -477,8 +478,9 @@ export async function setBrandVisibility(slug, showInFilters, user) {
   return copy(brand)
 }
 
-/** Guarda tipo, ventana anual y descuento de una colección (§4.5). TODO(api): PUT /api/admin/collections/{slug} */
+/** Guarda tipo, ventana anual y descuento de una colección (§4.5). PUT /api/admin/collections/{slug} */
 export async function saveCollection(form, user) {
+  if (USE_API) return catalogApi.saveCollection(form)
   await latency()
   forbidden(user, 'collections.edit', 'Solo el Dueño puede editar colecciones.')
   const errors = validateCollection(form)
@@ -504,13 +506,14 @@ export async function saveProductType(_code, _form, user) {
 
 // ---------------------------------------------------------------- Configuración
 
-/** TODO(api): GET /api/admin/settings */
+/** GET /api/admin/settings */
 export async function getSettings() {
+  if (USE_API) return catalogApi.getSettings()
   await latency()
   return copy(db().settings)
 }
 
-/** Valida en el servidor; devuelve { errors } por campo si algo falla. TODO(api): PUT /api/admin/settings */
+/** Respuesta inmediata por campo; con la API, el servidor vuelve a validar (PUT /api/admin/settings). */
 export function validateSettings(s) {
   const errors = {}
   const money = ['freeShippingThreshold', 'parcelShippingCost', 'localShippingCost']
@@ -525,6 +528,7 @@ export function validateSettings(s) {
 }
 
 export async function saveSettings(settings) {
+  if (USE_API) return catalogApi.saveSettings(settings)
   await latency()
   const errors = validateSettings(settings)
   if (Object.keys(errors).length) {
@@ -552,10 +556,25 @@ export async function quoteShipping({ subtotal, postalCode }) {
   return computeShipping({ subtotal, postalCode }, db().settings)
 }
 
-/** TODO(api): GET /api/admin/users · POST /api/admin/users/invitations */
+/** GET /api/admin/users */
 export async function getInternalUsers() {
+  if (USE_API) return catalogApi.getInternalUsers()
   await latency()
-  return listUsers()
+  return [...listUsers(), ...(db().invitedUsers ?? [])]
+}
+
+/** Invita a un miembro del equipo. POST /api/admin/users/invitations */
+export async function inviteUser(invitation, user) {
+  if (USE_API) return catalogApi.inviteUser(invitation)
+  await latency()
+  forbidden(user, 'settings.manage', 'Solo el Dueño invita al equipo.')
+  const email = String(invitation.email ?? '').trim().toLowerCase()
+  const invited = db().invitedUsers ?? []
+  if ([...listUsers(), ...invited].some((u) => u.email === email)) throw invalid({ email: 'Este correo ya tiene una cuenta.' })
+  const created = { id: `u-${email}`, name: `${invitation.firstName} ${invitation.lastName}`, email, role: invitation.role }
+  db().invitedUsers = [...invited, created]
+  save()
+  return copy(created)
 }
 
 /** Repartidores para la entrega local. TODO(api): GET /api/admin/users?role=operaciones */

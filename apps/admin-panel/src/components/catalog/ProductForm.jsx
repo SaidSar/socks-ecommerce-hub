@@ -17,8 +17,11 @@ function initialForm(product) {
   if (!product) return { slug: null, line: 'especiales', name: '', brand: 'sin-marca', type: 'calcetas', collection: null, unitsPerPack: '1', price: '199', unitCost: '', colors: ['ROJ'], barcodes: {} }
   return {
     slug: product.slug,
+    rowVersion: product.rowVersion,
     line: product.line,
     name: product.name,
+    nameJp: product.nameJp ?? '',
+    material: product.material ?? '',
     brand: product.brand.slug,
     type: product.type.code,
     collection: product.collection?.slug ?? null,
@@ -151,6 +154,17 @@ export default function ProductForm({ product, catalog, canEdit, canSeeCosts, on
             <Field id={id('name')} label="Nombre" error={errors.name}>
               {(p) => <input {...p} value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ej. Calceta Copo Navideño" />}
             </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {form.line === 'sokko' && (
+                <Field id={id('nameJp')} label="Nombre en japonés *" error={errors.nameJp}>
+                  {(p) => <input {...p} lang="ja" value={form.nameJp ?? ''} onChange={(e) => set({ nameJp: e.target.value })} placeholder="Ej. 折紙・夜" />}
+                </Field>
+              )}
+              <Field id={id('material')} label="Material" error={errors.material}>
+                {(p) => <input {...p} value={form.material ?? ''} onChange={(e) => set({ material: e.target.value })} placeholder="Ej. Algodón peinado" />}
+              </Field>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id={id('brand')} label="Marca" error={errors.brand}>

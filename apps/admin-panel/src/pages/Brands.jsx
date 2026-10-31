@@ -91,8 +91,12 @@ export default function Brands() {
     setStatus(`Marca ${brand.name} creada.`)
   }
   const toggle = async (b) => {
-    await api.setBrandVisibility(b.slug, !b.showInFilters)
-    setStatus(`${b.name}: ${b.showInFilters ? 'oculta' : 'visible'} en el filtro de la tienda.`)
+    try {
+      await api.setBrandVisibility(b.slug, !b.showInFilters, b.rowVersion)
+      setStatus(`${b.name}: ${b.showInFilters ? 'oculta' : 'visible'} en el filtro de la tienda.`)
+    } catch (ex) {
+      setStatus(ex.message)
+    }
   }
 
   return (

@@ -36,6 +36,7 @@ function SettingsForm({ initial, users }) {
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [formMessage, setFormMessage] = useState('')
   const dirty = JSON.stringify(toSettings(draft)) !== JSON.stringify(toSettings(toDraft(saved)))
 
   // Aviso al salir con cambios sin guardar: dentro del panel (router) y al cerrar o recargar la pestaña.
@@ -57,6 +58,7 @@ function SettingsForm({ initial, users }) {
   }
 
   const save = async () => {
+    setFormMessage('')
     const next = toSettings(draft)
     const errs = api.validateSettings(next)
     setErrors(errs)
@@ -72,6 +74,8 @@ function SettingsForm({ initial, users }) {
       setStatus('Cambios guardados. La tienda los toma de GET /api/config.')
     } catch (e) {
       setErrors(e.errors ?? {})
+      // Un conflicto (otra persona guardó antes) no trae errores por campo: el mensaje se muestra tal cual.
+      setFormMessage(e.errors ? '' : e.message)
     } finally {
       setBusy(false)
     }
@@ -84,14 +88,14 @@ function SettingsForm({ initial, users }) {
       <ShippingSettings draft={draft} set={set} errors={errors} />
       <LocalZoneSettings zones={draft.localZones} onChange={set('localZones')} error={errors.localZones} />
       <InventorySettings value={draft.fewUnitsThreshold} onChange={set('fewUnitsThreshold')} error={errors.fewUnitsThreshold} />
-      <InternalUsers users={users} />
+      <InternalUsers users={users} onInvite={api.inviteUser} />
       <div className="xl:col-span-2 flex flex-wrap items-center gap-3">
         <Button onClick={save} disabled={busy}>
           <Icon name="check" className="w-4 h-4" />
           {busy ? 'Guardando…' : 'Guardar cambios'}
         </Button>
-        <span role="status" className={`text-[13px] ${hasErrors ? 'text-laca' : 'text-matcha'}`}>
-          {hasErrors ? 'Revise los campos marcados.' : status}
+        <span role="status" className={`text-[13px] ${hasErrors || formMessage ? 'text-laca' : 'text-matcha'}`}>
+          {formMessage || (hasErrors ? 'Revise los campos marcados.' : status)}
         </span>
         {dirty && !status && !hasErrors && <span className="text-[12.5px] text-ink-soft">Hay cambios sin guardar.</span>}
       </div>
