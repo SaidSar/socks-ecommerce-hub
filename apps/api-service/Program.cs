@@ -16,7 +16,7 @@ builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.Environment
 
 // Enums en JSON con los códigos de API de DESIGN_DB §1.6.
 builder.Services.AddControllers()
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false)));
 
 // SQL Server vía EF Core (DESIGN_DB.md). En producción la cadena llega por ConnectionStrings__Sokko (Azure SQL).
 builder.Services.AddDbContext<SokkoDbContext>(options =>
@@ -62,6 +62,7 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ICheckoutOrder, CheckoutOrder>();
 builder.Services.AddScoped<IExpireOxxoOrders, ExpireOxxoOrders>();
 builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
+builder.Services.AddHostedService<OxxoExpiryJob>();
 
 builder.Services.AddSokkoAuth();
 builder.Services.AddAuthRateLimiting();

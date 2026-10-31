@@ -13,7 +13,7 @@ public static class AuthLimits
     public const string InvalidCredentials = "El correo o la contraseña no coinciden.";
     private const int DefaultPermitLimit = 10;
 
-    /// <summary>Límite por IP y ruta, para que agotar uno no bloquee los demás.</summary>
+    /// <summary>Límite por IP y plantilla de ruta: agotar una no bloquea las demás, y cambiar de folio no da más intentos.</summary>
     public static IServiceCollection AddAuthRateLimiting(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
@@ -21,7 +21,8 @@ public static class AuthLimits
             options.AddPolicy(Policy, context =>
             {
                 var limit = context.RequestServices.GetRequiredService<IConfiguration>().GetValue("RateLimiting:AuthPermitLimit", DefaultPermitLimit);
-                var key = $"{context.Connection.RemoteIpAddress}|{context.Request.Path}";
+                var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? context.Request.Path.Value;
+                var key = $"{context.Connection.RemoteIpAddress}|{context.Request.Method}|{route}";
                 return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = limit,

@@ -47,6 +47,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
         builder.UseSetting("RateLimiting:AuthPermitLimit", PermitLimit);
         builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email)));
     }
