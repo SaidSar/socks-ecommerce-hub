@@ -56,6 +56,9 @@ public interface ICatalogAdminService
     Task<AdminResult<AdminProductView>> CreateProductAsync(ProductRequestDto request, CancellationToken cancellationToken = default);
 
     Task<AdminResult<AdminProductView>> UpdateProductAsync(string slug, ProductRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Marca, colección y unidades por paquete de una fila de importación ya validada; lo que venga en <c>null</c> no cambia.</summary>
+    Task ApplyImportedFieldsAsync(int productId, int? brandId, int? collectionId, byte? unitsPerPack, DateTime at, CancellationToken cancellationToken = default);
 }
 
 public class CatalogAdminService(
@@ -388,6 +391,19 @@ public class CatalogAdminService(
                 new Dictionary<string, string> { ["colors"] = $"No se puede quitar {string.Join(", ", blocked)}: tiene unidades apartadas para pedidos." }), null);
         }
         return (null, product.Slug);
+    }
+
+    public async Task ApplyImportedFieldsAsync(int productId, int? brandId, int? collectionId, byte? unitsPerPack, DateTime at, CancellationToken cancellationToken = default)
+    {
+        if (brandId is null && collectionId is null && unitsPerPack is null)
+        {
+            return;
+        }
+        await db.Products.Where(p => p.Id == productId).ExecuteUpdateAsync(u => u
+            .SetProperty(p => p.BrandId, p => brandId ?? p.BrandId)
+            .SetProperty(p => p.CollectionId, p => collectionId ?? p.CollectionId)
+            .SetProperty(p => p.UnitsPerPack, p => unitsPerPack ?? p.UnitsPerPack)
+            .SetProperty(p => p.UpdatedAt, at), cancellationToken);
     }
 
     private static ProductLine? ParseLine(string? line) =>
