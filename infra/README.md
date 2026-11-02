@@ -44,6 +44,16 @@ Además, el ambiente `production` (*Settings → Environments*) lleva estas vari
 | `API_URL` | salida `apiUrl` |
 | `SQL_SERVER_FQDN` | salida `sqlServerFqdn` |
 
+### Subject de OIDC
+
+La credencial federada de `id-sokko-deploy` acepta un solo *subject*, que debe coincidir exactamente con el que manda GitHub (parámetro `githubOidcSubject`):
+
+```
+repo:SaidSar@159501332/socks-ecommerce-hub@1420135878:environment:production
+```
+
+No es el formato corto (`repo:SaidSar/socks-ecommerce-hub:...`): este repositorio manda el subject con el ID numérico del dueño (`159501332`) y del repositorio (`1420135878`). Así, si alguien renombra la cuenta o el repositorio, o crea otro con el mismo nombre, su token no sirve para desplegar. Con el formato corto, `azure/login` falla con `AADSTS700213` (no hay credencial que coincida). Si el repositorio cambia de dueño o se vuelve a crear, cambian los ID: copie el subject nuevo del error de `azure/login` y actualice el parámetro.
+
 El workflow corre solo después de que CI pasa en un push a `main`. También se puede lanzar a mano, solo desde `main`:
 
 ```bash
