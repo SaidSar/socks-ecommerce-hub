@@ -56,6 +56,7 @@ public class CheckoutOrder(
     ISettingsService settings,
     IQuoteShipping quoteShipping,
     IPaymentGateway gateway,
+    IOrderConfirmation confirmation,
     IClock clock) : ICheckoutOrder
 {
     public async Task<CheckoutResult> PlaceAsync(CheckoutCommand command, CancellationToken cancellationToken = default)
@@ -87,6 +88,11 @@ public class CheckoutOrder(
             {
                 var winner = await orders.FindByIdempotencyKeyAsync(command.IdempotencyKey!, cancellationToken);
                 return winner is null ? result : Replay(winner, hash);
+            }
+            // Ya confirmado: una repetición de la misma compra no vuelve a avisar.
+            if (result is CheckoutResult.Created created)
+            {
+                await confirmation.SendAsync(created.Folio);
             }
             return result;
         }

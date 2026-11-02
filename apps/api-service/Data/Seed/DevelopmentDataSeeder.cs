@@ -13,13 +13,19 @@ public static class DevelopmentDataSeeder
 {
     public static void Seed(DbContext context) => SeedAsync(context, CancellationToken.None).GetAwaiter().GetResult();
 
-    public static async Task SeedAsync(DbContext context, CancellationToken cancellationToken)
+    public static Task SeedAsync(DbContext context, CancellationToken cancellationToken) =>
+        InTransactionAsync((SokkoDbContext)context, SeedAllAsync, cancellationToken);
+
+    /// <summary>Solo el catálogo, con su stock inicial y kárdex: sin usuarios ni pedidos demo. Lo usa el bootstrap de producción.</summary>
+    public static Task SeedCatalogOnlyAsync(SokkoDbContext db, CancellationToken cancellationToken) =>
+        InTransactionAsync(db, SeedCatalogAsync, cancellationToken);
+
+    private static async Task InTransactionAsync(SokkoDbContext db, Func<SokkoDbContext, CancellationToken, Task> work, CancellationToken cancellationToken)
     {
-        var db = (SokkoDbContext)context;
         // Sin migraciones pendientes, EF llama al seeding dentro de su propia transacción: se reutiliza.
         if (db.Database.CurrentTransaction is not null)
         {
-            await SeedAllAsync(db, cancellationToken);
+            await work(db, cancellationToken);
         }
         else
         {
@@ -27,7 +33,7 @@ public static class DevelopmentDataSeeder
             await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
                 await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-                await SeedAllAsync(db, cancellationToken);
+                await work(db, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
             });
         }

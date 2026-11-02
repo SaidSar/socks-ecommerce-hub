@@ -28,6 +28,12 @@ public interface IUserService
     /// <summary>Alta de un miembro del equipo sin contraseña utilizable. <c>null</c> si el correo ya tiene una cuenta.</summary>
     Task<User?> CreateInternalAsync(string firstName, string lastName, string email, UserRole role, CancellationToken cancellationToken = default);
 
+    /// <summary>Cualquier usuario con ese correo, activo o no.</summary>
+    Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>Alta con contraseña elegida, para el bootstrap. Un cliente acepta los términos al crearse. <c>null</c> si el correo ya existe.</summary>
+    Task<User?> CreateAccountAsync(string firstName, string lastName, string email, UserRole role, string password, CancellationToken cancellationToken = default);
+
     /// <summary>Guarda el hash del token e invalida los anteriores del usuario.</summary>
     Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default);
 
@@ -151,6 +157,33 @@ public class UserService(SokkoDbContext db, IAuthService auth, IClock clock) : I
             db.Entry(user).State = EntityState.Detached;
             return null;
         }
+        return user;
+    }
+
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeEmail(email);
+        return db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == normalized, cancellationToken);
+    }
+
+    public async Task<User?> CreateAccountAsync(string firstName, string lastName, string email, UserRole role, string password, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeEmail(email);
+        if (await db.Users.AnyAsync(u => u.Email == normalized, cancellationToken))
+        {
+            return null;
+        }
+
+        var now = clock.UtcNow;
+        var user = new User
+        {
+            FirstName = firstName.Trim(), LastName = lastName.Trim(), Email = normalized, Role = role, CreatedAt = now, UpdatedAt = now,
+            AcceptedTermsAt = role == UserRole.Customer ? now : null,
+        };
+        user.PasswordHash = auth.HashPassword(user, password);
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+        db.Entry(user).State = EntityState.Detached;
         return user;
     }
 

@@ -114,6 +114,8 @@ public class AuthTaskTests
         public Task<User?> CreateCustomerAsync(NewCustomer customer, CancellationToken cancellationToken = default) => Task.FromResult(existing);
         public Task<IReadOnlyList<User>> ListInternalAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<User>>([]);
         public Task<User?> CreateInternalAsync(string firstName, string lastName, string email, UserRole role, CancellationToken cancellationToken = default) => Task.FromResult(existing);
+        public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(existing);
+        public Task<User?> CreateAccountAsync(string firstName, string lastName, string email, UserRole role, string password, CancellationToken cancellationToken = default) => Task.FromResult(existing);
 
         public Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default)
         {
@@ -140,6 +142,8 @@ public class AuthTaskTests
 
         public Task SendInvitationAsync(string email, string link, CancellationToken cancellationToken = default) =>
             SendPasswordResetAsync(email, link, cancellationToken);
+
+        public Task SendOrderConfirmationAsync(OrderConfirmationEmail order, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private static readonly FakeClock Clock = new(new DateOnly(2026, 10, 30));

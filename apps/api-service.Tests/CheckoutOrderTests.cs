@@ -93,6 +93,17 @@ public class CheckoutOrderTests
         public Task<bool> ConfirmOxxoPaymentAsync(string folio, DateTime at, CancellationToken cancellationToken = default) => Task.FromResult(false);
     }
 
+    private sealed class SpyConfirmation : IOrderConfirmation
+    {
+        public List<string> Sent { get; } = [];
+
+        public Task SendAsync(string folio)
+        {
+            Sent.Add(folio);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class SpyGateway : IPaymentGateway
     {
         private readonly FakePaymentGateway _inner = new();
@@ -126,7 +137,7 @@ public class CheckoutOrderTests
         Size = new Size { Code = "M" },
     };
 
-    private sealed record Sut(CheckoutOrder Checkout, FakeUnitOfWork Work, FakeInventory Inventory, FakeOrders Orders, SpyGateway Gateway);
+    private sealed record Sut(CheckoutOrder Checkout, FakeUnitOfWork Work, FakeInventory Inventory, FakeOrders Orders, SpyGateway Gateway, SpyConfirmation Confirmation);
 
     private static Sut Build(ProductVariant variant, DateOnly? today = null, FakeUnitOfWork? work = null, FakeInventory? inventory = null, FakeOrders? orders = null)
     {
@@ -137,7 +148,8 @@ public class CheckoutOrderTests
         var clock = new FakeClock(today ?? new DateOnly(2026, 12, 15));
         var settings = new FakeSettingsService(new ConfigDto(799m, 99m, 49m, true, 4, 0.16m), LocalCp);
         var catalog = new CatalogService(TestDbContext.Create(), new CollectionService(TestDbContext.Create(), new FakeClock(new DateOnly(2026, 10, 26))), settings, clock);
-        return new Sut(new CheckoutOrder(work, inventory, orders, catalog, settings, new QuoteShipping(settings), gateway, clock), work, inventory, orders, gateway);
+        var confirmation = new SpyConfirmation();
+        return new Sut(new CheckoutOrder(work, inventory, orders, catalog, settings, new QuoteShipping(settings), gateway, confirmation, clock), work, inventory, orders, gateway, confirmation);
     }
 
     private static CheckoutCommand Command(
@@ -213,6 +225,20 @@ public class CheckoutOrderTests
         Assert.Equal(code, Assert.IsType<CheckoutResult.Declined>(result).Code);
         Assert.Equal(1, sut.Work.Rollbacks);
         Assert.Equal(0, sut.Work.Commits);
+        Assert.Empty(sut.Confirmation.Sent);
+    }
+
+    [Fact]
+    public async Task Confirmation_goes_out_once_after_the_commit_and_not_on_a_replay()
+    {
+        var first = Build(Variant(400m));
+        await first.Checkout.PlaceAsync(Command(key: "llave"), Ct);
+        Assert.Single(first.Confirmation.Sent);
+        Assert.Equal(1, first.Work.Commits);
+
+        var replay = Build(Variant(400m), orders: new FakeOrders { Existing = first.Orders.Created });
+        await replay.Checkout.PlaceAsync(Command(key: "llave"), Ct);
+        Assert.Empty(replay.Confirmation.Sent);
     }
 
     [Fact]

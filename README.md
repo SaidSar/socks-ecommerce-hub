@@ -73,9 +73,9 @@ dotnet ef database update      # crea la BD "Sokko", aplica migraciones y siembr
 
 - **SQL Server Express:** cambie `Server=localhost` por `Server=localhost\SQLEXPRESS`.
 - **Docker (macOS/Linux):** `docker run -d --name sokko-sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=<su-contraseña>" -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest` y cree `appsettings.Development.local.json` (Git lo ignora) con `{"ConnectionStrings":{"Sokko":"Server=localhost,1433;Database=Sokko;User Id=sa;Password=<su-contraseña>;TrustServerCertificate=True"}}`.
-- **Semillas:** la migración trae colores, tallas, marcas, tipos, colecciones, configuración y zonas locales (todos los ambientes). En Development, `database update` agrega además 14 productos, 64 SKU con su kárdex inicial y las cuentas demo (`hola@sokko.mx` / `Kyoto2026`, `daniel@sokko.mx` / `Operaciones2026`, `nexus@sokko.mx` / `NexusCode2026`). Volver a correrlo no duplica nada.
+- **Semillas:** la migración trae colores, tallas, marcas, tipos, colecciones, configuración y zonas locales (todos los ambientes). En Development, `database update` agrega además 24 productos, 120 SKU con su kárdex inicial, 34 pedidos demo y las cuentas demo (`hola@sokko.mx` / `Kyoto2026`, `daniel@sokko.mx` / `Operaciones2026`, `nexus@sokko.mx` / `NexusCode2026`). Volver a correrlo no duplica nada.
 - **Cambios al modelo:** `dotnet ef migrations add <Nombre>`. La prueba `Migrations_are_in_sync_with_the_model` falla en CI si se olvida.
-- **Producción (Azure SQL):** la cadena llega por la variable `ConnectionStrings__Sokko`; el script se genera con `dotnet ef migrations script --idempotent`. La suscripción, el grupo de recursos y las regiones permitidas están en [`docs/infra/AZURE.md`](docs/infra/AZURE.md).
+- **Producción (Azure SQL):** la cadena llega por la variable `ConnectionStrings__Sokko`; las migraciones las aplica el workflow `deploy.yml` con `dotnet ef migrations bundle`. La suscripción, el grupo de recursos y las regiones permitidas están en [`docs/infra/AZURE.md`](docs/infra/AZURE.md).
 
 ```bash
 cd apps/api-service
@@ -119,6 +119,10 @@ cd apps/admin-panel && npm run build
 # Backend
 cd apps/api-service && dotnet build
 ```
+
+## Despliegue en Azure
+
+Infraestructura en [`infra/`](infra/README.md) y workflow en [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). **Todavía no se despliega:** faltan los pasos de [`infra/README.md`](infra/README.md).
 
 ## CI
 

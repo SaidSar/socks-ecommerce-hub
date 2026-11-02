@@ -13,7 +13,7 @@
 | Tenant (directorio) | `5fdc35e0-3fa0-4913-8db6-53b8535cb098` (UAdeO) |
 | Cuenta dueña de la suscripción | `23020117@uadeo.mx` |
 | Grupo de recursos | `rg-sokko-prod` |
-| Región | **West US 2** (`westus2`) |
+| Región | Grupo en **West US 2** (`westus2`); recursos en **West US** (`westus`), ver §2.1 |
 | Permisos adicionales | `23020667@uadeo.mx` con rol **Owner (Propietario)**, solo en `rg-sokko-prod` |
 
 Los ID de suscripción y de tenant no son secretos (no dan acceso por sí solos), pero **ninguna
@@ -35,9 +35,12 @@ Azure for Students aplica una directiva que limita el despliegue a **5 regiones*
 | Norway East | `norwayeast` |
 
 **México Central (`mexicocentral`) no está permitida**: la creación del grupo falla con
-`RequestDisallowedByAzure`. Se eligió **West US 2** por su latencia hacia México y porque ofrece el
-catálogo más amplio de servicios y planes. **Todos los recursos de SOKKO se crean en `westus2`**,
-salvo que un servicio no esté disponible ahí.
+`RequestDisallowedByAzure`. El grupo se creó en **West US 2**.
+
+**Los recursos se crean en West US (`westus`)**: en `westus2` la suscripción tiene **cuota 0 de App
+Service**, para B1 y también para F1 (el what-if falla con `Current Limit (B1 VMs): 0`). Las otras
+cuatro regiones permitidas sí tienen cuota, y `westus` es la más cercana a México. La región del
+grupo no limita la de sus recursos.
 
 Para consultar las regiones permitidas:
 
@@ -64,7 +67,7 @@ Los siete quedan en estado `Registered` en la suscripción:
 
 | Proveedor | Para qué |
 |---|---|
-| `Microsoft.Web` | App Service (`api-service`) y Static Web Apps (`web-store`, `admin-panel`) |
+| `Microsoft.Web` | App Service (`api-service`). La tienda y el panel van en Vercel, fuera de Azure (ver §6) |
 | `Microsoft.Sql` | Azure SQL Database (BD `Sokko`, ver `docs/design/DESIGN_DB.md`) |
 | `Microsoft.Communication` | Azure Communication Services (correos transaccionales) |
 | `Microsoft.KeyVault` | Key Vault (secretos y cadenas de conexión) |
@@ -146,11 +149,17 @@ Resultado esperado: `rg-sokko-prod` en `westus2` con estado `Succeeded`; `230206
 
 ## 6. Siguientes pasos
 
-- Crear los recursos de producción dentro de `rg-sokko-prod` (`westus2`): App Service para
-  `api-service`, Azure SQL para la BD `Sokko`, Key Vault, Application Insights / Log Analytics y
-  Communication Services.
-- La cadena de conexión llega a la API por la variable `ConnectionStrings__Sokko` (ver
-  [`README.md`](../../README.md)); en Azure debe venir de Key Vault mediante identidad administrada.
-- Las migraciones se aplican con el script idempotente:
-  `dotnet ef migrations script --idempotent`.
+- Crear los recursos de producción dentro de `rg-sokko-prod` (`westus`) con
+  [`infra/main.bicep`](../../infra/main.bicep): App Service para `api-service`, Azure SQL para la BD
+  `Sokko`, Key Vault, Application Insights / Log Analytics y Communication Services. Pasos en
+  [`infra/README.md`](../../infra/README.md).
+- **La tienda (`web-store`) y el panel (`admin-panel`) se publican en Vercel**, no en Azure:
+  `https://sokko-tienda.vercel.app` y `https://sokko-panel.vercel.app`. Cada uno es un proyecto de
+  Vercel con *Root Directory* en su carpeta y la variable `VITE_API_URL` apuntando a la API. Esas dos
+  URLs son los parámetros `webStoreUrl` y `adminPanelUrl` del Bicep, que la API usa para CORS y para
+  los enlaces de los correos.
+- La API entra a Azure SQL con su identidad administrada, así que `ConnectionStrings__Sokko` no lleva
+  contraseña. La clave JWT y la cadena de Communication Services van en Key Vault.
+- Las migraciones las aplica el workflow `deploy.yml` con un *migrations bundle*
+  (`dotnet ef migrations bundle`), no al arrancar la API.
 - Al crear cada recurso, agregar su nombre, SKU y región a una tabla nueva en este documento.

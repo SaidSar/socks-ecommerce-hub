@@ -214,3 +214,25 @@ public class AdminOrdersApiTests(AdminApiFactory factory) : AdminOpsTestBase(fac
     public void Every_carrier_has_a_code() =>
         Assert.All(Enum.GetValues<Carrier>(), c => Assert.Equal(c, CarrierCodes.Parse(CarrierCodes.ToCode(c))));
 }
+
+public class OrderEmailApiTests(AdminApiFactory factory) : AdminOpsTestBase(factory)
+{
+    [Fact]
+    public async Task Card_and_oxxo_purchases_send_their_confirmation()
+    {
+        var product = await CreateProduct(5);
+
+        var card = await Buy(product.Sku);
+        var oxxo = await Buy(product.Sku, payment: "oxxo_pay");
+
+        var mails = Factory.Email.Orders;
+        var cardMail = mails.Single(m => m.Folio == card);
+        Assert.Equal("ana.lopez@correo.test", cardMail.Email);
+        Assert.Null(cardMail.OxxoReference);
+        Assert.Equal("Producto de prueba", cardMail.Lines.Single().Name);
+
+        var oxxoMail = mails.Single(m => m.Folio == oxxo);
+        Assert.StartsWith("93", oxxoMail.OxxoReference);
+        Assert.NotNull(oxxoMail.OxxoExpiresAt);
+    }
+}
