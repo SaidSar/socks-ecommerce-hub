@@ -32,11 +32,11 @@ param useSqlFreeOffer bool = true
 @description('Ruta que sondea App Service cada minuto. /api/health/live no toca la BD; /api/health sí, e impediría su autopausa.')
 param healthCheckPath string = '/api/health/live'
 
-@description('Repositorio de GitHub que puede desplegar con OIDC.')
-param githubRepository string = 'SaidSar/socks-ecommerce-hub'
-
 @description('Ambiente de GitHub del workflow de despliegue.')
 param githubEnvironment string = 'production'
+
+@description('Subject exacto del token OIDC que manda GitHub. Este repositorio lo manda con los ID numéricos del dueño y del repositorio (infra/README.md).')
+param githubOidcSubject string = 'repo:SaidSar@159501332/socks-ecommerce-hub@1420135878:environment:production'
 
 @description('Cada cuántos minutos se buscan pedidos OXXO vencidos. Cada búsqueda despierta la BD: una vez al día, un pedido vencido puede cancelarse hasta 24 h tarde.')
 param oxxoExpiryCheckMinutes int = 1440
@@ -217,7 +217,7 @@ resource deployerGitHub 'Microsoft.ManagedIdentity/userAssignedIdentities/federa
   name: 'github-${githubEnvironment}'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubRepository}:environment:${githubEnvironment}'
+    subject: githubOidcSubject
     audiences: ['api://AzureADTokenExchange']
   }
 }
