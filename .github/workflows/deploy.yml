@@ -1,6 +1,7 @@
-# Despliegue de la API a Azure: corre después de que CI pase en un push a main. Entra por OIDC, sin secretos guardados.
-# La tienda y el panel los despliega Vercel desde su integración con GitHub (docs/infra/AZURE.md §6).
-# Variables del ambiente "production": ver infra/README.md. Sin ellas, el job se salta.
+# Despliegue de la API a Azure: corre después de que CI pase en un push a main, o a mano desde main. Entra por OIDC, sin
+# secretos guardados. La tienda y el panel los despliega Vercel desde su integración con GitHub (docs/infra/AZURE.md §6).
+# Se activa con la variable de repositorio DEPLOY_ENABLED=true: el `if` del job se evalúa antes de cargar el ambiente, así
+# que ahí no se ven las variables de "production". Esas las usan los pasos (infra/README.md).
 name: Deploy
 
 on:
@@ -8,6 +9,7 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,14 +23,19 @@ concurrency:
 jobs:
   deploy:
     name: deploy
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && vars.AZURE_CLIENT_ID != ''
+    # A mano, solo desde main: una rama sin revisar no llega a producción.
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' && (
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      )
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v7
         with:
-          # El commit que CI aprobó, no lo último de main.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # Tras CI, el commit que CI aprobó, no lo último de main; a mano, el commit de la ejecución.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
