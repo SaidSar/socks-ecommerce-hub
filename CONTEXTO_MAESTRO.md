@@ -123,6 +123,12 @@ se incluye en el bundle de la tienda.
 - **Acceso:** Entity Framework Core desde `apps/api-service/Data`.
 - **Esquema:** `docs/design/DESIGN_DB.md`; migración inicial `InitialCreate` con semillas de catálogo y, en Development, datos demo.
 
+### 2.4 Infraestructura (Azure)
+
+- **Suscripción:** Azure for Students; grupo de recursos `rg-sokko-prod` en **West US 2** (`westus2`).
+- **Restricción:** solo se permiten `westus2`, `westus`, `canadacentral`, `brazilsouth` y `norwayeast` (México Central no).
+- **Detalle, permisos y comandos para reproducirlo:** `docs/infra/AZURE.md`.
+
 ---
 
 ## 3. Principios SOA aplicados
