@@ -101,6 +101,17 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// `dotnet Sokko.Api.dll bootstrap`: carga inicial de producción (infra/README.md). Corre y termina sin levantar el servidor,
+// antes de las comprobaciones de arranque: solo necesita la cadena de conexión.
+if (args is ["bootstrap", ..])
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var services = scope.ServiceProvider;
+    Environment.ExitCode = await new ProductionBootstrap(
+        services.GetRequiredService<SokkoDbContext>(), services.GetRequiredService<IUserService>(), new TerminalPrompt()).RunAsync();
+    return;
+}
+
 // Sin clave de firma o sin URL de la tienda, falla al arrancar y no en la primera petición.
 _ = app.Services.GetRequiredService<JwtOptions>();
 _ = app.Services.GetRequiredService<ResetLinkOptions>();

@@ -38,6 +38,27 @@ Crear el ambiente `production` en *Settings → Environments* y, dentro de él, 
 
 Sin `AZURE_CLIENT_ID`, el workflow se salta y no falla.
 
+## Carga inicial de producción (bootstrap)
+
+Producción no lleva la semilla de Development. Después del primer despliegue, desde una máquina con `az login` (con MFA) y una regla de firewall temporal con su IP:
+
+```bash
+cd apps/api-service
+ASPNETCORE_ENVIRONMENT=Production \
+ConnectionStrings__Sokko="Server=tcp:<sqlServerFqdn>,1433;Database=Sokko;Authentication=Active Directory Default;Encrypt=True" \
+dotnet run -c Release -- bootstrap
+```
+
+Sobre una publicación ya compilada es `dotnet Sokko.Api.dll bootstrap`. El comando:
+
+- **Catálogo:** carga los 24 productos y 120 variantes de `DevelopmentSeed`, con su stock inicial y su kárdex (`InventarioInicial`). Es el mismo código que la semilla de Development.
+- **Cuentas:** crea al Dueño (pregunta su correo y nombre), a `daniel@sokko.mx` y `kevin@sokko.mx` (Operaciones) y a `cliente@sokko.mx` ("Cliente Demo", cliente de la tienda).
+- **Contraseñas:** las pide en la terminal, sin eco, y no las escribe en ningún lado. Siguen la política de la API: 8 caracteres o más, con mayúsculas, minúsculas y un número. La del Dueño necesita además 12 caracteres o más.
+- **Lo que no hace:** no crea pedidos ni las cuentas demo de Development.
+- **Es idempotente:** correrlo otra vez no duplica productos y no cambia la contraseña ni el rol de una cuenta que ya existe. Solo vuelve a preguntar el correo del Dueño.
+
+Al terminar, borre la regla de firewall temporal.
+
 ## Tienda y panel en Vercel
 
 Cada app es un proyecto de Vercel conectado a este repositorio:
