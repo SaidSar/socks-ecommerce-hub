@@ -4,7 +4,7 @@
 
 La suscripción (Azure for Students), sus regiones permitidas y el MFA obligatorio están en [`docs/infra/AZURE.md`](../docs/infra/AZURE.md).
 
-**Estado:** nada de esto se ha desplegado ni probado en Azure. Falta el what-if, la aprobación de costos y la creación de recursos.
+**Estado:** los recursos ya existen en `rg-sokko-prod` (`westus`). La API se publica con el workflow `deploy.yml`.
 
 ## Lo que necesita el dueño de la suscripción
 
@@ -25,7 +25,15 @@ Sin `jwtSigningKey`, un despliegue posterior conserva la clave que ya está en K
 
 ## GitHub
 
-Crear el ambiente `production` en *Settings → Environments* y, dentro de él, estas variables (no son secretos; el workflow entra por OIDC):
+El workflow se activa con una variable **de repositorio** (*Settings → Secrets and variables → Actions → Variables*), no de ambiente:
+
+| Variable | Valor |
+|---|---|
+| `DEPLOY_ENABLED` | `true` |
+
+Tiene que ser del repositorio porque el `if` del job se evalúa antes de cargar el ambiente, y ahí las variables de `production` todavía no existen. Sin ella, o con otro valor, el job se salta y no falla.
+
+Además, el ambiente `production` (*Settings → Environments*) lleva estas variables, que usan los pasos. No son secretos: el workflow entra por OIDC.
 
 | Variable | De dónde sale |
 |---|---|
@@ -36,7 +44,11 @@ Crear el ambiente `production` en *Settings → Environments* y, dentro de él, 
 | `API_URL` | salida `apiUrl` |
 | `SQL_SERVER_FQDN` | salida `sqlServerFqdn` |
 
-Sin `AZURE_CLIENT_ID`, el workflow se salta y no falla.
+El workflow corre solo después de que CI pasa en un push a `main`. También se puede lanzar a mano, solo desde `main`:
+
+```bash
+gh workflow run deploy.yml --ref main
+```
 
 ## Carga inicial de producción (bootstrap)
 
