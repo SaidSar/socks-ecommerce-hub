@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Sokko.Api.Data;
@@ -196,6 +197,23 @@ public class ProductionBootstrapTests(BootstrapFactory factory) : IClassFixture<
         var everything = string.Join('\n', factory.Logs.Lines);
         Assert.DoesNotContain(OwnerPassword, everything);
         Assert.DoesNotContain(EasyPassword, everything);
+    }
+
+    [Fact]
+    public async Task Runs_with_only_the_connection_string_and_no_jwt_key()
+    {
+        // Lo mismo que hay en la máquina que lo corre contra producción: la BD y el reloj, sin JwtOptions ni IAuthService.
+        var services = new ServiceCollection()
+            .AddDbContext<SokkoDbContext>(o => o.UseSqlServer(factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("Sokko")))
+            .AddSingleton<IClock, SystemClock>()
+            .BuildServiceProvider();
+        await using var scope = services.CreateAsyncScope();
+
+        var prompt = new ScriptedPrompt(_ownerEmail, "Ana", "Dueña", OwnerPassword, OwnerPassword, EasyPassword, EasyPassword);
+        Assert.Equal(0, await ProductionBootstrap.Create(scope.ServiceProvider, prompt).RunAsync(Ct));
+
+        var owner = await Query(db => db.Users.AsNoTracking().SingleAsync(u => u.Email == _ownerEmail, Ct));
+        Assert.NotEqual(PasswordVerificationResult.Failed, new PasswordHasher<User>().VerifyHashedPassword(owner, owner.PasswordHash, OwnerPassword));
     }
 
     [Theory]

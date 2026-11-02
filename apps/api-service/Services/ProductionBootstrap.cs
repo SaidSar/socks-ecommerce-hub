@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Sokko.Api.Data;
@@ -80,6 +81,18 @@ public partial class ProductionBootstrap(SokkoDbContext db, IUserService users, 
         new("kevin@sokko.mx", "Kevin", "Armenta", UserRole.Operations, StrongPassword: false),
         new("cliente@sokko.mx", "Cliente", "Demo", UserRole.Customer, StrongPassword: false),
     ];
+
+    /// <summary>
+    /// Arma el bootstrap sin la clave JWT ni el correo: se corre desde una máquina que solo tiene la cadena de conexión. Para guardar
+    /// contraseñas basta el hasher; la clave temporal no firma ningún token.
+    /// </summary>
+    public static ProductionBootstrap Create(IServiceProvider services, IBootstrapPrompt prompt)
+    {
+        var db = services.GetRequiredService<SokkoDbContext>();
+        var clock = services.GetRequiredService<IClock>();
+        var hashing = new AuthService(new JwtOptions("bootstrap", "bootstrap", RandomNumberGenerator.GetBytes(64), TimeSpan.FromMinutes(1)), clock);
+        return new ProductionBootstrap(db, new UserService(db, hashing, clock), prompt);
+    }
 
     [GeneratedRegex(AuthRules.Password)]
     private static partial Regex PasswordPattern();
