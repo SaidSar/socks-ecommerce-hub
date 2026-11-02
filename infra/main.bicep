@@ -1,14 +1,18 @@
-// Infraestructura de SOKKO en Azure. Se despliega dentro de un grupo de recursos que ya existe (rg-sokko-prod): no crea el grupo
-// y no toca nada de la suscripción. Todas las asignaciones de roles son sobre recursos de ese grupo.
+// Infraestructura de SOKKO en Azure: la API y lo que necesita. La tienda y el panel van en Vercel (docs/infra/AZURE.md §6).
+// Se despliega dentro de un grupo de recursos que ya existe (rg-sokko-prod): no crea el grupo y no toca nada de la suscripción.
+// Todas las asignaciones de roles son sobre recursos de ese grupo.
 // Ningún secreto vive en este archivo ni en el repo: la clave JWT llega como parámetro seguro y queda en Key Vault.
 targetScope = 'resourceGroup'
 
-@description('Región de la API, la BD y la observabilidad.')
-param location string = 'mexicocentral'
+@description('Región de todos los recursos. Azure for Students solo permite westus2, westus, canadacentral, brazilsouth y norwayeast.')
+@allowed(['westus2', 'westus', 'canadacentral', 'brazilsouth', 'norwayeast'])
+param location string = 'westus2'
 
-@description('Región de los metadatos de Static Web Apps; el contenido se sirve global. Este servicio solo admite algunas regiones.')
-@allowed(['centralus', 'eastus2', 'westus2', 'westeurope', 'eastasia'])
-param staticWebAppLocation string = 'centralus'
+@description('URL de la tienda en Vercel: origen permitido por CORS y base de los enlaces de los correos. Varias, separadas por coma.')
+param webStoreUrl string = 'https://sokko-tienda.vercel.app'
+
+@description('URL del panel en Vercel: origen permitido por CORS. Varias, separadas por coma.')
+param adminPanelUrl string = 'https://sokko-panel.vercel.app'
 
 @description('Ubicación de los datos de Communication Services.')
 param communicationDataLocation string = 'United States'
@@ -48,7 +52,6 @@ var suffix = uniqueString(resourceGroup().id)
 var databaseName = 'Sokko'
 var keyVaultSecretsUserRole = '4633458b-17de-408a-b874-0445c86b69e6'
 var websiteContributorRole = 'de139f84-1756-47ae-9be6-808fbbe84772'
-var contributorRole = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: 'log-${namePrefix}-prod'
@@ -76,20 +79,6 @@ resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   kind: 'linux'
   sku: { name: 'B1', tier: 'Basic' }
   properties: { reserved: true }
-}
-
-resource storeSite 'Microsoft.Web/staticSites@2024-04-01' = {
-  name: 'stapp-${namePrefix}-tienda'
-  location: staticWebAppLocation
-  sku: { name: 'Free', tier: 'Free' }
-  properties: {}
-}
-
-resource panelSite 'Microsoft.Web/staticSites@2024-04-01' = {
-  name: 'stapp-${namePrefix}-panel'
-  location: staticWebAppLocation
-  sku: { name: 'Free', tier: 'Free' }
-  properties: {}
 }
 
 resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
@@ -242,26 +231,6 @@ resource deployerApi 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-resource deployerStore 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storeSite
-  name: guid(storeSite.id, deployer.id, contributorRole)
-  properties: {
-    principalId: deployer.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRole)
-  }
-}
-
-resource deployerPanel 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: panelSite
-  name: guid(panelSite.id, deployer.id, contributorRole)
-  properties: {
-    principalId: deployer.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRole)
-  }
-}
-
 resource apiSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: api
   name: 'appsettings'
@@ -276,8 +245,8 @@ resource apiSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     Email__Provider: 'Azure'
     Email__ConnectionString: '@Microsoft.KeyVault(VaultName=${vault.name};SecretName=Email-ConnectionString)'
     Email__SenderAddress: 'DoNotReply@${emailDomain.properties.mailFromSenderDomain}'
-    Frontend__WebStoreUrl: 'https://${storeSite.properties.defaultHostname}'
-    Frontend__AdminPanelUrl: 'https://${panelSite.properties.defaultHostname}'
+    Frontend__WebStoreUrl: webStoreUrl
+    Frontend__AdminPanelUrl: adminPanelUrl
     Payments__DemoMode: string(paymentsDemoMode)
     Orders__OxxoExpiryCheckMinutes: string(oxxoExpiryCheckMinutes)
   }
@@ -286,10 +255,6 @@ resource apiSettings 'Microsoft.Web/sites/config@2024-04-01' = {
 output apiName string = api.name
 output apiUrl string = 'https://${api.properties.defaultHostName}'
 output apiPrincipalId string = api.identity.principalId
-output storeUrl string = 'https://${storeSite.properties.defaultHostname}'
-output storeSiteName string = storeSite.name
-output panelUrl string = 'https://${panelSite.properties.defaultHostname}'
-output panelSiteName string = panelSite.name
 output sqlServerName string = sqlServer.name
 output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
 output databaseName string = databaseName

@@ -1,4 +1,5 @@
-# Despliegue a Azure: corre después de que CI pase en un push a main. Entra por OIDC, sin secretos guardados.
+# Despliegue de la API a Azure: corre después de que CI pase en un push a main. Entra por OIDC, sin secretos guardados.
+# La tienda y el panel los despliega Vercel desde su integración con GitHub (docs/infra/AZURE.md §6).
 # Variables del ambiente "production": ver infra/README.md. Sin ellas, el job se salta.
 name: Deploy
 
@@ -31,10 +32,6 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-
       - name: Publicar la API
         working-directory: apps/api-service
         run: dotnet publish Sokko.Api.csproj -c Release -o "$RUNNER_TEMP/api"
@@ -66,45 +63,3 @@ jobs:
         with:
           app-name: ${{ vars.API_NAME }}
           package: ${{ runner.temp }}/api
-
-      - name: Compilar la tienda
-        working-directory: apps/web-store
-        env:
-          VITE_API_URL: ${{ vars.API_URL }}
-        run: |
-          npm ci
-          npm run build
-
-      - name: Compilar el panel
-        working-directory: apps/admin-panel
-        env:
-          VITE_API_URL: ${{ vars.API_URL }}
-        run: |
-          npm ci
-          npm run build
-
-      - name: Pedir los tokens de Static Web Apps
-        id: swa
-        run: |
-          store=$(az staticwebapp secrets list --name "${{ vars.STORE_SITE_NAME }}" --query properties.apiKey -o tsv)
-          panel=$(az staticwebapp secrets list --name "${{ vars.PANEL_SITE_NAME }}" --query properties.apiKey -o tsv)
-          echo "::add-mask::$store"
-          echo "::add-mask::$panel"
-          echo "store=$store" >> "$GITHUB_OUTPUT"
-          echo "panel=$panel" >> "$GITHUB_OUTPUT"
-
-      - uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ steps.swa.outputs.store }}
-          action: upload
-          app_location: apps/web-store/dist
-          skip_app_build: true
-          skip_api_build: true
-
-      - uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ steps.swa.outputs.panel }}
-          action: upload
-          app_location: apps/admin-panel/dist
-          skip_app_build: true
-          skip_api_build: true

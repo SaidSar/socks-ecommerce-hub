@@ -1,20 +1,14 @@
 # Infraestructura de SOKKO en Azure
 
-`main.bicep` despliega dentro de un grupo de recursos que ya existe, `rg-sokko-prod`. No crea el grupo, y todas sus asignaciones de roles son sobre recursos de ese grupo.
+`main.bicep` despliega la API y lo que necesita dentro de un grupo de recursos que ya existe, `rg-sokko-prod`, en `westus2`. No crea el grupo, y todas sus asignaciones de roles son sobre recursos de ese grupo. La tienda y el panel van en Vercel (ver abajo).
+
+La suscripción (Azure for Students), sus regiones permitidas y el MFA obligatorio están en [`docs/infra/AZURE.md`](../docs/infra/AZURE.md).
 
 **Estado:** nada de esto se ha desplegado ni probado en Azure. Falta el what-if, la aprobación de costos y la creación de recursos.
 
 ## Lo que necesita el dueño de la suscripción
 
-Propietario sobre `rg-sokko-prod` alcanza para desplegar, salvo por dos cosas que son de la suscripción:
-
-1. **Proveedores de recursos registrados.** Registrarlos requiere permisos sobre la suscripción:
-
-   ```bash
-   for p in Microsoft.Web Microsoft.Sql Microsoft.Communication Microsoft.KeyVault Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity; do az provider register --namespace $p; done
-   ```
-
-2. **Oferta gratuita de Azure SQL.** Depende de la suscripción. Si no la admite, se despliega con `useSqlFreeOffer=false`, que tiene costo.
+Propietario sobre `rg-sokko-prod` alcanza para desplegar. Los proveedores de recursos ya están registrados (`docs/infra/AZURE.md` §3). La oferta gratuita de Azure SQL depende de la suscripción: si no la admite, se despliega con `useSqlFreeOffer=false`, que tiene costo.
 
 ## Despliegue
 
@@ -41,10 +35,22 @@ Crear el ambiente `production` en *Settings → Environments* y, dentro de él, 
 | `API_NAME` | salida `apiName` |
 | `API_URL` | salida `apiUrl` |
 | `SQL_SERVER_FQDN` | salida `sqlServerFqdn` |
-| `STORE_SITE_NAME` | salida `storeSiteName` |
-| `PANEL_SITE_NAME` | salida `panelSiteName` |
 
 Sin `AZURE_CLIENT_ID`, el workflow se salta y no falla.
+
+## Tienda y panel en Vercel
+
+Cada app es un proyecto de Vercel conectado a este repositorio:
+
+| Proyecto | Root Directory | URL | Variable de entorno |
+|---|---|---|---|
+| `sokko-tienda` | `apps/web-store` | `https://sokko-tienda.vercel.app` | `VITE_API_URL` = salida `apiUrl` |
+| `sokko-panel` | `apps/admin-panel` | `https://sokko-panel.vercel.app` | `VITE_API_URL` = salida `apiUrl` |
+
+- Framework *Vite*: Vercel corre `npm run build` y publica `dist`. `vercel.json` manda todas las rutas a `index.html` y agrega los encabezados de seguridad.
+- La API solo acepta esas dos URLs (`webStoreUrl` y `adminPanelUrl` en el Bicep). Las vistas previas de Vercel tienen otra URL, así que CORS las rechaza. Para probarlas, agregue su URL al parámetro, separada por coma.
+- Si cambia la URL de un proyecto, actualice el parámetro y vuelva a desplegar el Bicep.
+- **CSP:** `connect-src` permite `https://*.azurewebsites.net`, porque el nombre de la API se conoce hasta desplegar. Cuando exista, conviene cambiarlo por el origen exacto de la API.
 
 ## Decisiones que afectan el costo
 
@@ -53,6 +59,6 @@ Sin `AZURE_CLIENT_ID`, el workflow se salta y no falla.
 
 ## Puntos sin comprobar
 
-- Que `mexicocentral` tenga todos los servicios; si no, se usa `location=southcentralus`.
+- Que la suscripción admita la oferta gratuita de Azure SQL y que su política permita cada recurso en `westus2`. Lo confirma el what-if.
 - Que los runners de GitHub alcancen Azure SQL con la regla "servicios de Azure". Si no, el paso de migraciones falla y hay que agregar una regla temporal con la IP del runner.
-- Que los roles de la identidad del workflow alcancen para publicar la API y las Static Web Apps.
+- Que el rol de la identidad del workflow alcance para publicar la API.
