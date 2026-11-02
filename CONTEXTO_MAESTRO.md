@@ -125,7 +125,7 @@ se incluye en el bundle de la tienda.
 
 ### 2.4 Infraestructura (Azure)
 
-- **Suscripción:** Azure for Students; grupo de recursos `rg-sokko-prod` en **West US 2** (`westus2`).
+- **Suscripción:** Azure for Students; grupo de recursos `rg-sokko-prod` en **West US 2** (`westus2`), con los recursos en **West US** (`westus`) porque en `westus2` la cuota de App Service es 0.
 - **Restricción:** solo se permiten `westus2`, `westus`, `canadacentral`, `brazilsouth` y `norwayeast` (México Central no).
 - **Detalle, permisos y comandos para reproducirlo:** `docs/infra/AZURE.md`.
 

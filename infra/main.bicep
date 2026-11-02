@@ -4,9 +4,9 @@
 // Ningún secreto vive en este archivo ni en el repo: la clave JWT llega como parámetro seguro y queda en Key Vault.
 targetScope = 'resourceGroup'
 
-@description('Región de todos los recursos. Azure for Students solo permite westus2, westus, canadacentral, brazilsouth y norwayeast.')
+@description('Región de todos los recursos. Azure for Students solo permite westus2, westus, canadacentral, brazilsouth y norwayeast; en westus2 la suscripción tiene cuota 0 de App Service.')
 @allowed(['westus2', 'westus', 'canadacentral', 'brazilsouth', 'norwayeast'])
-param location string = 'westus2'
+param location string = 'westus'
 
 @description('URL de la tienda en Vercel: origen permitido por CORS y base de los enlaces de los correos. Varias, separadas por coma.')
 param webStoreUrl string = 'https://sokko-tienda.vercel.app'
@@ -59,7 +59,8 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   properties: {
     sku: { name: 'PerGB2018' }
     retentionInDays: 30
-    workspaceCapping: { dailyQuotaGb: 1 }
+    // Unos 5 GB al mes: la ingesta gratuita de Log Analytics.
+    workspaceCapping: { dailyQuotaGb: json('0.16') }
   }
 }
 

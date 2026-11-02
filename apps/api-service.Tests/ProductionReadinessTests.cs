@@ -161,7 +161,33 @@ public class HealthApiTests
         }
     }
 
+    /// <summary>Una BD que no contesta: si /live la tocara, tardaría o fallaría.</summary>
+    private sealed class NoDatabaseFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Development");
+            builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+            builder.ConfigureAppConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Sokko"] = "Server=tcp:127.0.0.1,1;Database=Nada;User Id=x;Password=x;Connect Timeout=5;TrustServerCertificate=True",
+            }));
+        }
+    }
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task Live_never_touches_the_database()
+    {
+        await using var factory = new NoDatabaseFactory();
+        var client = factory.CreateClient();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/health/live", Ct)).StatusCode);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"tardó {watch.Elapsed}");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/api/health", Ct)).StatusCode);
+    }
 
     [Fact]
     public async Task Health_checks_the_database()
