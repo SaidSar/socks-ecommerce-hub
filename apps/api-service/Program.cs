@@ -119,6 +119,10 @@ _ = app.Services.GetRequiredService<JwtOptions>();
 _ = app.Services.GetRequiredService<ResetLinkOptions>();
 _ = app.Services.GetRequiredService<IEmailSender>();
 var imageStorage = app.Services.GetRequiredService<IImageStorage>();
+if (!imageStorage.IsConfigured)
+{
+    app.Logger.LogWarning("Falta Images:BlobServiceUrl: no se pueden subir ni borrar fotos de producto (503). Las ya guardadas se siguen mostrando.");
+}
 
 // Configure the HTTP request pipeline.
 // Antes que todo: el rate limiting, la autenticación y la redirección a HTTPS usan la IP y el esquema reales.

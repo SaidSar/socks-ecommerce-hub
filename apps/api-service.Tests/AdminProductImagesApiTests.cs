@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sokko.Api.Data;
 using Sokko.Api.Services;
 
@@ -262,6 +265,38 @@ public class AdminProductImagesApiTests(AdminApiFactory factory) : AdminApiTestB
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SokkoDbContext>();
         Assert.False(await db.ProductImages.AnyAsync(i => i.ProductId == id, Ct));
+    }
+
+    [Fact]
+    public async Task Without_storage_upload_and_delete_are_503_and_the_rest_keeps_working()
+    {
+        var product = await NewProduct();
+        var id = product.GetProperty("id").GetInt32();
+        var imageId = Ids(await UploadOk(id, Webp, "Ya guardada"))[0];
+
+        // La misma API sin almacenamiento, como producción sin Images:BlobServiceUrl.
+        await using var noStorage = Factory.WithWebHostBuilder(b =>
+            b.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IImageStorage>(new UnconfiguredImageStorage()))));
+        var client = noStorage.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login", new { email = "hola@sokko.mx", password = "Kyoto2026" }, Ct);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await Json(login)).GetProperty("accessToken").GetString());
+
+        async Task AssertUnavailable(HttpResponseMessage response)
+        {
+            await AssertProblem(response, HttpStatusCode.ServiceUnavailable);
+            Assert.Equal("Almacenamiento de imágenes no configurado.", (await Json(response)).GetProperty("title").GetString());
+        }
+
+        await AssertUnavailable(await client.PostAsync($"/api/admin/products/{id}/images", Form(Webp), Ct));
+        // También antes de validar: un archivo inválido o un producto que no existe no cambian la respuesta.
+        await AssertUnavailable(await client.PostAsync($"/api/admin/products/{int.MaxValue}/images", Form([1, 2, 3]), Ct));
+        await AssertUnavailable(await client.DeleteAsync($"/api/admin/products/{id}/images/{imageId}", Ct));
+
+        // La foto que ya estaba sigue en la tienda; ordenar y el texto alternativo solo tocan la BD.
+        var store = await Json(await client.GetAsync($"/api/products/{product.GetProperty("slug").GetString()}", Ct));
+        Assert.Equal("Ya guardada", store.GetProperty("images")[0].GetProperty("altText").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/admin/products/{id}/images/{imageId}", new { altText = "Nuevo" }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/admin/products/{id}/images/order", new { imageIds = new[] { imageId } }, Ct)).StatusCode);
     }
 
     [Fact]

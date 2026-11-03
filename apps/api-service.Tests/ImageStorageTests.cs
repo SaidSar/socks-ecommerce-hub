@@ -83,10 +83,14 @@ public class ImageStorageTests
     }
 
     [Fact]
-    public void Without_it_development_uses_the_local_folder_and_production_fails_at_startup()
+    public void Without_it_development_uses_the_local_folder_and_production_starts_without_storage()
     {
-        Assert.IsType<LocalImageStorage>(ImageStorageSetup.Create(Config(), new FakeEnvironment(Environments.Development, Path.GetTempPath())));
-        var error = Assert.Throws<InvalidOperationException>(() => ImageStorageSetup.Create(Config(), new FakeEnvironment(Environments.Production, Path.GetTempPath())));
-        Assert.Contains("Images:BlobServiceUrl", error.Message);
+        var local = ImageStorageSetup.Create(Config(), new FakeEnvironment(Environments.Development, Path.GetTempPath()));
+        Assert.IsType<LocalImageStorage>(local);
+        Assert.True(local.IsConfigured);
+
+        var production = ImageStorageSetup.Create(Config(("Images:BlobServiceUrl", "  ")), new FakeEnvironment(Environments.Production, Path.GetTempPath()));
+        Assert.IsType<UnconfiguredImageStorage>(production);
+        Assert.False(production.IsConfigured);
     }
 }

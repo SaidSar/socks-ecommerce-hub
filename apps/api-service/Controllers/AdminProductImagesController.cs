@@ -21,6 +21,11 @@ public class AdminProductImagesController(IProductImageService images) : AdminCo
     [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestBytes)]
     public async Task<IActionResult> Upload(int id, CancellationToken cancellationToken)
     {
+        // Antes de leer el cuerpo: sin almacenamiento, cualquier subida es 503, aunque el archivo sea inválido.
+        if (!images.CanStore)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: UnconfiguredImageStorage.Message);
+        }
         if (Request.ContentLength > MaxRequestBytes)
         {
             return TooLarge();

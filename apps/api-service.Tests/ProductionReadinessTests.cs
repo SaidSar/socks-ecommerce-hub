@@ -28,7 +28,6 @@ public class ProductionApiFactory : WebApplicationFactory<Program>
         ["Email:Provider"] = EmailSetup.AzureProvider,
         ["Email:ConnectionString"] = "endpoint=https://prueba.communication.azure.com/;accesskey=a2V5",
         ["Email:SenderAddress"] = "DoNotReply@prueba.azurecomm.net",
-        ["Images:BlobServiceUrl"] = "https://prueba.blob.core.windows.net",
         ["Payments:DemoMode"] = "true",
         ["Orders:OxxoExpiryJobEnabled"] = "false",
         ["RateLimiting:AuthPermitLimit"] = "2",
@@ -108,6 +107,18 @@ public class ProductionReadinessTests(ProductionApiFactory factory) : IClassFixt
     [InlineData("/openapi/v1.json")]
     public async Task Swagger_does_not_exist_in_production(string url) =>
         Assert.Equal(HttpStatusCode.NotFound, (await Client().GetAsync(url, Ct)).StatusCode);
+
+    [Fact]
+    public async Task Starts_without_image_storage_and_the_store_still_lists_products()
+    {
+        // Settings no trae Images:BlobServiceUrl: la API arranca, la tienda recibe images[] y solo subir y borrar dan 503.
+        Assert.False(factory.Settings.ContainsKey("Images:BlobServiceUrl"));
+        Assert.False(factory.Services.GetRequiredService<IImageStorage>().IsConfigured);
+
+        var response = await Client().GetAsync("/api/products/tabi-origami-noche", Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JsonValueKind.Array, (await response.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("images").ValueKind);
+    }
 
     [Fact]
     public async Task Config_tells_the_store_about_demo_mode() =>

@@ -7,6 +7,9 @@ namespace Sokko.Api.Services;
 /// <summary>Servicio de utilidad: guarda y borra las fotos de producto. Devuelve la URL pública con la que se muestran.</summary>
 public interface IImageStorage
 {
+    /// <summary><c>false</c> si no hay dónde guardar fotos: subir y borrar responden 503; mostrar las ya guardadas sigue igual.</summary>
+    bool IsConfigured => true;
+
     Task<string> UploadAsync(string blobName, Stream content, string contentType, CancellationToken cancellationToken = default);
 
     /// <summary>No falla si ya no existe.</summary>
@@ -35,6 +38,23 @@ public class AzureBlobImageStorage(BlobContainerClient container) : IImageStorag
 
     public Task DeleteAsync(string blobName, CancellationToken cancellationToken = default) =>
         container.GetBlobClient(blobName).DeleteIfExistsAsync(DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: cancellationToken);
+}
+
+/// <summary>
+/// Producción sin <c>Images:BlobServiceUrl</c>: la API arranca igual. Las fotos ya guardadas son URLs públicas y la tienda las sigue
+/// mostrando; solo subir y borrar quedan fuera de servicio. Nadie debe llamar a estos métodos: el servicio revisa
+/// <see cref="IsConfigured"/> antes.
+/// </summary>
+public class UnconfiguredImageStorage : IImageStorage
+{
+    public const string Message = "Almacenamiento de imágenes no configurado.";
+
+    public bool IsConfigured => false;
+
+    public Task<string> UploadAsync(string blobName, Stream content, string contentType, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(Message);
+
+    public Task DeleteAsync(string blobName, CancellationToken cancellationToken = default) => throw new InvalidOperationException(Message);
 }
 
 /// <summary>Development: las fotos van a <c>wwwroot/uploads</c> y las sirve la propia API.</summary>
@@ -80,8 +100,8 @@ public static class ImageStorageSetup
     public const string DefaultContainer = "product-images";
 
     /// <summary>
-    /// Con <c>Images:BlobServiceUrl</c> (la URL de la cuenta, <c>https://&lt;cuenta&gt;.blob.core.windows.net</c>) usa Azure Blob;
-    /// sin ella, solo en Development, la carpeta local. Se resuelve al arrancar, como el correo.
+    /// Con <c>Images:BlobServiceUrl</c> (la URL de la cuenta, <c>https://&lt;cuenta&gt;.blob.core.windows.net</c>) usa Azure Blob.
+    /// Sin ella: en Development, la carpeta local; en los demás ambientes, <see cref="UnconfiguredImageStorage"/>, y la API arranca igual.
     /// </summary>
     public static IImageStorage Create(IConfiguration configuration, IWebHostEnvironment environment)
     {
@@ -97,6 +117,6 @@ public static class ImageStorageSetup
             var baseUrl = configuration["Images:LocalBaseUrl"] ?? "http://localhost:5080/";
             return new LocalImageStorage(Path.Combine(environment.ContentRootPath, "wwwroot"), new Uri(baseUrl.TrimEnd('/') + "/"));
         }
-        throw new InvalidOperationException("Falta Images:BlobServiceUrl: la URL de la cuenta de Storage de las fotos.");
+        return new UnconfiguredImageStorage();
     }
 }

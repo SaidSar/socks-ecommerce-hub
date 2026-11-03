@@ -14,6 +14,8 @@ public enum AdminOutcome
     Conflict,
     /// <summary>413: el archivo pasa del límite.</summary>
     TooLarge,
+    /// <summary>503: falta una dependencia que se configura aparte (por ejemplo, el almacenamiento de fotos).</summary>
+    Unavailable,
 }
 
 /// <summary>Resultado de una escritura del panel: el valor, o por qué no se hizo y los errores por campo.</summary>
@@ -26,6 +28,8 @@ public record AdminResult<T>(AdminOutcome Outcome, T? Value = default, string? M
     public static AdminResult<T> Invalid(IReadOnlyDictionary<string, string> errors) => new(AdminOutcome.Invalid, Errors: errors);
 
     public static AdminResult<T> TooLarge(string message) => new(AdminOutcome.TooLarge, Message: message);
+
+    public static AdminResult<T> Unavailable(string message) => new(AdminOutcome.Unavailable, Message: message);
 
     public static AdminResult<T> Conflict(string message, IReadOnlyDictionary<string, string>? errors = null) => new(AdminOutcome.Conflict, Message: message, Errors: errors);
 }

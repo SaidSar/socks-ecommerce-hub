@@ -41,6 +41,9 @@ public record ImageFormat(string Extension, string ContentType)
 /// <summary>Servicio de entidad: fotos de producto del panel. El archivo lo guarda <see cref="IImageStorage"/>; la fila, la BD.</summary>
 public interface IProductImageService
 {
+    /// <summary><c>false</c> sin almacenamiento configurado: subir y borrar responden 503.</summary>
+    bool CanStore { get; }
+
     Task<AdminResult<AdminProductImagesDto>> AddAsync(int productId, Stream content, long length, string? altText, CancellationToken cancellationToken = default);
 
     Task<AdminResult<AdminProductImagesDto>> DeleteAsync(int productId, int imageId, CancellationToken cancellationToken = default);
@@ -66,8 +69,16 @@ public class ProductImageService(
 
     public static AdminProductImageDto ToDto(ProductImage image) => new(image.Id, image.Url, image.AltText, image.SortOrder);
 
+    public bool CanStore => storage.IsConfigured;
+
+    private static AdminResult<AdminProductImagesDto> NoStorage() => AdminResult<AdminProductImagesDto>.Unavailable(UnconfiguredImageStorage.Message);
+
     public async Task<AdminResult<AdminProductImagesDto>> AddAsync(int productId, Stream content, long length, string? altText, CancellationToken cancellationToken = default)
     {
+        if (!CanStore)
+        {
+            return NoStorage();
+        }
         if (!await db.Products.AnyAsync(p => p.Id == productId, cancellationToken))
         {
             return AdminResult<AdminProductImagesDto>.NotFound(ProductNotFound);
@@ -134,6 +145,11 @@ public class ProductImageService(
 
     public async Task<AdminResult<AdminProductImagesDto>> DeleteAsync(int productId, int imageId, CancellationToken cancellationToken = default)
     {
+        // Sin almacenamiento no se borra la fila: el archivo quedaría huérfano en la cuenta.
+        if (!CanStore)
+        {
+            return NoStorage();
+        }
         var blobName = await unitOfWork.InTransactionAsync<string?>(async ct =>
         {
             var images = await db.ProductImages.Where(i => i.ProductId == productId).OrderBy(i => i.SortOrder).ToListAsync(ct);
