@@ -4,6 +4,7 @@ import ProductGrid from '../components/catalog/ProductGrid'
 import SectionHead, { EYEBROW } from '../components/catalog/SectionHead'
 import Price from '../components/product/Price'
 import ProductArt from '../components/product/ProductArt'
+import ProductGallery from '../components/product/ProductGallery'
 import { SeasonTag } from '../components/product/ProductCard'
 import { label, LINE_LABELS, unitText } from '../config/enums'
 import { useAsync } from '../hooks/useAsync'
@@ -106,17 +107,21 @@ function ProductDetail({ product }) {
       </div>
 
       <section className="gutter mx-auto grid max-w-7xl items-start gap-8 py-8 md:grid-cols-[1.1fr_1fr] md:gap-14 md:py-12">
-        <div className={`relative flex aspect-[4/5] max-w-full items-center justify-center ${isSokko ? 'linen-tex bg-sand' : 'bg-shelf'}`}>
-          <div className="h-[80%] w-[70%]">
-            <ProductArt product={product} colorCode={color} />
+        {product.images?.length ? (
+          <ProductGallery product={product}>{product.offSeasonPct ? <SeasonTag product={product} className="absolute top-4 left-4" /> : null}</ProductGallery>
+        ) : (
+          <div className={`relative flex aspect-[4/5] max-w-full items-center justify-center ${isSokko ? 'linen-tex bg-sand' : 'bg-shelf'}`}>
+            <div className="h-[80%] w-[70%]">
+              <ProductArt product={product} colorCode={color} />
+            </div>
+            {product.offSeasonPct ? <SeasonTag product={product} className="absolute top-4 left-4" /> : null}
+            {isSokko && product.nameJp && (
+              <span lang="ja" className="vertical absolute top-6 right-6 font-jp text-[20px] tracking-[.3em] text-ink-soft">
+                {product.nameJp}
+              </span>
+            )}
           </div>
-          {product.offSeasonPct ? <SeasonTag product={product} className="absolute top-4 left-4" /> : null}
-          {isSokko && product.nameJp && (
-            <span lang="ja" className="vertical absolute top-6 right-6 font-jp text-[20px] tracking-[.3em] text-ink-soft">
-              {product.nameJp}
-            </span>
-          )}
-        </div>
+        )}
 
         <div className="flex min-w-0 flex-col gap-7">
           <div className="flex flex-col gap-3">

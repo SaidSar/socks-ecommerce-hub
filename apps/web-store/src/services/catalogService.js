@@ -60,6 +60,8 @@ function toCard(product, today) {
     fewUnits: product.stock <= DEFAULT_CONFIG.fewUnitsThreshold,
     stock: product.stock,
     art: product.art,
+    // El mock no tiene fotos: la tienda dibuja la ilustración.
+    images: [],
   }
 }
 
