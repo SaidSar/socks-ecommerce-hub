@@ -14,8 +14,8 @@ public record AdminProductView(OperationsProductDto Base, decimal Price, decimal
     public OperationsProductDto ToOperations() => Base;
 
     public OwnerProductDto ToOwner() => new(
-        Base.Slug, Base.Line, Base.PieceNumber, Base.Name, Base.NameJp, Base.Material, Base.Brand, Base.Type, Base.UnitsPerPack, Base.Collection,
-        Price, OffSeasonPrice, Base.Colors, Base.Variants, Base.Stock, Base.Sold, Base.IsActive, Base.RowVersion, UnitCost, Margin);
+        Base.Id, Base.Slug, Base.Line, Base.PieceNumber, Base.Name, Base.NameJp, Base.Material, Base.Brand, Base.Type, Base.UnitsPerPack, Base.Collection,
+        Price, OffSeasonPrice, Base.Colors, Base.Variants, Base.Images, Base.Stock, Base.Sold, Base.IsActive, Base.RowVersion, UnitCost, Margin);
 }
 
 /// <summary>Colección completa dentro del servicio; sale a la API solo por el DTO de cada rol (R-24).</summary>
@@ -108,6 +108,7 @@ public class CatalogAdminService(
             .Include(p => p.Collection)
             .Include(p => p.Variants.Where(v => v.IsActive)).ThenInclude(v => v.Color)
             .Include(p => p.Variants.Where(v => v.IsActive)).ThenInclude(v => v.Size)
+            .Include(p => p.Images.OrderBy(i => i.SortOrder))
             .AsSplitQuery();
 
     private static AdminColorDto ColorDto(Color c) => new(c.Code, c.Slug, c.Name, c.Hex, c.LineHex, c.IsSokkoTone);
@@ -130,6 +131,7 @@ public class CatalogAdminService(
 
         return new AdminProductView(
             new OperationsProductDto(
+                p.Id,
                 p.Slug,
                 p.Line,
                 p.PieceNumber,
@@ -142,6 +144,7 @@ public class CatalogAdminService(
                 p.Collection is null ? null : new AdminCollectionRefDto(p.Collection.Slug, p.Collection.Name, p.Collection.Kind, catalog.IsInSeason(p, today)),
                 variants.Select(v => v.Color).DistinctBy(c => c.Code).Select(ColorDto).ToList(),
                 variants.Select(v => new AdminVariantDto(v.Sku, v.ColorCode, v.Size.Code, v.Size.Label, v.Barcode, v.Stock)).ToList(),
+                p.Images.OrderBy(i => i.SortOrder).Select(ProductImageService.ToDto).ToList(),
                 variants.Sum(v => v.Stock),
                 sold,
                 p.IsActive,

@@ -69,6 +69,8 @@ const PATHS = {
   x: <path d="M6 6l12 12M18 6L6 18" />,
   up: <path d="M7 14l5-5 5 5" />,
   down: <path d="M7 10l5 5 5-5" />,
+  left: <path d="M14 7l-5 5 5 5" />,
+  right: <path d="M10 7l5 5-5 5" />,
   alert: (
     <>
       <path d="M12 3l9.5 17h-19z" />

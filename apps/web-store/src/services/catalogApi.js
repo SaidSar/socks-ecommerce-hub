@@ -25,9 +25,13 @@ function artOf(p) {
 
 const toPct = (fraction) => Math.round(fraction * 100)
 
+/** Fotos en orden; la primera es la de la tarjeta. Sin fotos, la tarjeta y la ficha dibujan `art`. */
+const imagesOf = (p) => (p.images ?? []).map((i) => ({ url: i.url, alt: i.altText ?? '' }))
+
 /** ProductCard (DESIGN_CATALOG_UI.md §2.1) a partir de un producto de la API. */
 export function toCard(p, fewUnitsThreshold = DEFAULT_CONFIG.fewUnitsThreshold) {
   const stock = p.variants.reduce((sum, v) => sum + v.stock, 0)
+  const images = imagesOf(p)
   return {
     slug: p.slug,
     line: p.line,
@@ -53,6 +57,7 @@ export function toCard(p, fewUnitsThreshold = DEFAULT_CONFIG.fewUnitsThreshold) 
     fewUnits: stock <= fewUnitsThreshold,
     stock,
     art: artOf(p),
+    images,
   }
 }
 

@@ -50,6 +50,24 @@ describe('toCard', () => {
   })
 })
 
+describe('fotos', () => {
+  it('sin fotos, la lista va vacía y se dibuja la ilustración', () => {
+    expect(toCard(copo, 4)).toMatchObject({ images: [], art: 'xmas' })
+  })
+
+  it('conserva el orden de la API y el texto alternativo', () => {
+    const images = [
+      { url: 'https://st.blob.core.windows.net/product-images/products/201/a.webp', altText: 'Copo de frente' },
+      { url: 'https://st.blob.core.windows.net/product-images/products/201/b.webp', altText: null },
+    ]
+    expect(toCard({ ...copo, imageUrl: images[0].url, images }, 4).images).toEqual([
+      { url: images[0].url, alt: 'Copo de frente' },
+      { url: images[1].url, alt: '' },
+    ])
+    expect(toDetail({ ...copo, images }, 4).images).toHaveLength(2)
+  })
+})
+
 describe('toDetail', () => {
   it('agrega nota, ventana, tallas y variantes con el código de color del SKU', () => {
     expect(toDetail(copo, 4)).toMatchObject({

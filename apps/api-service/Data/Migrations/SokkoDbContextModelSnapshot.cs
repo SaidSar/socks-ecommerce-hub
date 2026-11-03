@@ -1221,6 +1221,51 @@ namespace Sokko.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Sokko.Api.Models.ProductImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AltText")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("BlobName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(200)")
+                        .IsFixedLength(false);
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlobName")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_ProductImages_BlobName");
+
+                    b.HasIndex("ProductId", "SortOrder")
+                        .HasDatabaseName("IX_ProductImages_ProductId_SortOrder");
+
+                    b.ToTable("ProductImages", "dbo", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductImages_SortOrder", "[SortOrder] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Sokko.Api.Models.ProductType", b =>
                 {
                     b.Property<int>("Id")
@@ -1929,6 +1974,18 @@ namespace Sokko.Api.Data.Migrations
                     b.Navigation("ProductType");
                 });
 
+            modelBuilder.Entity("Sokko.Api.Models.ProductImage", b =>
+                {
+                    b.HasOne("Sokko.Api.Models.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_ProductImages_Products");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Sokko.Api.Models.ProductVariant", b =>
                 {
                     b.HasOne("Sokko.Api.Models.Color", "Color")
@@ -2030,6 +2087,8 @@ namespace Sokko.Api.Data.Migrations
 
             modelBuilder.Entity("Sokko.Api.Models.Product", b =>
                 {
+                    b.Navigation("Images");
+
                     b.Navigation("Variants");
                 });
 

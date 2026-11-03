@@ -57,3 +57,6 @@ desktop.ini
 
 # ---------- Claude Code (local) ----------
 .claude/
+
+# ---------- Fotos subidas en Development (LocalImageStorage) ----------
+apps/api-service/wwwroot/uploads/

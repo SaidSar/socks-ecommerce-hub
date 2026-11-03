@@ -22,13 +22,15 @@ export function problemToError(status, problem) {
   return err
 }
 
+/** `body` en JSON, o `FormData` tal cual: el navegador pone el `Content-Type` multipart con su separador. */
 export async function request(method, path, body) {
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
   let response
   try {
     response = await authFetch(path, {
       method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined || isForm ? {} : { 'Content-Type': 'application/json' },
+      body: body === undefined || isForm ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(NETWORK_MESSAGE, 0)
@@ -67,6 +69,25 @@ export async function getCatalog() {
 
 export const saveProduct = (form) =>
   form.slug ? request('PUT', `/api/admin/products/${encodeURIComponent(form.slug)}`, productBody(form)) : request('POST', '/api/admin/products', productBody(form))
+
+// ---------------------------------------------------------------- Fotos de producto
+// Todas responden { images, rowVersion }: la portada cambia el RowVersion del producto (R-25).
+
+const imagesPath = (productId) => `/api/admin/products/${encodeURIComponent(productId)}/images`
+
+export function uploadProductImage(productId, blob, altText) {
+  const form = new FormData()
+  form.append('file', blob, blob.type === 'image/webp' ? 'foto.webp' : 'foto.jpg')
+  if (altText) form.append('altText', altText)
+  return request('POST', imagesPath(productId), form)
+}
+
+export const deleteProductImage = (productId, imageId) => request('DELETE', `${imagesPath(productId)}/${encodeURIComponent(imageId)}`)
+
+export const reorderProductImages = (productId, imageIds) => request('PUT', `${imagesPath(productId)}/order`, { imageIds })
+
+export const setProductImageAlt = (productId, imageId, altText) =>
+  request('PUT', `${imagesPath(productId)}/${encodeURIComponent(imageId)}`, { altText: altText || null })
 
 export const addBrand = (name) => request('POST', '/api/admin/brands', { name: String(name ?? '').trim() })
 

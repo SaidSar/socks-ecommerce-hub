@@ -24,6 +24,7 @@ public class SokkoDbContext(DbContextOptions<SokkoDbContext> options) : DbContex
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();

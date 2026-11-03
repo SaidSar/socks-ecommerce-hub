@@ -14,12 +14,18 @@ public sealed class AdminApiFactory : WebApplicationFactory<Program>
 {
     internal CapturingEmailSender Email { get; } = new();
 
+    internal InMemoryImageStorage Images { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("RateLimiting:AuthPermitLimit", "10000");
         builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
-        builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email)));
+        builder.ConfigureTestServices(services =>
+        {
+            services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email));
+            services.Replace(ServiceDescriptor.Singleton<IImageStorage>(Images));
+        });
     }
 }
 
@@ -76,6 +82,19 @@ public abstract class AdminApiTestBase(AdminApiFactory factory)
     protected Task<HttpResponseMessage> Post(string url, string? role, object body) => Send(HttpMethod.Post, url, role, body);
 
     protected Task<HttpResponseMessage> Put(string url, string? role, object body) => Send(HttpMethod.Put, url, role, body);
+
+    protected Task<HttpResponseMessage> Delete(string url, string? role) => Send(HttpMethod.Delete, url, role);
+
+    /// <summary>POST multipart, como lo manda el navegador.</summary>
+    protected async Task<HttpResponseMessage> PostForm(string url, string? role, MultipartFormDataContent form)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = form };
+        if (role is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TokenOf(role));
+        }
+        return await Client.SendAsync(request, Ct);
+    }
 
     protected static async Task<JsonElement> Json(HttpResponseMessage response) =>
         await response.Content.ReadFromJsonAsync<JsonElement>(Ct);

@@ -52,6 +52,9 @@ public record SizeDto(string Code, string Label);
 /// <summary><c>Color</c> = <c>Colors.Slug</c>, <c>Size</c> = <c>Sizes.Code</c> y <c>Stock</c> = disponible. Nunca lleva costo (R-30).</summary>
 public record ProductVariantDto(string Sku, string Color, string Size, int Stock);
 
+/// <summary>Foto del producto, en orden: la primera es la de la tarjeta.</summary>
+public record ProductImageDto(string Url, string? AltText);
+
 /// <summary>Producto de la tienda. <c>Price</c> es el de lista y <c>FinalPrice</c> el que se cobra (R-29).</summary>
 public record ProductDto(
     int Id,
@@ -64,6 +67,7 @@ public record ProductDto(
     string Name,
     string? NameJp,
     string Material,
+    /// <summary>La primera de <c>Images</c>; <c>null</c> sin fotos (la tienda dibuja la ilustración).</summary>
     string? ImageUrl,
     int? EditionSize,
     byte UnitsPerPack,
@@ -73,6 +77,7 @@ public record ProductDto(
     decimal DiscountPct,
     IReadOnlyList<ColorDto> Colors,
     IReadOnlyList<ProductVariantDto> Variants,
+    IReadOnlyList<ProductImageDto> Images,
     // Solo en la ficha: tabla de tallas según type.sizeSystem.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<SizeDto>? Sizes = null);
 

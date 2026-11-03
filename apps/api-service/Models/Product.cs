@@ -22,6 +22,7 @@ public class Product
     public decimal Price { get; set; }
     public byte UnitsPerPack { get; set; } = 1;
     public int? EditionSize { get; set; }
+    /// <summary>URL de la primera foto de <see cref="Images"/>; la mantiene <see cref="Services.IProductImageService"/>.</summary>
     public string? ImageUrl { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
@@ -33,4 +34,5 @@ public class Product
     public ProductType ProductType { get; set; } = null!;
     public Collection? Collection { get; set; }
     public ICollection<ProductVariant> Variants { get; set; } = [];
+    public ICollection<ProductImage> Images { get; set; } = [];
 }

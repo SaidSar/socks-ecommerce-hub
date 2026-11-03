@@ -188,6 +188,7 @@ public class CatalogService(
             .Include(p => p.Collection)
             .Include(p => p.Variants.Where(v => v.IsActive)).ThenInclude(v => v.Color)
             .Include(p => p.Variants.Where(v => v.IsActive)).ThenInclude(v => v.Size)
+            .Include(p => p.Images.OrderBy(i => i.SortOrder))
             .AsSplitQuery();
 
     private ProductDto ToDto(Product product, DateOnly today)
@@ -232,7 +233,8 @@ public class CatalogService(
                 .ToList(),
             variants
                 .Select(v => new ProductVariantDto(v.Sku, v.Color.Slug, v.Size.Code, v.Stock - v.Reserved))
-                .ToList());
+                .ToList(),
+            product.Images.OrderBy(i => i.SortOrder).Select(i => new ProductImageDto(i.Url, i.AltText)).ToList());
     }
 
     private static string ApiCode(ProductLine line) => line.ToString().ToLowerInvariant();

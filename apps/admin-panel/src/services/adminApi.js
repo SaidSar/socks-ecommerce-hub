@@ -479,6 +479,33 @@ export async function saveProduct(form, user) {
   return copy(catalogProducts(user?.role).find((p) => p.slug === product.slug))
 }
 
+/** Las fotos viven en el almacenamiento de la API: sin ella no hay dónde guardarlas. */
+const NO_PHOTOS = 'Las fotos se guardan en la API: configura VITE_API_URL para subirlas.'
+
+/** Foto nueva, ya reducida a WebP. POST /api/admin/products/{id}/images */
+export async function uploadProductImage(productId, blob, altText) {
+  if (USE_API) return catalogApi.uploadProductImage(productId, blob, altText)
+  throw new ApiError(NO_PHOTOS, 400)
+}
+
+/** DELETE /api/admin/products/{id}/images/{imageId}: también borra el archivo. */
+export async function deleteProductImage(productId, imageId) {
+  if (USE_API) return catalogApi.deleteProductImage(productId, imageId)
+  throw new ApiError(NO_PHOTOS, 400)
+}
+
+/** PUT /api/admin/products/{id}/images/order: todas las fotos, la portada primero. */
+export async function reorderProductImages(productId, imageIds) {
+  if (USE_API) return catalogApi.reorderProductImages(productId, imageIds)
+  throw new ApiError(NO_PHOTOS, 400)
+}
+
+/** PUT /api/admin/products/{id}/images/{imageId} */
+export async function setProductImageAlt(productId, imageId, altText) {
+  if (USE_API) return catalogApi.setProductImageAlt(productId, imageId, altText)
+  throw new ApiError(NO_PHOTOS, 400)
+}
+
 /** Nueva marca (§4.4): sin duplicados, sin distinguir mayúsculas. POST /api/admin/brands */
 export async function addBrand(name, user) {
   if (USE_API) return catalogApi.addBrand(name)

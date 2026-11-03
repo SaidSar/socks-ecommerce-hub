@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Sokko.Api.Data;
 using Sokko.Api.Data.Seed;
 using Sokko.Api.Services;
@@ -69,6 +70,9 @@ builder.Services.AddHostedService<OxxoExpiryJob>();
 builder.Services.AddScoped<ICatalogAdminService, CatalogAdminService>();
 builder.Services.AddScoped<IBrandService, BrandService>();
 builder.Services.AddScoped<IProductTypeService, ProductTypeService>();
+builder.Services.AddScoped<IProductImageService, ProductImageService>();
+// Fotos: Azure Blob con Images:BlobServiceUrl; en Development sin ella, wwwroot/uploads.
+builder.Services.AddSingleton(_ => ImageStorageSetup.Create(builder.Configuration, builder.Environment));
 
 builder.Services.AddSokkoAuth();
 builder.Services.AddAuthRateLimiting();
@@ -114,6 +118,11 @@ if (args is ["bootstrap", ..])
 _ = app.Services.GetRequiredService<JwtOptions>();
 _ = app.Services.GetRequiredService<ResetLinkOptions>();
 _ = app.Services.GetRequiredService<IEmailSender>();
+var imageStorage = app.Services.GetRequiredService<IImageStorage>();
+if (!imageStorage.IsConfigured)
+{
+    app.Logger.LogWarning("Falta Images:BlobServiceUrl: no se pueden subir ni borrar fotos de producto (503). Las ya guardadas se siguen mostrando.");
+}
 
 // Configure the HTTP request pipeline.
 // Antes que todo: el rate limiting, la autenticación y la redirección a HTTPS usan la IP y el esquema reales.
@@ -130,6 +139,11 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/openapi/v1.json", "SOKKO API v1");
         options.DocumentTitle = "SOKKO API Service";
     });
+
+    if (imageStorage is LocalImageStorage local)
+    {
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(local.EnsureRoot()), RequestPath = $"/{LocalImageStorage.Folder}" });
+    }
 }
 else
 {

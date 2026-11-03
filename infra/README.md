@@ -23,6 +23,35 @@ Después de aprobar costos, se repite con `az deployment group create`. Luego, u
 
 Sin `jwtSigningKey`, un despliegue posterior conserva la clave que ya está en Key Vault.
 
+## Fotos de producto (`storage.bicep`)
+
+Va aparte de `main.bicep` para no volver a desplegar el plan ni la BD. Crea `stsokkoqifdnnh6tfjpc` (StorageV2, Standard_LRS, Hot, TLS 1.2, sin Shared Key) en `westus`, con el contenedor `product-images` de lectura pública solo de blobs (nadie puede listarlo), y le da a la identidad de la API el rol **Storage Blob Data Contributor** sobre esa cuenta.
+
+Requiere `Microsoft.Storage` registrado (no está entre los siete de `docs/infra/AZURE.md` §3):
+
+```bash
+az provider register --namespace Microsoft.Storage --wait
+az deployment group what-if -g rg-sokko-prod -f infra/storage.bicep
+az deployment group create -g rg-sokko-prod -f infra/storage.bicep
+```
+
+Luego, solo esta app setting (el valor es la salida `blobServiceUrl`):
+
+```bash
+az webapp config appsettings set -g rg-sokko-prod -n app-sokko-qifdnnh6tfjpc --settings Images__BlobServiceUrl=https://stsokkoqifdnnh6tfjpc.blob.core.windows.net/
+```
+
+- **Sin esa setting la API arranca igual:** la tienda sigue mostrando las fotos ya guardadas (son URLs públicas) y, sin fotos, las ilustraciones. Solo subir y borrar fotos responden 503 ("Almacenamiento de imágenes no configurado."), y al arrancar queda un aviso en el registro.
+- **`main.bicep` reemplaza todas las app settings** al desplegarse. Para que un redespliegue no borre esta, páselo con `imagesBlobServiceUrl`:
+
+  ```bash
+  az deployment group what-if -g rg-sokko-prod -f infra/main.bicep     -p sqlAdminLogin="<correo>" sqlAdminObjectId="<object-id>" imagesBlobServiceUrl="https://stsokkoqifdnnh6tfjpc.blob.core.windows.net/"
+  ```
+
+  Sin el parámetro (vacío por omisión), el redespliegue quita la setting y las fotos quedan de solo lectura hasta volver a ponerla.
+- El rol tarda unos minutos en propagarse; mientras tanto, subir una foto responde 500 (403 de Storage en el registro).
+- En Development, sin la setting, las fotos van a `apps/api-service/wwwroot/uploads` y las sirve la API en `/uploads`.
+
 ## GitHub
 
 El workflow se activa con una variable **de repositorio** (*Settings → Secrets and variables → Actions → Variables*), no de ambiente:
@@ -93,7 +122,7 @@ Cada app es un proyecto de Vercel conectado a este repositorio:
 - Framework *Vite*: Vercel corre `npm run build` y publica `dist`. `vercel.json` manda todas las rutas a `index.html` y agrega los encabezados de seguridad.
 - La API solo acepta esas dos URLs (`webStoreUrl` y `adminPanelUrl` en el Bicep). Las vistas previas de Vercel tienen otra URL, así que CORS las rechaza. Para probarlas, agregue su URL al parámetro, separada por coma.
 - Si cambia la URL de un proyecto, actualice el parámetro y vuelva a desplegar el Bicep.
-- **CSP:** `connect-src` permite `https://*.azurewebsites.net`, porque el nombre de la API se conoce hasta desplegar. Cuando exista, conviene cambiarlo por el origen exacto de la API.
+- **CSP:** `connect-src` solo permite el origen exacto de la API (`https://app-sokko-qifdnnh6tfjpc.azurewebsites.net`) e `img-src`, el de la cuenta de las fotos (`https://stsokkoqifdnnh6tfjpc.blob.core.windows.net`, ver `storage.bicep`). Si cambia el nombre de alguno de los dos, hay que cambiar `vercel.json` en las dos apps.
 
 ## Región
 

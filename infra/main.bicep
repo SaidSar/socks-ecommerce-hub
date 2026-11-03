@@ -44,6 +44,9 @@ param oxxoExpiryCheckMinutes int = 1440
 @description('Tienda de demostración: el checkout avisa que no hay cobros reales.')
 param paymentsDemoMode bool = true
 
+@description('URL de la cuenta de Storage de las fotos (salida blobServiceUrl de storage.bicep). Vacía no agrega la setting y la API arranca sin subir fotos (503).')
+param imagesBlobServiceUrl string = ''
+
 @description('Clave de firma de los JWT. Solo en el primer despliegue o al rotarla; vacía conserva la que ya está en Key Vault.')
 @secure()
 param jwtSigningKey string = ''
@@ -236,7 +239,8 @@ resource apiSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: api
   name: 'appsettings'
   dependsOn: [vaultReader, emailSecret, jwtSecret]
-  properties: {
+  // Este recurso reemplaza todas las app settings: las que se ponen a mano se pierden si no están aquí.
+  properties: union({
     ASPNETCORE_ENVIRONMENT: 'Production'
     APPLICATIONINSIGHTS_CONNECTION_STRING: insights.properties.ConnectionString
     ApplicationInsightsAgent_EXTENSION_VERSION: '~3'
@@ -250,7 +254,7 @@ resource apiSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     Frontend__AdminPanelUrl: adminPanelUrl
     Payments__DemoMode: string(paymentsDemoMode)
     Orders__OxxoExpiryCheckMinutes: string(oxxoExpiryCheckMinutes)
-  }
+  }, empty(imagesBlobServiceUrl) ? {} : { Images__BlobServiceUrl: imagesBlobServiceUrl })
 }
 
 output apiName string = api.name

@@ -28,6 +28,10 @@ public abstract class AdminControllerBase : ControllerBase
         {
             case AdminOutcome.NotFound:
                 return Problem(statusCode: StatusCodes.Status404NotFound, title: result.Message);
+            case AdminOutcome.TooLarge:
+                return Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: result.Message);
+            case AdminOutcome.Unavailable:
+                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: result.Message);
             case AdminOutcome.Invalid:
                 var modelState = new ModelStateDictionary();
                 foreach (var (field, message) in result.Errors!)

@@ -7,6 +7,7 @@ import Icon from '../ui/Icon'
 import SidePanel, { SidePanelHeader } from '../ui/SidePanel'
 import { Segmented } from '../ui/Tabs'
 import { Banner, LineTag, Swatch, TABLE, TD, TH } from './CatalogUi'
+import ProductPhotos from './ProductPhotos'
 
 const FIELD = 'h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[13.5px] outline-none focus:border-ai disabled:bg-linen disabled:text-ink-soft'
 const LINE_OPTIONS = LINES.map((key) => ({ key, label: label(LINE_SHORT_LABELS, key) }))
@@ -304,6 +305,8 @@ export default function ProductForm({ product, catalog, canEdit, canSeeCosts, on
                 </p>
               )}
             </fieldset>
+
+            <ProductPhotos product={product} canEdit={canEdit} onRowVersion={(rowVersion) => setForm((f) => ({ ...f, rowVersion }))} />
 
             <div className="flex min-w-0 flex-col gap-2">
               <div className="flex items-baseline justify-between gap-3">
