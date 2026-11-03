@@ -41,8 +41,14 @@ Luego, solo esta app setting (el valor es la salida `blobServiceUrl`):
 az webapp config appsettings set -g rg-sokko-prod -n app-sokko-qifdnnh6tfjpc --settings Images__BlobServiceUrl=https://stsokkoqifdnnh6tfjpc.blob.core.windows.net/
 ```
 
-- **Sin esa setting la API no arranca en producción** (igual que sin correo): hay que crearla antes de publicar la versión con fotos.
-- **`main.bicep` reemplaza todas las app settings** al desplegarse: si se vuelve a desplegar, hay que repetir el comando de arriba (o agregar `Images__BlobServiceUrl` a `apiSettings`).
+- **Sin esa setting la API arranca igual:** la tienda sigue mostrando las fotos ya guardadas (son URLs públicas) y, sin fotos, las ilustraciones. Solo subir y borrar fotos responden 503 ("Almacenamiento de imágenes no configurado."), y al arrancar queda un aviso en el registro.
+- **`main.bicep` reemplaza todas las app settings** al desplegarse. Para que un redespliegue no borre esta, páselo con `imagesBlobServiceUrl`:
+
+  ```bash
+  az deployment group what-if -g rg-sokko-prod -f infra/main.bicep     -p sqlAdminLogin="<correo>" sqlAdminObjectId="<object-id>" imagesBlobServiceUrl="https://stsokkoqifdnnh6tfjpc.blob.core.windows.net/"
+  ```
+
+  Sin el parámetro (vacío por omisión), el redespliegue quita la setting y las fotos quedan de solo lectura hasta volver a ponerla.
 - El rol tarda unos minutos en propagarse; mientras tanto, subir una foto responde 500 (403 de Storage en el registro).
 - En Development, sin la setting, las fotos van a `apps/api-service/wwwroot/uploads` y las sirve la API en `/uploads`.
 
