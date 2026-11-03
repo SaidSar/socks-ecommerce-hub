@@ -23,6 +23,29 @@ Después de aprobar costos, se repite con `az deployment group create`. Luego, u
 
 Sin `jwtSigningKey`, un despliegue posterior conserva la clave que ya está en Key Vault.
 
+## Fotos de producto (`storage.bicep`)
+
+Va aparte de `main.bicep` para no volver a desplegar el plan ni la BD. Crea `stsokkoqifdnnh6tfjpc` (StorageV2, Standard_LRS, Hot, TLS 1.2, sin Shared Key) en `westus`, con el contenedor `product-images` de lectura pública solo de blobs (nadie puede listarlo), y le da a la identidad de la API el rol **Storage Blob Data Contributor** sobre esa cuenta.
+
+Requiere `Microsoft.Storage` registrado (no está entre los siete de `docs/infra/AZURE.md` §3):
+
+```bash
+az provider register --namespace Microsoft.Storage --wait
+az deployment group what-if -g rg-sokko-prod -f infra/storage.bicep
+az deployment group create -g rg-sokko-prod -f infra/storage.bicep
+```
+
+Luego, solo esta app setting (el valor es la salida `blobServiceUrl`):
+
+```bash
+az webapp config appsettings set -g rg-sokko-prod -n app-sokko-qifdnnh6tfjpc --settings Images__BlobServiceUrl=https://stsokkoqifdnnh6tfjpc.blob.core.windows.net/
+```
+
+- **Sin esa setting la API no arranca en producción** (igual que sin correo): hay que crearla antes de publicar la versión con fotos.
+- **`main.bicep` reemplaza todas las app settings** al desplegarse: si se vuelve a desplegar, hay que repetir el comando de arriba (o agregar `Images__BlobServiceUrl` a `apiSettings`).
+- El rol tarda unos minutos en propagarse; mientras tanto, subir una foto responde 500 (403 de Storage en el registro).
+- En Development, sin la setting, las fotos van a `apps/api-service/wwwroot/uploads` y las sirve la API en `/uploads`.
+
 ## GitHub
 
 El workflow se activa con una variable **de repositorio** (*Settings → Secrets and variables → Actions → Variables*), no de ambiente:
