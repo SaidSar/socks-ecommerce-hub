@@ -28,6 +28,7 @@ public class ProductionApiFactory : WebApplicationFactory<Program>
         ["Email:Provider"] = EmailSetup.AzureProvider,
         ["Email:ConnectionString"] = "endpoint=https://prueba.communication.azure.com/;accesskey=a2V5",
         ["Email:SenderAddress"] = "DoNotReply@prueba.azurecomm.net",
+        ["Images:BlobServiceUrl"] = "https://prueba.blob.core.windows.net",
         ["Payments:DemoMode"] = "true",
         ["Orders:OxxoExpiryJobEnabled"] = "false",
         ["RateLimiting:AuthPermitLimit"] = "2",

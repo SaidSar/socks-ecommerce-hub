@@ -13,8 +13,27 @@ public record AdminColorDto(string Code, string ApiCode, string Name, string? He
 
 public record AdminVariantDto(string Sku, string Color, string Size, string SizeLabel, string? Barcode, int Stock);
 
+/// <summary>Foto de producto en el panel; <c>SortOrder</c> 0 es la portada.</summary>
+public record AdminProductImageDto(int Id, string Url, string? AltText, int SortOrder);
+
+/// <summary>Respuesta de las escrituras de fotos: cambian la portada, así que también el <c>RowVersion</c> del producto (R-25).</summary>
+public record AdminProductImagesDto(IReadOnlyList<AdminProductImageDto> Images, byte[] RowVersion);
+
+/// <summary>Nuevo orden de las fotos: todas las del producto, la portada primero.</summary>
+public class ImageOrderRequestDto
+{
+    public List<int>? ImageIds { get; init; }
+}
+
+public class ImageAltTextRequestDto
+{
+    [StringLength(200, ErrorMessage = "El texto alternativo admite hasta 200 caracteres.")]
+    public string? AltText { get; init; }
+}
+
 /// <summary>Producto para Operaciones (R-24, R-30): este tipo no tiene ninguna cifra en pesos, no las lleva en <c>null</c>.</summary>
 public record OperationsProductDto(
+    int Id,
     string Slug,
     ProductLine Line,
     short PieceNumber,
@@ -27,6 +46,7 @@ public record OperationsProductDto(
     AdminCollectionRefDto? Collection,
     IReadOnlyList<AdminColorDto> Colors,
     IReadOnlyList<AdminVariantDto> Variants,
+    IReadOnlyList<AdminProductImageDto> Images,
     int Stock,
     int Sold,
     bool IsActive,
@@ -34,6 +54,7 @@ public record OperationsProductDto(
 
 /// <summary>Producto para el Dueño: lo mismo que Operaciones, más precio, costo y margen (R-24, R-30).</summary>
 public record OwnerProductDto(
+    int Id,
     string Slug,
     ProductLine Line,
     short PieceNumber,
@@ -48,6 +69,7 @@ public record OwnerProductDto(
     decimal? OffSeasonPrice,
     IReadOnlyList<AdminColorDto> Colors,
     IReadOnlyList<AdminVariantDto> Variants,
+    IReadOnlyList<AdminProductImageDto> Images,
     int Stock,
     int Sold,
     bool IsActive,

@@ -462,6 +462,7 @@ public class OrdersApiTests(OrdersApiFactory factory) : IClassFixture<OrdersApiF
             b.UseSetting("Email:Provider", EmailSetup.AzureProvider);
             b.UseSetting("Email:ConnectionString", "endpoint=https://prueba.communication.azure.com/;accesskey=a2V5");
             b.UseSetting("Email:SenderAddress", "DoNotReply@prueba.azurecomm.net");
+            b.UseSetting("Images:BlobServiceUrl", "https://prueba.blob.core.windows.net");
             // No llega a conectarse: la ruta responde antes de tocar la BD.
             b.UseSetting("ConnectionStrings:Sokko", "Server=localhost;Database=SinUso;Trusted_Connection=True;TrustServerCertificate=True");
         });
