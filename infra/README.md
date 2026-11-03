@@ -93,7 +93,7 @@ Cada app es un proyecto de Vercel conectado a este repositorio:
 - Framework *Vite*: Vercel corre `npm run build` y publica `dist`. `vercel.json` manda todas las rutas a `index.html` y agrega los encabezados de seguridad.
 - La API solo acepta esas dos URLs (`webStoreUrl` y `adminPanelUrl` en el Bicep). Las vistas previas de Vercel tienen otra URL, así que CORS las rechaza. Para probarlas, agregue su URL al parámetro, separada por coma.
 - Si cambia la URL de un proyecto, actualice el parámetro y vuelva a desplegar el Bicep.
-- **CSP:** `connect-src` permite `https://*.azurewebsites.net`, porque el nombre de la API se conoce hasta desplegar. Cuando exista, conviene cambiarlo por el origen exacto de la API.
+- **CSP:** `connect-src` solo permite el origen exacto de la API (`https://app-sokko-qifdnnh6tfjpc.azurewebsites.net`) e `img-src`, el de la cuenta de las fotos (`https://stsokkoqifdnnh6tfjpc.blob.core.windows.net`, ver `storage.bicep`). Si cambia el nombre de alguno de los dos, hay que cambiar `vercel.json` en las dos apps.
 
 ## Región
 
