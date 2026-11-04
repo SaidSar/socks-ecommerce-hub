@@ -49,6 +49,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRegisterCustomer, RegisterCustomer>();
 builder.Services.AddScoped<IResetPassword, ResetPassword>();
 builder.Services.AddScoped<IInviteUser, InviteUser>();
+builder.Services.AddScoped<ISubmitContactMessage, SubmitContactMessage>();
 builder.Services.AddSingleton(provider => EmailSetup.Create(provider, builder.Configuration, builder.Environment.IsDevelopment()));
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -76,6 +77,7 @@ builder.Services.AddSingleton(_ => ImageStorageSetup.Create(builder.Configuratio
 
 builder.Services.AddSokkoAuth();
 builder.Services.AddAuthRateLimiting();
+builder.Services.AddContactRateLimiting();
 // Errores y respuestas sin cuerpo (401, 403, 404…) como ProblemDetails.
 builder.Services.AddProblemDetails();
 

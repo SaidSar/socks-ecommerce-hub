@@ -120,6 +120,7 @@ export const saveSettings = (settings) =>
     localShippingCost: settings.localShippingCost,
     localFreeShipping: settings.localFreeShipping,
     fewUnitsThreshold: settings.fewUnitsThreshold,
+    contactEmail: settings.contactEmail,
     localZones: settings.localZones,
     rowVersion: settings.rowVersion,
   })

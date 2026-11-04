@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
 import PageHeader from '../components/layout/PageHeader'
+import ContactSettings from '../components/settings/ContactSettings'
 import InternalUsers from '../components/settings/InternalUsers'
 import InventorySettings from '../components/settings/InventorySettings'
 import LocalZoneSettings from '../components/settings/LocalZoneSettings'
@@ -9,6 +10,7 @@ import Button from '../components/ui/Button'
 import EmptyState, { Loading } from '../components/ui/EmptyState'
 import Icon from '../components/ui/Icon'
 import Modal from '../components/ui/Modal'
+import { normalizeContactEmail } from '../domain/contact'
 import { useAdminData, useAdminQuery } from '../hooks/useAdminData'
 
 const toDraft = (s) => ({
@@ -17,6 +19,7 @@ const toDraft = (s) => ({
   localShippingCost: String(s.localShippingCost),
   localFreeShipping: s.localFreeShipping,
   fewUnitsThreshold: String(s.fewUnitsThreshold),
+  contactEmail: s.contactEmail ?? '',
   localZones: s.localZones,
 })
 
@@ -26,6 +29,7 @@ const toSettings = (d) => ({
   localShippingCost: d.localShippingCost === '' ? NaN : Number(d.localShippingCost),
   localFreeShipping: d.localFreeShipping,
   fewUnitsThreshold: d.fewUnitsThreshold === '' ? NaN : Number(d.fewUnitsThreshold),
+  contactEmail: normalizeContactEmail(d.contactEmail),
   localZones: d.localZones,
 })
 
@@ -88,6 +92,7 @@ function SettingsForm({ initial, users }) {
       <ShippingSettings draft={draft} set={set} errors={errors} />
       <LocalZoneSettings zones={draft.localZones} onChange={set('localZones')} error={errors.localZones} />
       <InventorySettings value={draft.fewUnitsThreshold} onChange={set('fewUnitsThreshold')} error={errors.fewUnitsThreshold} />
+      <ContactSettings value={draft.contactEmail} onChange={set('contactEmail')} error={errors.contactEmail} />
       <InternalUsers users={users} onInvite={api.inviteUser} />
       <div className="xl:col-span-2 flex flex-wrap items-center gap-3">
         <Button onClick={save} disabled={busy}>
@@ -115,7 +120,7 @@ function SettingsForm({ initial, users }) {
   )
 }
 
-/** Configuración (solo Dueño): envíos, zona local, inventario y usuarios internos. */
+/** Configuración (solo Dueño): envíos, zona local, inventario, correo de contacto y usuarios internos. */
 export default function Settings() {
   const { api } = useAdminData()
   const { data: settings, error } = useAdminQuery(() => api.getSettings(), [])
@@ -126,7 +131,7 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader title="Configuración" sub="Reglas de envío, zona local, inventario y usuarios" />
+      <PageHeader title="Configuración" sub="Reglas de envío, zona local, inventario, contacto y usuarios" />
       {error && <EmptyState icon="alert" title="No pudimos cargar la configuración." />}
       {!(initial && users) && !error && <Loading label="Cargando configuración…" />}
       {initial && users && <SettingsForm initial={initial} users={users} />}

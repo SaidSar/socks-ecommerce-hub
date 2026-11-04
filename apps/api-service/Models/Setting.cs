@@ -15,6 +15,8 @@ public class Setting
     public decimal IvaRate { get; set; }
     /// <summary>Pieza del hero; de la línea Sokko (lo valida el servicio).</summary>
     public int? FeaturedProductId { get; set; }
+    /// <summary>Correo de la tienda que recibe los mensajes de contacto; sin él, solo se guardan.</summary>
+    public string? ContactEmail { get; set; }
     public int? UpdatedByUserId { get; set; }
     public DateTime UpdatedAt { get; set; }
     public byte[] RowVersion { get; set; } = null!;

@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 /** Ruta, línea o producto inexistente. */
 export default function NotFound() {
+  usePageMeta('Página no encontrada')
   return (
     <main className="gutter mx-auto flex max-w-7xl flex-col items-start gap-4 py-20">
       <span aria-hidden="true" lang="ja" className="font-jp text-[56px] leading-none text-ink/15">

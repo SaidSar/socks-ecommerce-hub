@@ -11,6 +11,7 @@ public record AdminSettingsDto(
     bool LocalFreeShipping,
     int FewUnitsThreshold,
     decimal IvaRate,
+    string? ContactEmail,
     IReadOnlyList<AdminZoneDto> LocalZones,
     byte[] RowVersion);
 
@@ -33,6 +34,9 @@ public class AdminSettingsRequestDto
     public bool LocalFreeShipping { get; init; }
 
     public int? FewUnitsThreshold { get; init; }
+
+    /// <summary>Correo que recibe los mensajes del formulario de contacto. Vacío o ausente: solo se guardan.</summary>
+    public string? ContactEmail { get; init; }
 
     public List<AdminZoneRequestDto>? LocalZones { get; init; }
 

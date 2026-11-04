@@ -55,6 +55,7 @@ export const INITIAL_SETTINGS = {
   localFreeShipping: true,
   fewUnitsThreshold: 4,
   ivaRate: 0.16,
+  contactEmail: null, // vacío: los mensajes de /contacto solo se guardan
   localZones: [
     { value: '81200–81299', label: 'Los Mochis' },
     { value: '81300–81399', label: 'Ejidos de Ahome · por confirmar' },

@@ -552,6 +552,58 @@ namespace Sokko.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Sokko.Api.Models.ContactMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(45)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime?>("NotifiedAt")
+                        .HasColumnType("datetime2(3)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_ContactMessages_CreatedAt");
+
+                    b.ToTable("ContactMessages", "dbo", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContactMessages_Message", "LEN([Message]) > 0");
+                        });
+                });
+
             modelBuilder.Entity("Sokko.Api.Models.InventoryMovement", b =>
                 {
                     b.Property<long>("Id")
@@ -1501,6 +1553,10 @@ namespace Sokko.Api.Data.Migrations
                 {
                     b.Property<byte>("Id")
                         .HasColumnType("tinyint");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<int?>("FeaturedProductId")
                         .HasColumnType("int");

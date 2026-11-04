@@ -83,4 +83,18 @@ public static class EmailTemplates
             Shell(title, body),
             $"{title}\n\nRecibimos su pedido {order.Folio}.\n\n{payText}\n\n{textLines}\nTotal, IVA incluido: {Money(order.Total)}");
     }
+
+    public static EmailContentParts ContactNotification(ContactNotificationEmail message)
+    {
+        var title = $"Mensaje de {message.Name}";
+        var body = $"""
+            <p><b>Asunto:</b> {E(message.Subject)}<br><b>Correo:</b> {E(message.Email)}</p>
+            <p style="white-space:pre-line;border-left:2px solid #DDD5CA;padding-left:12px">{E(message.Message)}</p>
+            <p style="color:#6A645C;font-size:13px">Responda directamente a {E(message.Email)}.</p>
+            """;
+        return new EmailContentParts(
+            $"Contacto: {message.Subject}",
+            Shell(title, body),
+            $"{title} <{message.Email}>\nAsunto: {message.Subject}\n\n{message.Message}");
+    }
 }

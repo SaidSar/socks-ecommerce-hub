@@ -3,6 +3,7 @@
 // Cada función devuelve copias: los componentes nunca mutan el estado ni ven seed.js.
 import { can } from '../config/roles'
 import { brandMargins, grossMargin, lineStats, productDto, seasonStatus, skuOf, validateCollection, validateProduct } from '../domain/catalog'
+import { normalizeContactEmail, validateContactEmail } from '../domain/contact'
 import { buildDashboard } from '../domain/dashboard'
 import { LINES, stockUnit } from '../domain/enums'
 import { buildTemplate, previewCsv, rowsToCsv } from '../domain/importCsv'
@@ -581,6 +582,8 @@ export function validateSettings(s) {
   if (!Number.isInteger(s.fewUnitsThreshold) || s.fewUnitsThreshold <= 0) errors.fewUnitsThreshold = 'El umbral debe ser mayor a 0.'
   if (!s.localZones?.length) errors.localZones = 'Agregue al menos un código postal a la zona local.'
   else if (s.localZones.some((z) => validateZone(z.value))) errors.localZones = 'Hay códigos postales con formato inválido.'
+  const contactEmail = validateContactEmail(s.contactEmail)
+  if (contactEmail) errors.contactEmail = contactEmail
   return errors
 }
 
@@ -599,6 +602,7 @@ export async function saveSettings(settings) {
     localShippingCost: settings.localShippingCost,
     localFreeShipping: Boolean(settings.localFreeShipping),
     fewUnitsThreshold: settings.fewUnitsThreshold,
+    contactEmail: normalizeContactEmail(settings.contactEmail),
     // El IVA no se edita en el panel; se conserva el vigente.
     ivaRate: db().settings.ivaRate,
     localZones: settings.localZones.map((z) => ({ value: formatZone(z.value), label: String(z.label ?? '').trim() })),

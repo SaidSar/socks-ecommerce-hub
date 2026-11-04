@@ -34,6 +34,7 @@ public class AdminSettingsApiTests(AdminApiFactory factory) : AdminApiTestBase(f
             .SetProperty(x => x.LocalShippingCost, s.LocalShippingCost)
             .SetProperty(x => x.LocalFreeShipping, s.LocalFreeShipping)
             .SetProperty(x => x.FewUnitsThreshold, s.FewUnitsThreshold)
+            .SetProperty(x => x.ContactEmail, s.ContactEmail)
             .SetProperty(x => x.UpdatedByUserId, s.UpdatedByUserId)
             .SetProperty(x => x.UpdatedAt, s.UpdatedAt));
         var ids = _zones.Select(z => z.Id).ToList();
@@ -48,8 +49,9 @@ public class AdminSettingsApiTests(AdminApiFactory factory) : AdminApiTestBase(f
         GC.SuppressFinalize(this);
     }
 
-    private static object Body(JsonElement current, decimal? threshold = 900m, decimal? parcel = 99m, decimal? local = 49m, int? few = 4, object? zones = null, string? rowVersion = null) => new
+    private static object Body(JsonElement current, decimal? threshold = 900m, decimal? parcel = 99m, decimal? local = 49m, int? few = 4, object? zones = null, string? rowVersion = null, string? contactEmail = null) => new
     {
+        contactEmail,
         freeShippingThreshold = threshold,
         parcelShippingCost = parcel,
         localShippingCost = local,
@@ -112,6 +114,56 @@ public class AdminSettingsApiTests(AdminApiFactory factory) : AdminApiTestBase(f
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.True((await Json(response)).GetProperty("errors").TryGetProperty(field, out _));
+    }
+
+    [Fact]
+    public async Task Contact_email_is_saved_normalized_and_reaches_the_contact_form()
+    {
+        var saved = await Put(Url, Owner, Body(await Current(), contactEmail: "  Tienda@SOKKO.test "));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal("tienda@sokko.test", (await Json(saved)).GetProperty("contactEmail").GetString());
+        Assert.Equal("tienda@sokko.test", (await Current()).GetProperty("contactEmail").GetString());
+
+        var sender = $"panel-{Guid.NewGuid():N}@sokko.test";
+        try
+        {
+            var contact = await Post("/api/contact", null, new { name = "Ana", email = sender, subject = "Un pedido", message = "¿Cuándo llega mi pedido?" });
+            Assert.Equal(HttpStatusCode.Accepted, contact.StatusCode);
+            Assert.Equal("tienda@sokko.test", Assert.Single(Factory.Email.Contacts, c => c.Email == sender).To);
+        }
+        finally
+        {
+            using var scope = Factory.Services.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<SokkoDbContext>().ContactMessages.Where(m => m.Email == sender).ExecuteDeleteAsync(CancellationToken.None);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task Empty_contact_email_is_stored_as_null(string? contactEmail)
+    {
+        await Put(Url, Owner, Body(await Current(), contactEmail: "tienda@sokko.test"));
+
+        var saved = await Put(Url, Owner, Body(await Current(), contactEmail: contactEmail));
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await Json(saved)).GetProperty("contactEmail").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("tienda")]
+    [InlineData("tienda@sokko")]
+    [InlineData("tienda @sokko.test")]
+    public async Task Rejects_an_invalid_contact_email(string contactEmail)
+    {
+        var response = await Put(Url, Owner, Body(await Current(), contactEmail: contactEmail));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            "Revise el formato del correo, por ejemplo nombre@dominio.com.",
+            (await Json(response)).GetProperty("errors").GetProperty("contactEmail")[0].GetString());
     }
 
     public static TheoryData<object[]> BadZones => new()

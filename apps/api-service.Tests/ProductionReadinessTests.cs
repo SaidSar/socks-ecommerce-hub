@@ -305,6 +305,7 @@ public class EmailTests
         public Task SendPasswordResetAsync(string email, string link, CancellationToken cancellationToken = default) => throw new InvalidOperationException();
         public Task SendInvitationAsync(string email, string link, CancellationToken cancellationToken = default) => throw new InvalidOperationException();
         public Task SendOrderConfirmationAsync(OrderConfirmationEmail order, CancellationToken cancellationToken = default) => throw new InvalidOperationException("servicio caído");
+        public Task SendContactNotificationAsync(ContactNotificationEmail message, CancellationToken cancellationToken = default) => throw new InvalidOperationException();
     }
 
     private sealed class ListLogger<T> : ILogger<T>

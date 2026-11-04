@@ -16,6 +16,9 @@ public record OrderConfirmationEmail(
     DateTime? OxxoExpiresAt,
     IReadOnlyList<OrderEmailLine> Lines);
 
+/// <summary>Aviso a la tienda de un mensaje del formulario de contacto.</summary>
+public record ContactNotificationEmail(string To, string Name, string Email, string Subject, string Message);
+
 /// <summary>Servicio de utilidad: envío de correos.</summary>
 public interface IEmailSender
 {
@@ -24,6 +27,8 @@ public interface IEmailSender
     Task SendInvitationAsync(string email, string link, CancellationToken cancellationToken = default);
 
     Task SendOrderConfirmationAsync(OrderConfirmationEmail order, CancellationToken cancellationToken = default);
+
+    Task SendContactNotificationAsync(ContactNotificationEmail message, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Development: el correo solo se escribe en el log. Lleva enlaces que dan acceso a la cuenta: nunca se usa en producción.</summary>
@@ -46,6 +51,12 @@ public class LogEmailSender(ILogger<LogEmailSender> logger) : IEmailSender
         logger.LogInformation("Confirmación del pedido {Folio} para {Email}", order.Folio, order.Email);
         return Task.CompletedTask;
     }
+
+    public Task SendContactNotificationAsync(ContactNotificationEmail message, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Mensaje de contacto para {To}: {Subject}", message.To, message.Subject);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Producción: Azure Communication Services. No espera a que el correo se entregue, solo a que el servicio lo acepte.</summary>
@@ -59,6 +70,9 @@ public class AzureCommunicationEmailSender(EmailClient client, string senderAddr
 
     public Task SendOrderConfirmationAsync(OrderConfirmationEmail order, CancellationToken cancellationToken = default) =>
         SendAsync(order.Email, EmailTemplates.OrderConfirmation(order), cancellationToken);
+
+    public Task SendContactNotificationAsync(ContactNotificationEmail message, CancellationToken cancellationToken = default) =>
+        SendAsync(message.To, EmailTemplates.ContactNotification(message), cancellationToken);
 
     private Task SendAsync(string to, EmailContentParts parts, CancellationToken cancellationToken) =>
         client.SendAsync(

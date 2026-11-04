@@ -49,6 +49,24 @@ internal sealed class CapturingEmailSender : IEmailSender
         }
         return Task.CompletedTask;
     }
+
+    public List<ContactNotificationEmail> Contacts { get; } = [];
+
+    /// <summary>Si es <c>true</c>, el aviso de contacto falla como si el servicio de correo estuviera caído.</summary>
+    public bool FailContact { get; set; }
+
+    public Task SendContactNotificationAsync(ContactNotificationEmail message, CancellationToken cancellationToken = default)
+    {
+        if (FailContact)
+        {
+            throw new InvalidOperationException("servicio caído");
+        }
+        lock (Contacts)
+        {
+            Contacts.Add(message);
+        }
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>API real contra la BD de Development; el correo se captura y el límite se ajusta por prueba.</summary>

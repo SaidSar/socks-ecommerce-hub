@@ -187,15 +187,15 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
           <span className="text-ink-soft">Un correo al mes, como máximo.</span>
         </AuthCheckbox>
         <AuthCheckbox id="terms" checked={f.terms} onChange={set('terms')} error={errors.terms}>
-          {/* TODO(design): enlaces a rutas legales cuando existan. */}
+          {/* En otra pestaña: así no se pierde lo que ya escribió en el registro. */}
           Acepto los{' '}
-          <a href="#terminos" className="underline decoration-ink/30 underline-offset-2">
+          <Link to="/terminos" target="_blank" rel="noopener" className="underline decoration-ink/30 underline-offset-2">
             términos y condiciones
-          </a>{' '}
+          </Link>{' '}
           y el{' '}
-          <a href="#privacidad" className="underline decoration-ink/30 underline-offset-2">
+          <Link to="/privacidad" target="_blank" rel="noopener" className="underline decoration-ink/30 underline-offset-2">
             aviso de privacidad
-          </a>
+          </Link>
           .
         </AuthCheckbox>
       </div>
