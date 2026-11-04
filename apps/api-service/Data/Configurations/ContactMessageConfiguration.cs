@@ -4,7 +4,7 @@ using Sokko.Api.Models;
 
 namespace Sokko.Api.Data.Configurations;
 
-/// <summary>Mensajes de contacto. Sin FK: el remitente puede no tener cuenta.</summary>
+/// <summary>Mensajes de contacto. El remitente puede no tener cuenta; la única FK es a quien lo atendió.</summary>
 public class ContactMessageConfiguration : IEntityTypeConfiguration<ContactMessage>
 {
     public void Configure(EntityTypeBuilder<ContactMessage> b)
@@ -18,6 +18,12 @@ public class ContactMessageConfiguration : IEntityTypeConfiguration<ContactMessa
         b.Property(m => m.IpAddress).HasMaxLength(45).IsUnicode(false);
         b.Property(m => m.CreatedAt).HasUtcNowDefault();
 
-        b.HasIndex(m => m.CreatedAt).HasDatabaseName("IX_ContactMessages_CreatedAt");
+        // La bandeja lista los más recientes primero.
+        b.HasIndex(m => m.CreatedAt).IsDescending().HasDatabaseName("IX_ContactMessages_CreatedAt");
+
+        b.HasOne(m => m.HandledBy).WithMany()
+            .HasForeignKey(m => m.HandledByUserId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_ContactMessages_Users");
     }
 }

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { AdminDataContext } from '../context/admin-data-context'
 
 /** Acceso a la API del panel. Los componentes nunca importan seed.js ni adminApi.js directamente. */
@@ -14,7 +14,8 @@ export function useAdminData() {
  */
 export function useAdminQuery(fetcher, deps = []) {
   const { version } = useAdminData()
-  const key = JSON.stringify([version, ...deps])
+  const [attempt, setAttempt] = useState(0)
+  const key = JSON.stringify([version, attempt, ...deps])
   const fetcherRef = useRef(fetcher)
   const [state, setState] = useState({ key: null, data: null, error: null })
 
@@ -33,5 +34,7 @@ export function useAdminQuery(fetcher, deps = []) {
     }
   }, [key])
 
-  return { data: state.data, error: state.error, loading: state.key !== key }
+  // `retry`: vuelve a pedir lo mismo (botón "Reintentar" de los errores).
+  const retry = useCallback(() => setAttempt((a) => a + 1), [])
+  return { data: state.data, error: state.error, loading: state.key !== key, retry }
 }

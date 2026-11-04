@@ -6,7 +6,7 @@ import { BRANDS, COLLECTIONS, COLORS, PRODUCT_TYPES, PRODUCTS, SIZES_BY_SYSTEM }
 import { computeShipping } from '../domain/shipping'
 
 // Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
-export const SEED_VERSION = 6
+export const SEED_VERSION = 7
 
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
@@ -326,7 +326,61 @@ export function createSeed() {
       })
     })
 
-  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES), catalog }
+  const { accounts, messages } = createPeople(orders, at, iso)
+
+  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES), catalog, accounts, messages }
+}
+
+/**
+ * Clientes con cuenta y mensajes de contacto del mock. Usa su propio PRNG para no mover el resto de la semilla.
+ * Liga los pedidos de las cuentas con `customer.userId`; los demás quedan como invitados.
+ */
+function createPeople(orders, at, iso) {
+  const rnd = mulberry32(20261104)
+  const emails = [...new Set(orders.map((o) => o.customer.email))]
+  const accounts = emails.slice(0, 7).map((email, i) => {
+    const name = orders.find((o) => o.customer.email === email).customer.name
+    return {
+      id: 9001 + i,
+      name,
+      email,
+      preferredSize: ['S', 'M', 'M', 'L'][Math.floor(rnd() * 4)],
+      marketingOptIn: i % 3 !== 2,
+      createdAt: iso(at(40 + i * 23, 11, 0)),
+      favorites: Math.floor(rnd() * 6),
+      phone: `668${String(1000000 + Math.floor(rnd() * 8999999)).slice(0, 7)}`,
+    }
+  })
+  // Dos cuentas recién creadas que aún no compran.
+  accounts.push(
+    { id: 9101, name: 'Abril Zazueta', email: 'abril.zazueta@correo.mx', preferredSize: 'M', marketingOptIn: true, createdAt: iso(at(2, 18, 5)), favorites: 3, phone: null },
+    { id: 9102, name: 'Tomás Lugo', email: 'tomas.lugo@correo.mx', preferredSize: null, marketingOptIn: false, createdAt: iso(at(9, 10, 40)), favorites: 0, phone: null },
+  )
+  const byEmail = new Map(accounts.map((a) => [a.email, a.id]))
+  orders.forEach((o) => {
+    if (byEmail.has(o.customer.email)) o.customer.userId = byEmail.get(o.customer.email)
+  })
+
+  const folio = orders[6].id
+  const messages = [
+    { name: 'Mariela Osuna', email: 'mariela.osuna@correo.mx', subject: 'Un pedido', message: `Hola, compré el pedido ${folio} el fin de semana y no me ha llegado la guía. ¿Me pueden ayudar?`, created: at(0, 8, 12) },
+    { name: 'Rafael Coronado', email: 'rafa.coronado@correo.mx', subject: 'Tallas y materiales', message: 'Calzo 27.5 en tenis. ¿Me conviene la M o la L en los Tabi? Gracias.', created: at(0, 7, 3) },
+    { name: 'Lucía Montoya', email: 'lucia.montoya@correo.mx', subject: 'Mayoreo o colaboraciones', message: 'Tengo una tienda de regalos en Culiacán y me interesa vender sus calcetas. ¿Manejan precio de mayoreo?', created: at(1, 17, 45) },
+    { name: 'Óscar Verdugo', email: 'oscar.verdugo@correo.mx', subject: 'Cambios y devoluciones', message: 'Me llegó una talla S y pedí M. ¿Cómo hago el cambio?', created: at(2, 12, 20), read: true },
+    { name: 'Daniela Rocha', email: 'daniela.rocha@correo.mx', subject: 'Un pedido', message: `Ya pagué en OXXO el pedido ${orders[1].id}, ¿cuándo lo envían?`, created: at(3, 9, 0), read: true },
+    { name: 'Gustavo Mendívil', email: 'gus.mendivil@correo.mx', subject: 'Otro tema', message: '¡Me encantaron los Kintsugi! Solo quería felicitarlos.', created: at(6, 20, 10), read: true, archived: true },
+  ].map((m, i) => ({
+    id: 501 + i,
+    name: m.name,
+    email: m.email,
+    subject: m.subject,
+    message: m.message,
+    createdAt: iso(m.created),
+    readAt: m.read ? iso(new Date(m.created.getTime() + 3 * 3600e3)) : null,
+    archivedAt: m.archived ? iso(new Date(m.created.getTime() + 26 * 3600e3)) : null,
+    handledBy: m.read ? 'Aiko M.' : null,
+  }))
+  return { accounts, messages }
 }
 
 /**

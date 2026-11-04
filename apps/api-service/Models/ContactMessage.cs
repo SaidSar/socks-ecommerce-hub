@@ -13,6 +13,14 @@ public class ContactMessage
     public DateTime CreatedAt { get; set; }
     /// <summary>Cuándo se avisó al correo de la tienda; <c>null</c> si no hay correo configurado o el envío falló.</summary>
     public DateTime? NotifiedAt { get; set; }
+    /// <summary>Cuándo alguien del equipo lo abrió en la bandeja; <c>null</c> = nuevo.</summary>
+    public DateTime? ReadAt { get; set; }
+    /// <summary>Cuándo se archivó; <c>null</c> = sigue en Nuevos o Leídos.</summary>
+    public DateTime? ArchivedAt { get; set; }
+    /// <summary>Quien hizo el último cambio de estado (leer, archivar…).</summary>
+    public int? HandledByUserId { get; set; }
+
+    public User? HandledBy { get; set; }
 }
 
 /// <summary>Longitudes máximas: las comparten la tabla y <c>ContactRequestDto</c>.</summary>

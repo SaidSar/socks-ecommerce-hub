@@ -21,6 +21,8 @@ public static class Permissions
     public const string PromotionsManage = "promotions.manage";
     public const string ShippingView = "shipping.view";
     public const string PaymentsConfirm = "payments.confirm";
+    /// <summary>Bandeja de mensajes de contacto: los dos roles (no lleva pesos).</summary>
+    public const string MessagesView = "messages.view";
 
     /// <summary>Política para cualquier miembro del equipo interno.</summary>
     public const string Staff = "staff";
@@ -28,10 +30,10 @@ public static class Permissions
     public static readonly string[] All =
     [
         MoneyView, OrdersManage, InventoryAdjust, InventoryImport, SettingsManage, CatalogView, CatalogEdit, BrandsEdit,
-        CollectionsEdit, TypesEdit, CostsView, CustomersView, FinanceView, PromotionsManage, ShippingView, PaymentsConfirm,
+        CollectionsEdit, TypesEdit, CostsView, CustomersView, FinanceView, PromotionsManage, ShippingView, PaymentsConfirm, MessagesView,
     ];
 
-    private static readonly string[] OperationsPermissions = [OrdersManage, InventoryAdjust, ShippingView, CatalogView];
+    private static readonly string[] OperationsPermissions = [OrdersManage, InventoryAdjust, ShippingView, CatalogView, MessagesView];
 
     public static bool IsStaff(UserRole role) => role is UserRole.Owner or UserRole.Operations;
 

@@ -560,6 +560,9 @@ namespace Sokko.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("datetime2(3)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2(3)")
@@ -569,6 +572,9 @@ namespace Sokko.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(254)
                         .HasColumnType("nvarchar(254)");
+
+                    b.Property<int?>("HandledByUserId")
+                        .HasColumnType("int");
 
                     b.Property<string>("IpAddress")
                         .HasMaxLength(45)
@@ -588,6 +594,9 @@ namespace Sokko.Api.Data.Migrations
                     b.Property<DateTime?>("NotifiedAt")
                         .HasColumnType("datetime2(3)");
 
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2(3)");
+
                     b.Property<string>("Subject")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -596,7 +605,10 @@ namespace Sokko.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt")
+                        .IsDescending()
                         .HasDatabaseName("IX_ContactMessages_CreatedAt");
+
+                    b.HasIndex("HandledByUserId");
 
                     b.ToTable("ContactMessages", "dbo", t =>
                         {
@@ -1929,6 +1941,17 @@ namespace Sokko.Api.Data.Migrations
                         .HasDatabaseName("IX_WishlistItems_ProductId");
 
                     b.ToTable("WishlistItems", "dbo");
+                });
+
+            modelBuilder.Entity("Sokko.Api.Models.ContactMessage", b =>
+                {
+                    b.HasOne("Sokko.Api.Models.User", "HandledBy")
+                        .WithMany()
+                        .HasForeignKey("HandledByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_ContactMessages_Users");
+
+                    b.Navigation("HandledBy");
                 });
 
             modelBuilder.Entity("Sokko.Api.Models.InventoryMovement", b =>

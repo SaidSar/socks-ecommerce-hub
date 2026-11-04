@@ -92,10 +92,9 @@ public class AuthServiceTests
     [Fact]
     public void Operations_has_the_same_permissions_as_the_panel()
     {
-        Assert.Equal(16, Permissions.All.Length);
-        Assert.Equal(
-            ["orders.manage", "inventory.adjust", "catalog.view", "shipping.view"],
-            Permissions.All.Where(Permissions.OperationsCan).OrderBy(p => Array.IndexOf<string>(["orders.manage", "inventory.adjust", "catalog.view", "shipping.view"], p)));
+        string[] operations = ["orders.manage", "inventory.adjust", "catalog.view", "shipping.view", "messages.view"];
+        Assert.Equal(17, Permissions.All.Length);
+        Assert.Equal(operations, Permissions.All.Where(Permissions.OperationsCan).OrderBy(p => Array.IndexOf(operations, p)));
         Assert.False(Permissions.IsStaff(UserRole.Customer));
     }
 }

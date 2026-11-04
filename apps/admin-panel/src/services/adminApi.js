@@ -4,8 +4,12 @@
 import { can } from '../config/roles'
 import { brandMargins, grossMargin, lineStats, productDto, seasonStatus, skuOf, validateCollection, validateProduct } from '../domain/catalog'
 import { normalizeContactEmail, validateContactEmail } from '../domain/contact'
+import { toCsv } from '../domain/csv'
+import { buildCustomers, customersCsv, customersCsvName, marketingCsv, marketingCsvName, queryCustomers } from '../domain/customers'
+import { MESSAGE_STATUSES, statusOf } from '../domain/messages'
+import { buildSalesReport, salesCsvName, taxIncluded, todayIso, validatePeriod } from '../domain/reports'
 import { buildDashboard } from '../domain/dashboard'
-import { LINES, stockUnit } from '../domain/enums'
+import { LINES, PAYMENT_METHOD_LABELS, stockUnit } from '../domain/enums'
 import { buildTemplate, previewCsv, rowsToCsv } from '../domain/importCsv'
 import { applyInitial, applyMovement, applySale, available, matchesStockFilter, release, sortMovements, stockState, STOCK_FILTERS } from '../domain/inventory'
 import { advance, cancel, countByFilter, isLate, markPaid, matchesFilter, matchesQuery } from '../domain/orders'
@@ -16,7 +20,10 @@ import { COLORS } from '../data/catalogSeed'
 import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
 import * as catalogApi from './adminCatalogApi'
+import * as customersApi from './adminCustomersApi'
+import * as messagesApi from './adminMessagesApi'
 import * as opsApi from './adminOpsApi'
+import * as reportsApi from './adminReportsApi'
 import { USE_API } from './api'
 import { ApiError } from './apiError'
 
@@ -643,6 +650,166 @@ export async function getCouriers() {
   if (USE_API) return opsApi.getCouriers()
   await latency()
   return [...COURIERS]
+}
+
+// ---------------------------------------------------------------- Reloj de las pantallas
+
+/** "Ahora" para fechas relativas y periodos: la hora real con la API, la hora demo en el mock. */
+export const currentNow = () => (USE_API ? new Date() : refNow())
+
+/** Hoy en la tienda (America/Mazatlan), "AAAA-MM-DD". */
+export const currentToday = () => todayIso(currentNow())
+
+// ---------------------------------------------------------------- Clientes (solo el Dueño)
+
+const csvFile = (text, fileName) => ({ blob: new Blob([text], { type: 'text/csv;charset=utf-8' }), fileName })
+
+function customerRows() {
+  const { orders, accounts } = db()
+  return buildCustomers(orders, accounts)
+}
+
+/** GET /api/admin/customers?type=&q=&sort=&page= */
+export async function getCustomers(params = {}, user) {
+  if (USE_API) return customersApi.getCustomers(params)
+  await latency()
+  forbidden(user, 'customers.view', 'Solo el Dueño ve los clientes.')
+  const { all: _all, ...rest } = queryCustomers(customerRows(), params)
+  return copy(rest)
+}
+
+/** GET /api/admin/customers/{id} o /api/admin/customers/guest?email= */
+export async function getCustomer(key, user) {
+  if (USE_API) return customersApi.getCustomer(key)
+  await latency()
+  forbidden(user, 'customers.view', 'Solo el Dueño ve los clientes.')
+  const email = String(key.email ?? '').trim().toLowerCase()
+  const row = customerRows().find((r) => (key.id != null ? r.id === key.id : r.kind === 'invitado' && r.email === email))
+  if (!row) throw new ApiError('No encontramos ese cliente.', 404)
+  const { orders, accounts } = db()
+  const account = accounts.find((a) => a.id === row.id)
+  const own = orders
+    .filter((o) => (row.id != null ? o.customer.userId === row.id : o.customer.userId == null && o.customer.email.toLowerCase() === row.email))
+    .sort((a, b) => (a.created < b.created ? 1 : -1))
+  const last = own[0]
+  return copy({
+    customer: row,
+    phone: account?.phone ?? (last ? '6681234567' : null),
+    orders: own.map((o) => ({ folio: o.id, createdAt: o.created, status: o.status, paymentStatus: o.paymentStatus, total: o.total })),
+    favorites: row.id != null ? (account?.favorites ?? 0) : null,
+    lastAddress: last
+      ? { street: 'Calle demo 123', neighborhood: 'Centro', city: last.customer.city, state: 'Sinaloa', postalCode: last.customer.postalCode, references: null }
+      : null,
+  })
+}
+
+/** GET /api/admin/customers/export.csv: la lista filtrada completa. */
+export async function exportCustomers(params = {}, user) {
+  const fileName = customersCsvName(currentToday())
+  if (USE_API) return customersApi.exportCustomers(params, fileName)
+  await latency()
+  forbidden(user, 'customers.view', 'Solo el Dueño exporta clientes.')
+  return csvFile(customersCsv(queryCustomers(customerRows(), params).all), fileName)
+}
+
+/** GET /api/admin/customers/marketing.csv: solo quienes aceptaron novedades. */
+export async function exportMarketing(user) {
+  const fileName = marketingCsvName(currentToday())
+  if (USE_API) return customersApi.exportMarketing(fileName)
+  await latency()
+  forbidden(user, 'customers.view', 'Solo el Dueño exporta clientes.')
+  return csvFile(marketingCsv(queryCustomers(customerRows(), { sort: 'alta' }).all), fileName)
+}
+
+// ---------------------------------------------------------------- Reportes (solo el Dueño)
+
+function assertPeriod(from, to) {
+  const errors = validatePeriod(from, to)
+  if (Object.keys(errors).length) throw invalid(errors)
+}
+
+/** GET /api/admin/reports/sales?from=&to= */
+export async function getSalesReport(period, user) {
+  if (USE_API) return reportsApi.getSalesReport(period)
+  await latency()
+  forbidden(user, 'finance.view', 'Solo el Dueño ve los reportes.')
+  assertPeriod(period.from, period.to)
+  return copy(buildSalesReport(db().orders, period.from, period.to))
+}
+
+const STATUS_CSV = { por_preparar: 'Por preparar', preparando: 'Preparando', enviado: 'Enviado', en_ruta: 'En ruta', entregado: 'Entregado', cancelado: 'Cancelado' }
+const PAYMENT_CSV = { pendiente: 'Pendiente', pagado: 'Pagado', reembolsado: 'Reembolsado' }
+const SALES_CSV_HEADER = ['Folio', 'Fecha (hora de Los Mochis)', 'Cliente', 'Correo', 'Método de pago', 'Estado de pago', 'Estado del pedido', 'Subtotal', 'Envío', 'IVA incluido', 'Total']
+const localStamp = (instant) => new Date(instant).toLocaleString('sv-SE', { timeZone: 'America/Mazatlan', hour12: false }).slice(0, 16)
+
+/** GET /api/admin/reports/sales.csv?from=&to=: una fila por pedido, para el contador. */
+export async function downloadSalesCsv(period, user) {
+  if (USE_API) return reportsApi.downloadSalesCsv(period)
+  await latency()
+  forbidden(user, 'finance.view', 'Solo el Dueño descarga los reportes.')
+  assertPeriod(period.from, period.to)
+  const rows = db()
+    .orders.filter((o) => {
+      const day = todayIso(new Date(o.created))
+      return day >= period.from && day <= period.to
+    })
+    .sort((a, b) => (a.created < b.created ? -1 : 1))
+    .map((o) => [
+      o.id,
+      localStamp(o.created),
+      o.customer.name,
+      o.customer.email,
+      PAYMENT_METHOD_LABELS[o.pay],
+      PAYMENT_CSV[o.paymentStatus],
+      STATUS_CSV[o.status],
+      o.subtotal,
+      o.shipping,
+      taxIncluded(o.total),
+      o.total,
+    ])
+  return csvFile(toCsv(SALES_CSV_HEADER, rows, [7, 8, 9, 10]), salesCsvName(period.from, period.to))
+}
+
+// ---------------------------------------------------------------- Mensajes de contacto (los dos roles)
+
+const MESSAGES_PAGE = 25
+
+/** GET /api/admin/messages?status=&q=&page= */
+export async function getMessages({ status = 'nuevos', q = '', page = 1 } = {}, user) {
+  if (USE_API) return messagesApi.getMessages({ status, q, page })
+  await latency()
+  forbidden(user, 'messages.view', 'Su rol no ve los mensajes.')
+  if (!MESSAGE_STATUSES.includes(status)) throw new ApiError('El filtro es nuevos, leidos o archivados.', 400)
+  const all = [...db().messages].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  const counts = Object.fromEntries(MESSAGE_STATUSES.map((s) => [s, all.filter((m) => statusOf(m) === s).length]))
+  const term = normalize(q)
+  const list = all.filter((m) => statusOf(m) === status && (!term || [m.name, m.email, m.subject, m.message].some((f) => normalize(f).includes(term))))
+  return copy({ messages: list.slice((page - 1) * MESSAGES_PAGE, page * MESSAGES_PAGE), counts, total: list.length, page, pageSize: MESSAGES_PAGE })
+}
+
+/** GET /api/admin/messages/unread-count */
+export async function getUnreadCount(user) {
+  if (USE_API) return messagesApi.getUnreadCount()
+  await latency()
+  if (!can(user?.role, 'messages.view')) return 0
+  return db().messages.filter((m) => statusOf(m) === 'nuevos').length
+}
+
+/** POST /api/admin/messages/{id}/{read|unread|archive|unarchive}. Idempotente: si ya estaba así, no cambia nada. */
+export async function updateMessage(id, action, user) {
+  if (USE_API) return messagesApi.updateMessage(id, action)
+  await latency()
+  forbidden(user, 'messages.view', 'Su rol no ve los mensajes.')
+  const message = db().messages.find((m) => m.id === id)
+  if (!message) throw new ApiError('No encontramos ese mensaje.', 404)
+  const field = action === 'read' || action === 'unread' ? 'readAt' : 'archivedAt'
+  const target = action === 'read' || action === 'archive' ? stamp() : null
+  if (Boolean(message[field]) !== Boolean(target)) {
+    message[field] = target
+    message.handledBy = by(user)
+    save()
+  }
+  return copy(message)
 }
 
 /** Solo DEV: vuelve a la semilla. */

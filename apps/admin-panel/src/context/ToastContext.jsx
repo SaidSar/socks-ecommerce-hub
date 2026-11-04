@@ -34,6 +34,18 @@ function Toast({ toast, onClose }) {
         <Icon name={error ? 'alert' : 'check'} className="h-4 w-4" />
       </span>
       <p className="min-w-0 flex-1 py-3 text-[13.5px] leading-snug text-ink">{toast.text}</p>
+      {toast.action && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.action.onClick()
+            onClose()
+          }}
+          className="h-11 shrink-0 rounded-md px-3 text-[13px] font-medium text-ai hover:bg-sand"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button type="button" onClick={onClose} aria-label="Cerrar aviso" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-soft hover:bg-sand hover:text-ink">
         <Icon name="x" className="h-4 w-4" />
       </button>
@@ -51,9 +63,9 @@ export function ToastProvider({ children }) {
 
   const dismiss = useCallback((id) => setToasts((list) => dropToast(list, id)), [])
 
-  const show = useCallback((tone, text, { key } = {}) => {
+  const show = useCallback((tone, text, { key, action } = {}) => {
     const id = nextId.current++
-    setToasts((list) => pushToast(list, { id, tone, text, key }))
+    setToasts((list) => pushToast(list, { id, tone, text, key, action }))
     return id
   }, [])
 

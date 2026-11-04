@@ -11,9 +11,9 @@ const LABEL = '#6A645C'
 /**
  * Ventas por día (30 días) contra el periodo anterior. SVG propio: cuadrícula tenue, etiquetas cada 7 días,
  * punto final enfatizado, crosshair + tooltip al pasar el cursor y tabla equivalente oculta para lectores de pantalla.
- * data: [{ date, v, prev }]
+ * data: [{ date, v, prev }]. Con más de un mes de días (Reportes) las etiquetas se espacian solas.
  */
-export default function SalesChart({ data }) {
+export default function SalesChart({ data, label = 'Ventas por día de los últimos 30 días comparadas con el periodo anterior.' }) {
   const [ref, w] = useWidth()
   const [hover, setHover] = useState(null)
   const h = 230
@@ -23,7 +23,10 @@ export default function SalesChart({ data }) {
   const pb = 28
   const max = Math.max(2000, Math.ceil(Math.max(...data.map((d) => Math.max(d.v, d.prev))) / 2000) * 2000)
   const innerW = Math.max(1, w - pl - pr)
-  const x = (i) => pl + (i * innerW) / (data.length - 1)
+  const x = (i) => pl + (data.length > 1 ? (i * innerW) / (data.length - 1) : innerW / 2)
+  // Cada 7 días como en el Dashboard; en periodos largos, unas 6 etiquetas.
+  const step = data.length <= 31 ? 7 : Math.ceil(data.length / 6)
+  const offset = data.length <= 31 ? 2 : 0
   const y = (v) => pt + (1 - v / max) * (h - pt - pb)
   const line = (k) => data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(d[k]).toFixed(1)}`).join('')
   const area = `${line('v')}L${x(data.length - 1)} ${y(0)}L${x(0)} ${y(0)}Z`
@@ -32,7 +35,7 @@ export default function SalesChart({ data }) {
 
   const onMove = (e) => {
     const r = e.currentTarget.getBoundingClientRect()
-    const i = Math.round(((e.clientX - r.left - pl) / innerW) * last)
+    const i = last === 0 ? 0 : Math.round(((e.clientX - r.left - pl) / innerW) * last)
     setHover(Math.max(0, Math.min(last, i)))
   }
   const hd = hover != null ? data[hover] : null
@@ -46,7 +49,7 @@ export default function SalesChart({ data }) {
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
         role="img"
-        aria-label="Ventas por día de los últimos 30 días comparadas con el periodo anterior. La tabla siguiente tiene los valores."
+        aria-label={`${label} La tabla siguiente tiene los valores.`}
       >
         {ticks.map((t) => (
           <g key={t}>
@@ -58,7 +61,7 @@ export default function SalesChart({ data }) {
         ))}
         {data.map(
           (d, i) =>
-            (i % 7 === 2 || i === last) && (
+            ((i % step === offset && last - i >= step / 2) || i === last) && (
               <text key={d.date} x={x(i)} y={h - 8} textAnchor={i === last ? 'end' : 'middle'} fontSize="11" fill={LABEL}>
                 {formatDate(d.date)}
               </text>

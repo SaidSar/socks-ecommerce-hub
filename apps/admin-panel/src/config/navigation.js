@@ -16,18 +16,10 @@ export const NAV = [
     to: '/clientes',
     icon: 'users',
     perm: 'customers.view',
-    ready: false,
-    soon: ['Historial de compras por cliente', 'Talla preferida y consentimiento de correos', 'Clientes recurrentes y valor de vida'],
+    ready: true,
   },
-  {
-    key: 'finanzas',
-    label: 'Finanzas',
-    to: '/finanzas',
-    icon: 'money',
-    perm: 'finance.view',
-    ready: false,
-    soon: ['Ventas, IVA y envíos cobrados por periodo', 'Exportación mensual a Excel para el contador externo', 'Margen y utilidad cuando se capture el costo por par'],
-  },
+  // Sección `finanzas` (permiso finance.view): /finanzas redirige aquí.
+  { key: 'finanzas', label: 'Reportes', to: '/reportes', icon: 'money', perm: 'finance.view', ready: true },
   {
     key: 'envios',
     label: 'Envíos',
@@ -36,6 +28,7 @@ export const NAV = [
     perm: 'shipping.view',
     ready: true,
   },
+  { key: 'mensajes', label: 'Mensajes', to: '/mensajes', icon: 'mail', perm: 'messages.view', ready: true },
   {
     key: 'promociones',
     label: 'Promociones',
@@ -49,6 +42,14 @@ export const NAV = [
 ]
 
 export const navByKey = (key) => NAV.find((n) => n.key === key)
+
+/** Sección de una ruta, para el título de la pestaña: la más específica que coincide. */
+export function navForPath(pathname) {
+  return [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => (n.to === '/' ? pathname === '/' : pathname === n.to || pathname.startsWith(`${n.to}/`)))
+}
+
+/** "Clientes · SOKKO Panel". */
+export const pageTitle = (label) => (label ? `${label} · SOKKO Panel` : 'SOKKO · Panel')
 
 // TODO(api): URL pública de la tienda por entorno.
 export const STORE_URL = import.meta.env.VITE_STORE_URL || 'http://localhost:5173'

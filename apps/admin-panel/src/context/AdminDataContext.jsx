@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { can } from '../config/roles'
 import * as adminApi from '../services/adminApi'
 import { USE_API } from '../services/api'
 import { AdminDataContext } from './admin-data-context'
@@ -10,7 +11,9 @@ import { AdminDataContext } from './admin-data-context'
 export function AdminDataProvider({ user, children }) {
   const [version, setVersion] = useState(0)
   const [summary, setSummary] = useState({ toPrepare: 0, late: 0 })
+  const [unread, setUnread] = useState(0)
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
+  const canReadMessages = can(user?.role, 'messages.view')
 
   useEffect(() => {
     let alive = true
@@ -20,6 +23,22 @@ export function AdminDataProvider({ user, children }) {
       alive = false
     }
   }, [version])
+
+  // Contador de mensajes nuevos de la barra lateral: tras cada cambio y cada 60 s mientras la pestaña está a la vista.
+  useEffect(() => {
+    if (!canReadMessages) return
+    let alive = true
+    const load = () => adminApi.getUnreadCount(user).then((n) => alive && setUnread(n), () => {})
+    load()
+    const timer = setInterval(() => document.visibilityState === 'visible' && load(), 60_000)
+    const onVisible = () => document.visibilityState === 'visible' && load()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      alive = false
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [version, canReadMessages, user])
 
   const api = useMemo(() => {
     const role = user?.role
@@ -61,10 +80,20 @@ export function AdminDataProvider({ user, children }) {
       getInternalUsers: () => adminApi.getInternalUsers(),
       inviteUser: mutate((invitation) => adminApi.inviteUser(invitation, user)),
       getCouriers: () => adminApi.getCouriers(),
+      getCustomers: (params) => adminApi.getCustomers(params, user),
+      getCustomer: (key) => adminApi.getCustomer(key, user),
+      exportCustomers: (params) => adminApi.exportCustomers(params, user),
+      exportMarketing: () => adminApi.exportMarketing(user),
+      getSalesReport: (period) => adminApi.getSalesReport(period, user),
+      downloadSalesCsv: (period) => adminApi.downloadSalesCsv(period, user),
+      getMessages: (params) => adminApi.getMessages(params, user),
+      updateMessage: mutate((id, action) => adminApi.updateMessage(id, action, user)),
+      now: adminApi.currentNow,
+      today: adminApi.currentToday,
       resetDemoData: mutate(() => adminApi.resetDemoData()),
     }
   }, [user, refresh])
 
-  const value = useMemo(() => ({ api, version, summary, refresh, usesApi: USE_API }), [api, version, summary, refresh])
+  const value = useMemo(() => ({ api, version, summary, unread, refresh, usesApi: USE_API }), [api, version, summary, unread, refresh])
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>
 }
