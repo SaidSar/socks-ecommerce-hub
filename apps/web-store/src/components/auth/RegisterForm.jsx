@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { SIZES } from '../../data/catalog.mock'
 import { useAuth } from '../../hooks/useAuth'
 import { useShake } from '../../hooks/useShake'
 import { AuthError } from '../../services/authService'
@@ -8,6 +7,7 @@ import { MESSAGES, emailError, passwordStrength, reviewCount } from '../../utils
 import AuthField, { AuthAlert, AuthCheckbox, AuthSubmit } from './AuthField'
 import PasswordField from './PasswordField'
 import PasswordStrength from './PasswordStrength'
+import SizePicker from './SizePicker'
 
 // Orden de foco ante errores = orden visual del formulario.
 const FIELD_ORDER = ['first', 'last', 'email', 'pw', 'pw2', 'terms']
@@ -147,39 +147,7 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
         autoComplete="new-password"
       />
 
-      <fieldset>
-        <legend className="text-[11px] tracking-[.24em] text-ink-soft uppercase">
-          Su talla habitual <span className="tracking-normal normal-case">(opcional)</span>
-        </legend>
-        <p id="reg-size-hint" className="mt-1 text-[12px] text-ink-soft">
-          La preseleccionaremos en cada pieza del atelier.
-        </p>
-        <div
-          className="mt-3 grid grid-cols-3 border border-ink/15"
-          role="radiogroup"
-          aria-label="Talla habitual"
-          aria-describedby="reg-size-hint"
-        >
-          {SIZES.map(({ code, label: cm }, i) => {
-            const selected = f.size === code
-            return (
-              <button
-                key={code}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => set('size')(selected ? '' : code)}
-                className={`flex h-14 flex-col items-center justify-center leading-none transition-colors ${
-                  i ? 'border-l border-ink/15' : ''
-                } ${selected ? 'bg-ink text-linen' : 'hover:bg-sand'}`}
-              >
-                <span className="text-[13px] tracking-[.14em]">{code}</span>
-                <span className={`tnum mt-1.5 text-[11px] ${selected ? 'text-linen/75' : 'text-ink-soft'}`}>{cm}</span>
-              </button>
-            )
-          })}
-        </div>
-      </fieldset>
+      <SizePicker id="reg-size" value={f.size} onChange={set('size')} />
 
       <div className="flex flex-col">
         <AuthCheckbox id="news" checked={f.news} onChange={set('news')}>
