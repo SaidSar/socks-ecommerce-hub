@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
+builder.Services.AddScoped<IWishlistService, WishlistService>();
 builder.Services.AddScoped<IQuoteShipping, QuoteShipping>();
 builder.Services.AddSingleton(_ => JwtOptions.FromConfiguration(builder.Configuration, builder.Environment.IsDevelopment()));
 builder.Services.AddSingleton(_ => new ResetLinkOptions(FrontendUrls.WebStore(builder.Configuration)));

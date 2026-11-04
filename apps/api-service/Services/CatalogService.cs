@@ -24,6 +24,9 @@ public interface ICatalogService
     Task<ProductDto?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default);
 
     Task<CatalogNavDto> GetNavAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Tarjetas de los productos activos con esos Id, en el mismo orden; los inactivos se omiten.</summary>
+    Task<IReadOnlyList<ProductDto>> ListByIdsAsync(IReadOnlyList<int> ids, CancellationToken cancellationToken = default);
 }
 
 public class CatalogService(
@@ -130,6 +133,19 @@ public class CatalogService(
             .ToListAsync(cancellationToken);
 
         return ToDto(product, clock.Today) with { Sizes = sizes };
+    }
+
+    public async Task<IReadOnlyList<ProductDto>> ListByIdsAsync(IReadOnlyList<int> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var today = clock.Today;
+        var products = await WithDetails(ActiveProducts().Where(p => ids.Contains(p.Id))).ToListAsync(cancellationToken);
+        var byId = products.ToDictionary(p => p.Id);
+        return ids.Where(byId.ContainsKey).Select(id => ToDto(byId[id], today)).ToList();
     }
 
     public async Task<CatalogNavDto> GetNavAsync(CancellationToken cancellationToken = default)

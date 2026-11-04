@@ -1909,6 +1909,28 @@ namespace Sokko.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Sokko.Api.Models.WishlistItem", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.HasKey("UserId", "ProductId")
+                        .HasName("PK_WishlistItems");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("IX_WishlistItems_ProductId");
+
+                    b.ToTable("WishlistItems", "dbo");
+                });
+
             modelBuilder.Entity("Sokko.Api.Models.InventoryMovement", b =>
                 {
                     b.HasOne("Sokko.Api.Models.User", "CreatedByUser")
@@ -2120,6 +2142,27 @@ namespace Sokko.Api.Data.Migrations
                         .HasConstraintName("FK_Users_Sizes");
 
                     b.Navigation("PreferredSize");
+                });
+
+            modelBuilder.Entity("Sokko.Api.Models.WishlistItem", b =>
+                {
+                    b.HasOne("Sokko.Api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_WishlistItems_Products");
+
+                    b.HasOne("Sokko.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_WishlistItems_Users");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Sokko.Api.Models.Brand", b =>
