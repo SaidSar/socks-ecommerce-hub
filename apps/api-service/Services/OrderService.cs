@@ -41,7 +41,7 @@ public class OrderService(SokkoDbContext db) : IOrderService
     private const int SqlUniqueConstraintViolation = 2627;
 
     private IQueryable<Order> WithDetails() =>
-        db.Orders.AsNoTracking().Include(o => o.Items).Include(o => o.StatusHistory).AsSplitQuery();
+        db.Orders.AsNoTracking().Include(o => o.Items).Include(o => o.StatusHistory).Include(o => o.Shipment).AsSplitQuery();
 
     public async Task<bool> CreateAsync(Order order, CancellationToken cancellationToken = default)
     {

@@ -34,6 +34,15 @@ export function CloseIcon(props) {
   )
 }
 
+/** `filled`: relleno con el color del texto (favorito guardado). */
+export function HeartIcon({ filled = false, ...props }) {
+  return (
+    <svg {...base} {...props} fill={filled ? 'currentColor' : 'none'}>
+      <path d="M12 19.5s-7-4.3-7-9.3C5 7.6 6.9 6 9 6c1.4 0 2.4.7 3 1.7.6-1 1.6-1.7 3-1.7 2.1 0 4 1.6 4 4.2 0 5-7 9.3-7 9.3z" />
+    </svg>
+  )
+}
+
 export function UserIcon(props) {
   return (
     <svg {...base} {...props}>

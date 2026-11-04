@@ -33,6 +33,7 @@ public class SokkoDbContext(DbContextOptions<SokkoDbContext> options) : DbContex
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<LocalDeliveryZone> LocalDeliveryZones => Set<LocalDeliveryZone>();
     public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
+    public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

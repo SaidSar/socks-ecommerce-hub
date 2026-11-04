@@ -18,17 +18,20 @@ public class ModelTests
     }
 
     [Fact]
-    public void Only_password_reset_tokens_cascade_on_delete()
+    public void Only_password_reset_tokens_and_wishlist_items_cascade_on_delete()
     {
-        // D-07: todas las FK son NO ACTION salvo PasswordResetTokens.UserId.
+        // D-07 y D-39: todas las FK son NO ACTION salvo PasswordResetTokens.UserId y WishlistItems.UserId.
         using var db = TestDbContext.Create();
         var foreignKeys = db.DesignModel().GetEntityTypes().SelectMany(e => e.GetForeignKeys()).ToList();
 
         var cascading = foreignKeys.Where(fk => fk.DeleteBehavior != DeleteBehavior.NoAction).ToList();
 
-        var fk = Assert.Single(cascading);
-        Assert.Equal(typeof(PasswordResetToken), fk.DeclaringEntityType.ClrType);
-        Assert.Equal(DeleteBehavior.Cascade, fk.DeleteBehavior);
+        Assert.Equal([typeof(PasswordResetToken), typeof(WishlistItem)], cascading.Select(fk => fk.DeclaringEntityType.ClrType).OrderBy(t => t.Name));
+        Assert.All(cascading, fk =>
+        {
+            Assert.Equal(DeleteBehavior.Cascade, fk.DeleteBehavior);
+            Assert.Equal(typeof(User), fk.PrincipalEntityType.ClrType);
+        });
     }
 
     [Fact]

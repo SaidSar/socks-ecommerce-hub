@@ -60,7 +60,7 @@ export default function MyOrders() {
             </p>
             <div className="mt-1 flex items-center justify-between gap-4">
               <p className="text-[13.5px]">{orderStatusLabel(order)}</p>
-              <Link to={`/checkout/confirmacion/${order.folio}`} className="inline-flex min-h-11 items-center text-[13px] underline decoration-ink/25 underline-offset-4">
+              <Link to={`/cuenta/pedidos/${order.folio}`} className="inline-flex min-h-11 items-center text-[13px] underline decoration-ink/25 underline-offset-4">
                 Ver detalle
                 <span className="sr-only"> de {order.folio}</span>
               </Link>

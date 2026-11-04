@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import ProductGrid from '../components/catalog/ProductGrid'
 import SectionHead, { EYEBROW } from '../components/catalog/SectionHead'
 import Price from '../components/product/Price'
+import FavoriteButton from '../components/product/FavoriteButton'
 import ProductArt from '../components/product/ProductArt'
 import ProductGallery from '../components/product/ProductGallery'
 import { SeasonTag } from '../components/product/ProductCard'
@@ -204,17 +205,20 @@ function ProductDetail({ product }) {
           </fieldset>
 
           <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={addToBag}
-              disabled={soldOut}
-              aria-describedby={error ? errorId : undefined}
-              className={`inline-flex min-h-11 w-full items-center justify-center px-6 py-3 text-[13px] tracking-[.14em] text-white uppercase transition-colors ${
-                soldOut ? 'cursor-not-allowed bg-ink-soft' : 'bg-laca hover:bg-laca-hover'
-              }`}
-            >
-              {soldOut ? AVAILABILITY_TEXT.agotado : `Agregar a la bolsa · ${formatPrice(product.price)}`}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={addToBag}
+                disabled={soldOut}
+                aria-describedby={error ? errorId : undefined}
+                className={`inline-flex min-h-11 flex-1 items-center justify-center px-6 py-3 text-[13px] tracking-[.14em] text-white uppercase transition-colors ${
+                  soldOut ? 'cursor-not-allowed bg-ink-soft' : 'bg-laca hover:bg-laca-hover'
+                }`}
+              >
+                {soldOut ? AVAILABILITY_TEXT.agotado : `Agregar a la bolsa · ${formatPrice(product.price)}`}
+              </button>
+              <FavoriteButton slug={product.slug} className="w-12 shrink-0 border border-ink/15 hover:border-ink" />
+            </div>
             <p className="tnum flex flex-wrap justify-between gap-3 text-[12.5px] text-ink-soft">
               <span role="status" className={(availability ? availability !== 'disponible' : product.fewUnits) ? 'text-laca' : ''}>
                 {availability ? AVAILABILITY_TEXT[availability] : stockText(product)}

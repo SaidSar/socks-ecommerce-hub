@@ -5,6 +5,8 @@ import { createRoot } from 'react-dom/client'
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 // jsdom no implementa el scroll; StoreLayout y Account lo llaman al cambiar de vista.
 window.scrollTo = () => {}
+// Tampoco la geometría SVG; PasswordStrength mide su trazo con getTotalLength.
+if (!window.SVGElement.prototype.getTotalLength) window.SVGElement.prototype.getTotalLength = () => 0
 
 /** Monta `ui` en un contenedor nuevo y espera a que terminen efectos y promesas pendientes. */
 export async function render(ui) {

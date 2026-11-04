@@ -29,6 +29,13 @@ function FaqItem({ item, open, onToggle, config }) {
       </h3>
       <div id={panelId} role="region" aria-labelledby={buttonId} hidden={!open} className="animate-fade max-w-[62ch] pb-6 text-[15px] leading-[1.8] text-ink-soft">
         {item.answer(config)}
+        {item.link && (
+          <p className="mt-3">
+            <Link to={item.link.to} className="inline-flex min-h-11 items-center font-serif text-[16px] text-ink italic underline decoration-ink/25 underline-offset-4 hover:text-laca">
+              {item.link.label} →
+            </Link>
+          </p>
+        )}
       </div>
     </li>
   )
