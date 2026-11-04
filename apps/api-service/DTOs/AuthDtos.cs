@@ -66,6 +66,33 @@ public class ResetPasswordRequestDto
     public string? NewPassword { get; init; }
 }
 
+/// <summary>Datos de "Mi perfil". El correo no se cambia aquí.</summary>
+public class UpdateProfileRequestDto
+{
+    [Required(ErrorMessage = "Escriba su nombre.")]
+    [StringLength(80)]
+    public string? FirstName { get; init; }
+
+    [Required(ErrorMessage = "Escriba su apellido.")]
+    [StringLength(80)]
+    public string? LastName { get; init; }
+
+    [RegularExpression("^(S|M|L)$", ErrorMessage = "La talla no existe.")]
+    public string? PreferredSize { get; init; }
+
+    public bool MarketingOptIn { get; init; }
+}
+
+public class ChangePasswordRequestDto
+{
+    [Required(ErrorMessage = "Escriba su contraseña actual.")]
+    public string? CurrentPassword { get; init; }
+
+    [Required(ErrorMessage = AuthRules.PasswordWeak)]
+    [RegularExpression(AuthRules.Password, ErrorMessage = AuthRules.PasswordWeak)]
+    public string? NewPassword { get; init; }
+}
+
 /// <summary>Usuario de la tienda (DESIGN_AUTH §5.3). Nunca lleva la contraseña ni su hash.</summary>
 public record AuthUserDto(int Id, string FirstName, string LastName, string Email, string? PreferredSize, bool MarketingOptIn, DateTime MemberSince)
 {

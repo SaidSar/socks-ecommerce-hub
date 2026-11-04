@@ -116,6 +116,9 @@ public class AuthTaskTests
         public Task<User?> CreateInternalAsync(string firstName, string lastName, string email, UserRole role, CancellationToken cancellationToken = default) => Task.FromResult(existing);
         public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(existing);
         public Task<User?> CreateAccountAsync(string firstName, string lastName, string email, UserRole role, string password, CancellationToken cancellationToken = default) => Task.FromResult(existing);
+        public Task<User?> UpdateProfileAsync(int id, ProfileUpdate update, CancellationToken cancellationToken = default) => Task.FromResult(existing);
+        public Task<PasswordChangeResult> ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken cancellationToken = default) =>
+            Task.FromResult(PasswordChangeResult.Changed);
 
         public Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default)
         {

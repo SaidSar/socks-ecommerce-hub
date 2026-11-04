@@ -9,6 +9,16 @@ namespace Sokko.Api.Services;
 
 public record NewCustomer(string FirstName, string LastName, string Email, string Password, string? PreferredSize, bool MarketingOptIn);
 
+/// <summary>Lo que el cliente cambia en "Mi perfil"; el correo queda fuera.</summary>
+public record ProfileUpdate(string FirstName, string LastName, string? PreferredSize, bool MarketingOptIn);
+
+public enum PasswordChangeResult
+{
+    Changed,
+    WrongPassword,
+    NotFound,
+}
+
 /// <summary>Servicio de entidad: único escritor de <c>Users</c> y <c>PasswordResetTokens</c> (DESIGN_DB §6).</summary>
 public interface IUserService
 {
@@ -33,6 +43,12 @@ public interface IUserService
 
     /// <summary>Alta con contraseña elegida, para el bootstrap. Un cliente acepta los términos al crearse. <c>null</c> si el correo ya existe.</summary>
     Task<User?> CreateAccountAsync(string firstName, string lastName, string email, UserRole role, string password, CancellationToken cancellationToken = default);
+
+    /// <summary>Nombre, talla y boletín de un usuario activo; <c>null</c> si ya no existe o está inactivo.</summary>
+    Task<User?> UpdateProfileAsync(int id, ProfileUpdate update, CancellationToken cancellationToken = default);
+
+    /// <summary>Cambia la contraseña si la actual coincide.</summary>
+    Task<PasswordChangeResult> ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken cancellationToken = default);
 
     /// <summary>Guarda el hash del token e invalida los anteriores del usuario.</summary>
     Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default);
@@ -123,6 +139,43 @@ public class UserService(SokkoDbContext db, IAuthService auth, IClock clock) : I
             return null;
         }
         return user;
+    }
+
+    public async Task<User?> UpdateProfileAsync(int id, ProfileUpdate update, CancellationToken cancellationToken = default)
+    {
+        var user = await ActiveUsers().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (user is null)
+        {
+            return null;
+        }
+
+        user.FirstName = update.FirstName.Trim();
+        user.LastName = update.LastName.Trim();
+        user.PreferredSize = update.PreferredSize is null
+            ? null
+            : await db.Sizes.FirstOrDefaultAsync(s => s.SizeSystem == SizeSystem.Calceta && s.Code == update.PreferredSize, cancellationToken);
+        user.MarketingOptIn = update.MarketingOptIn;
+        user.UpdatedAt = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return user;
+    }
+
+    public async Task<PasswordChangeResult> ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var user = await ActiveUsers().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (user is null)
+        {
+            return PasswordChangeResult.NotFound;
+        }
+        if (auth.VerifyPassword(user, currentPassword) == PasswordCheck.Failed)
+        {
+            return PasswordChangeResult.WrongPassword;
+        }
+
+        user.PasswordHash = auth.HashPassword(user, newPassword);
+        user.UpdatedAt = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return PasswordChangeResult.Changed;
     }
 
     public async Task<IReadOnlyList<User>> ListInternalAsync(CancellationToken cancellationToken = default) =>
