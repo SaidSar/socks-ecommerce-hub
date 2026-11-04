@@ -6,6 +6,7 @@ import { usePageMeta } from '../hooks/usePageMeta'
 import { formatDate } from '../utils/orderDates'
 import { formatMXN } from '../utils/currency'
 import { AcademicNotice } from './LegalPage'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 
 const UPDATED = '2026-11-03T19:00:00Z'
 
@@ -29,7 +30,8 @@ export default function Shipping() {
   )
 
   return (
-    <main className="gutter mx-auto max-w-7xl py-14 md:py-20">
+    <main className="gutter mx-auto max-w-7xl pt-2 pb-14 md:pt-4 md:pb-20">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Envíos' }]} className="mb-8 md:mb-12" />
       <AcademicNotice />
 
       <PageIntro eyebrow="Ayuda" jp="配送" title="Envíos" className="mt-12">

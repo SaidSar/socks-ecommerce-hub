@@ -10,7 +10,7 @@ const MENU_ID = 'menu-cuenta'
  * y menú desplegable (role="menu") que cierra con Esc, clic fuera o al elegir; ↑/↓, Inicio y Fin
  * recorren los menuitem.
  */
-export default function AccountMenu() {
+export default function AccountMenu({ current = false }) {
   const { user, isAuthenticated, initials, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef(null)
@@ -92,6 +92,7 @@ export default function AccountMenu() {
         ref={triggerRef}
         type="button"
         aria-label={`Cuenta de ${user.firstName}`}
+        aria-current={current ? 'page' : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? MENU_ID : undefined}
@@ -102,7 +103,7 @@ export default function AccountMenu() {
             setOpen(true)
           }
         }}
-        className="flex min-h-11 min-w-11 items-center justify-center"
+        className="relative flex min-h-11 min-w-11 items-center justify-center aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-2 aria-[current=page]:after:bottom-0.5 aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-laca"
       >
         <span className="relative flex h-[30px] w-[30px] items-center justify-center rounded-full border border-ink/20 bg-sand font-serif text-[13px] leading-none">
           {initials}

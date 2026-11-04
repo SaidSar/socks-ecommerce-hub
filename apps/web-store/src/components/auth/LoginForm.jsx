@@ -2,17 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useShake } from '../../hooks/useShake'
+import { useToast } from '../../hooks/useToast'
+import { AUTH_TOASTS } from '../../domain/account'
 import { AuthError, DEMO_ACCOUNT } from '../../services/authService'
 import { MESSAGES, emailError } from '../../utils/authValidation'
 import AuthField, { AuthAlert, AuthCheckbox, AuthSubmit } from './AuthField'
 import PasswordField from './PasswordField'
 
 /**
- * Iniciar sesión (DESIGN_AUTH.md §4.2). Tras el éxito no navega: la guarda de Account lleva a la
- * bienvenida o a ?redirect=. `onAuthStart('login')` le avisa el modo antes de la petición.
+ * Iniciar sesión (DESIGN_AUTH.md §4.2). Tras el éxito no navega: la guarda de Account lleva al inicio
+ * o a ?redirect=, y el aviso flotante (que vive sobre las rutas) saluda al llegar.
  */
-export default function LoginForm({ onAuthStart, search = '' }) {
+export default function LoginForm({ search = '' }) {
   const { login } = useAuth()
+  const toast = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
@@ -44,15 +47,17 @@ export default function LoginForm({ onAuthStart, search = '' }) {
     }
 
     setLoading(true)
-    onAuthStart?.('login')
+    let user
     try {
-      await login({ email: email.trim(), password, remember })
+      user = await login({ email: email.trim(), password, remember })
     } catch (err) {
       setLoading(false)
       // Mismo mensaje para correo o contraseña: no revela cuál falló.
       setFormError(err instanceof AuthError ? MESSAGES.invalidCredentials : MESSAGES.network)
       fail(passwordRef)
+      return
     }
+    toast.success(AUTH_TOASTS.login(user.firstName), { key: 'auth' })
   }
 
   return (

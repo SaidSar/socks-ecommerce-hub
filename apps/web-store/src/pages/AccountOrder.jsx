@@ -12,7 +12,13 @@ export default function AccountOrder() {
   const { status, data: order, retry } = useAsync(() => getOrder(folio), folio)
 
   return (
-    <AccountLayout title={`Pedido ${folio}`} heading="Mis pedidos" description="Detalle y rastreo de su pedido en SOKKO.">
+    <AccountLayout
+      title={`Pedido ${folio}`}
+      crumb={folio}
+      heading="Mis pedidos"
+      description="Detalle y rastreo de su pedido en SOKKO."
+      trail={[{ label: 'Mis pedidos', to: '/cuenta/pedidos' }]}
+    >
       <Link to="/cuenta/pedidos" className={`mb-4 ${BACK}`}>
         ← Todos mis pedidos
       </Link>

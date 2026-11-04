@@ -133,11 +133,12 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShow((s) => !s)}
-                  aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  aria-label="Mostrar contraseña"
                   aria-pressed={show}
                   className="absolute right-0 top-1 w-11 h-11 rounded-md flex items-center justify-center text-ink-soft hover:text-ink"
                 >
-                  <Icon name={show ? 'eyeOff' : 'eye'} />
+                  {/* Ojo abierto con el texto visible, tachado con la contraseña oculta. */}
+                  <Icon name={show ? 'eye' : 'eyeOff'} />
                 </button>
               </div>
               {errors.password && (

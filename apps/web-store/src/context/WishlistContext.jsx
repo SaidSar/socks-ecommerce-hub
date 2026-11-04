@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { WISHLIST_MESSAGES } from '../domain/account'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
 import * as wishlistService from '../services/wishlistService'
 import { WishlistContext } from './wishlist-context'
-
-const NOTICE_MS = 4000
 
 /** Slugs de la lista de la cuenta; si el invitado guardó favoritos en este navegador, primero se unen a ella y se borran de aquí. */
 async function syncAccount(account) {
@@ -24,8 +23,10 @@ export function WishlistProvider({ children }) {
   const account = user?.email ?? null
   const [slugs, setSlugs] = useState(() => (account ? [] : wishlistService.readGuestSlugs()))
   const [version, setVersion] = useState(0)
-  const [notice, setNotice] = useState(null)
+  const toast = useToast()
   const slugsRef = useRef(slugs)
+  // "Deshacer" del aviso llama a la versión más reciente de toggle (la cuenta pudo cambiar entre tanto).
+  const toggleRef = useRef(null)
 
   useEffect(() => {
     slugsRef.current = slugs
@@ -48,13 +49,7 @@ export function WishlistProvider({ children }) {
     }
   }, [account])
 
-  useEffect(() => {
-    if (!notice) return
-    const timer = setTimeout(() => setNotice(null), NOTICE_MS)
-    return () => clearTimeout(timer)
-  }, [notice])
-
-  /** Agrega o quita al momento; si el servidor falla, la lista vuelve a como estaba. */
+  /** Agrega o quita al momento y lo confirma con un aviso; si el servidor falla, la lista vuelve a como estaba. */
   const toggle = useCallback(
     async (slug) => {
       const saved = slugsRef.current.includes(slug)
@@ -63,14 +58,24 @@ export function WishlistProvider({ children }) {
       try {
         if (saved) await wishlistService.removeFavorite(account, slug)
         else await wishlistService.addFavorite(account, slug)
-        setNotice({ text: saved ? WISHLIST_MESSAGES.removed : WISHLIST_MESSAGES.added, tone: 'info' })
+        // Una sola clave: tocar varios corazones seguidos deja a la vista solo el último aviso.
+        toast.success(saved ? WISHLIST_MESSAGES.removed : WISHLIST_MESSAGES.added, {
+          key: 'wishlist',
+          action: saved
+            ? { label: WISHLIST_MESSAGES.undo, onClick: () => toggleRef.current(slug) }
+            : { label: WISHLIST_MESSAGES.view, to: '/cuenta/favoritos' },
+        })
       } catch (err) {
         setSlugs((current) => (saved ? (current.includes(slug) ? current : [slug, ...current]) : current.filter((s) => s !== slug)))
-        setNotice({ text: err?.code === 'LIMIT' ? WISHLIST_MESSAGES.limit : WISHLIST_MESSAGES.network, tone: 'error' })
+        toast.error(err?.code === 'LIMIT' ? WISHLIST_MESSAGES.limit : WISHLIST_MESSAGES.network, { key: 'wishlist' })
       }
     },
-    [account],
+    [account, toast],
   )
+
+  useEffect(() => {
+    toggleRef.current = toggle
+  }, [toggle])
 
   const value = useMemo(
     () => ({
@@ -87,18 +92,6 @@ export function WishlistProvider({ children }) {
   return (
     <WishlistContext.Provider value={value}>
       {children}
-      {/* Un solo aviso para toda la tienda: el éxito solo se anuncia; un error también se ve. */}
-      <div
-        role="status"
-        aria-live="polite"
-        className={
-          notice?.tone === 'error'
-            ? 'animate-fade fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md border-l-2 border-laca bg-linen px-4 py-3 text-[13.5px] shadow-lg'
-            : 'sr-only'
-        }
-      >
-        {notice?.text}
-      </div>
     </WishlistContext.Provider>
   )
 }

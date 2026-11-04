@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { ActiveLineContext } from '../../context/active-line-context'
 import CartDrawer from '../cart/CartDrawer'
 import Footer from './Footer'
 import Header from './Header'
@@ -7,6 +8,8 @@ import Header from './Header'
 /** Marco común de la tienda: encabezado con las líneas, la vista de la ruta, pie y bolsa. */
 export default function StoreLayout() {
   const { pathname } = useLocation()
+  const [line, setLine] = useState(null)
+  const activeLine = useMemo(() => ({ line, setLine }), [line])
 
   // Cada vista nueva empieza arriba (la búsqueda cambia ?q= sin cambiar de ruta y no se mueve).
   useEffect(() => {
@@ -14,13 +17,15 @@ export default function StoreLayout() {
   }, [pathname])
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <div className="flex-1">
-        <Outlet />
+    <ActiveLineContext.Provider value={activeLine}>
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <Footer />
+        <CartDrawer />
       </div>
-      <Footer />
-      <CartDrawer />
-    </div>
+    </ActiveLineContext.Provider>
   )
 }

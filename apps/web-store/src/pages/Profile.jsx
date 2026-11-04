@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AccountLayout from '../components/account/AccountLayout'
-import AuthField, { AuthCheckbox, AuthSubmit } from '../components/auth/AuthField'
+import AuthField, { AuthCheckbox, SaveSubmit } from '../components/auth/AuthField'
 import PasswordField from '../components/auth/PasswordField'
 import PasswordStrength from '../components/auth/PasswordStrength'
 import SizePicker from '../components/auth/SizePicker'
 import { PROFILE_MESSAGES } from '../domain/account'
 import { useAuth } from '../hooks/useAuth'
+import { useSaveStatus } from '../hooks/useSaveStatus'
+import { useToast } from '../hooks/useToast'
 import { AuthError } from '../services/authService'
 import { MESSAGES, passwordStrength } from '../utils/authValidation'
 
@@ -18,45 +20,41 @@ const focusFirst = (errors, ids) => {
   if (first) document.getElementById(ids[first])?.focus()
 }
 
-/** Resultado del envío en una región aria-live: "Guardando…", éxito o error. Siempre montada para que se anuncie. */
-function FormStatus({ state, message }) {
-  return (
-    <p role="status" aria-live="polite" className={`min-h-5 text-[13.5px] ${state === 'error' ? 'text-laca' : 'text-matcha'}`}>
-      {state === 'saving' && <span className="text-ink-soft">Guardando…</span>}
-      {(state === 'saved' || state === 'error') && message}
-    </p>
-  )
-}
-
 const PROFILE_IDS = { first: 'profile-first', last: 'profile-last' }
+
+/** Valores del formulario a partir del usuario guardado: sirven de punto de partida y para saber si hay cambios. */
+const profileValues = (user) => ({ first: user.firstName, last: user.lastName, size: user.preferredSize ?? '', news: Boolean(user.marketingOptIn) })
 
 function ProfileForm() {
   const { user, updateProfile } = useAuth()
-  const [f, setF] = useState({ first: user.firstName, last: user.lastName, size: user.preferredSize ?? '', news: Boolean(user.marketingOptIn) })
+  const toast = useToast()
+  const [f, setF] = useState(() => profileValues(user))
   const [errors, setErrors] = useState({})
-  const [result, setResult] = useState({ state: 'idle', message: '' })
+  const [status, save] = useSaveStatus()
+  const savedValues = profileValues(user)
+  const dirty = f.first.trim() !== savedValues.first || f.last.trim() !== savedValues.last || f.size !== savedValues.size || f.news !== savedValues.news
 
   const set = (key) => (value) => {
     setF((x) => ({ ...x, [key]: value }))
     setErrors((x) => ({ ...x, [key]: undefined }))
-    if (result.state !== 'saving') setResult({ state: 'idle', message: '' })
   }
 
   const submit = async (e) => {
     e.preventDefault()
-    if (result.state === 'saving') return
+    if (status === 'saving' || !dirty) return
     const next = { first: f.first.trim() ? undefined : MESSAGES.firstName, last: f.last.trim() ? undefined : MESSAGES.lastName }
     if (Object.values(next).some(Boolean)) {
       setErrors(next)
       focusFirst(next, PROFILE_IDS)
       return
     }
-    setResult({ state: 'saving', message: '' })
     try {
-      await updateProfile({ firstName: f.first, lastName: f.last, preferredSize: f.size || null, marketingOptIn: f.news })
-      setResult({ state: 'saved', message: PROFILE_MESSAGES.saved })
+      // updateProfile actualiza la sesión: el encabezado y el menú de cuenta toman el nombre nuevo.
+      const saved = await save(() => updateProfile({ firstName: f.first, lastName: f.last, preferredSize: f.size || null, marketingOptIn: f.news }))
+      setF(profileValues(saved))
+      toast.success(PROFILE_MESSAGES.saved, { key: 'profile' })
     } catch {
-      setResult({ state: 'error', message: MESSAGES.network })
+      toast.error(MESSAGES.network, { key: 'profile' })
     }
   }
 
@@ -97,12 +95,9 @@ function ProfileForm() {
         Quiero enterarme de las ediciones limitadas antes de su lanzamiento. <span className="text-ink-soft">Un correo al mes, como máximo.</span>
       </AuthCheckbox>
 
-      <div className="flex flex-col gap-3">
-        <AuthSubmit loading={result.state === 'saving'} loadingText="Guardando…">
-          Guardar cambios
-        </AuthSubmit>
-        <FormStatus {...result} />
-      </div>
+      <SaveSubmit status={status} dirty={dirty}>
+        Guardar cambios
+      </SaveSubmit>
     </form>
   )
 }
@@ -112,14 +107,16 @@ const EMPTY_PASSWORDS = { current: '', next: '', confirm: '' }
 
 function PasswordForm() {
   const { changePassword } = useAuth()
+  const toast = useToast()
   const [f, setF] = useState(EMPTY_PASSWORDS)
   const [errors, setErrors] = useState({})
-  const [result, setResult] = useState({ state: 'idle', message: '' })
+  const [status, save] = useSaveStatus()
+  const formRef = useRef(null)
+  const dirty = Boolean(f.current || f.next || f.confirm)
 
   const set = (key) => (value) => {
     setF((x) => ({ ...x, [key]: value }))
     setErrors((x) => ({ ...x, [key]: undefined }))
-    if (result.state !== 'saving') setResult({ state: 'idle', message: '' })
   }
 
   const fail = (next) => {
@@ -129,7 +126,7 @@ function PasswordForm() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (result.state === 'saving') return
+    if (status === 'saving' || !dirty) return
     const next = {
       current: f.current ? undefined : PROFILE_MESSAGES.currentEmpty,
       next: passwordStrength(f.next).valid ? undefined : MESSAGES.passwordWeak,
@@ -139,23 +136,20 @@ function PasswordForm() {
       fail(next)
       return
     }
-    setResult({ state: 'saving', message: '' })
     try {
-      await changePassword({ currentPassword: f.current, newPassword: f.next })
+      await save(() => changePassword({ currentPassword: f.current, newPassword: f.next }))
       setF(EMPTY_PASSWORDS)
-      setResult({ state: 'saved', message: PROFILE_MESSAGES.passwordChanged })
+      // Con los campos vacíos no queda nada que editar: el foco sale del formulario y el aviso confirma.
+      if (formRef.current?.contains(document.activeElement)) document.activeElement.blur()
+      toast.success(PROFILE_MESSAGES.passwordChanged, { key: 'password' })
     } catch (err) {
-      if (err instanceof AuthError && err.code === 'WRONG_PASSWORD') {
-        setResult({ state: 'idle', message: '' })
-        fail({ current: PROFILE_MESSAGES.currentWrong })
-      } else {
-        setResult({ state: 'error', message: MESSAGES.network })
-      }
+      if (err instanceof AuthError && err.code === 'WRONG_PASSWORD') fail({ current: PROFILE_MESSAGES.currentWrong })
+      else toast.error(MESSAGES.network, { key: 'password' })
     }
   }
 
   return (
-    <form onSubmit={submit} noValidate aria-labelledby="clave-t" className="flex flex-col gap-7">
+    <form ref={formRef} onSubmit={submit} noValidate aria-labelledby="clave-t" className="flex flex-col gap-7">
       <h2 id="clave-t" className={H2}>
         Cambiar contraseña
       </h2>
@@ -172,12 +166,9 @@ function PasswordForm() {
         error={errors.confirm}
         autoComplete="new-password"
       />
-      <div className="flex flex-col gap-3">
-        <AuthSubmit loading={result.state === 'saving'} loadingText="Cambiando…">
-          Cambiar contraseña
-        </AuthSubmit>
-        <FormStatus {...result} />
-      </div>
+      <SaveSubmit status={status} dirty={dirty} savingText="Cambiando…" savedText="Cambiada">
+        Cambiar contraseña
+      </SaveSubmit>
     </form>
   )
 }

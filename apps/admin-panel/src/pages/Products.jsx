@@ -13,6 +13,7 @@ import { LOW_MARGIN } from '../domain/catalog'
 import { label, LINE_SHORT_LABELS, LINES, UNIT_LABELS, unitText } from '../domain/enums'
 import { useAdminAuth } from '../hooks/useAdminAuth'
 import { useAdminData, useAdminQuery } from '../hooks/useAdminData'
+import { useToast } from '../hooks/useToast'
 import { formatMXN, normalize } from '../utils/format'
 
 const FEW = 4
@@ -25,7 +26,7 @@ export default function Products() {
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(null) // slug, 'nuevo' o null
-  const [status, setStatus] = useState('')
+  const toast = useToast()
   const canEdit = can('catalog.edit')
   const canSeeCosts = can('costs.view')
   const line = LINES.includes(params.get('linea')) ? params.get('linea') : 'todas'
@@ -42,7 +43,7 @@ export default function Products() {
   const save = async (form) => {
     const saved = await api.saveProduct(form)
     setOpen(null)
-    setStatus(`Producto ${saved.name} guardado.`)
+    toast.success(`Producto ${saved.name} guardado.`)
   }
 
   const products = data?.products ?? []
@@ -71,9 +72,6 @@ export default function Products() {
           <SearchField id="prod-q" value={q} onChange={setQ} placeholder="Buscar producto" className="sm:ml-auto" />
         </div>
         {!canSeeCosts && <Banner>Como Operaciones ves stock y datos del catálogo. El precio, el costo y el margen solo los ve el Dueño.</Banner>}
-        <p role="status" className="text-[13px] text-matcha empty:hidden">
-          {status}
-        </p>
 
         {error && <EmptyState icon="alert" title="No pudimos cargar los productos." />}
         {!data && !error && <Loading label="Cargando productos…" />}

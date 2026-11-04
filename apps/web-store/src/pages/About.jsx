@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowIcon } from '../components/brand/Icons'
 import { BODY, Eyebrow, TITLE } from '../components/info/PageIntro'
 import { usePageMeta } from '../hooks/usePageMeta'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 
 const VALUES = [
   {
@@ -30,7 +31,10 @@ export default function About() {
 
   return (
     <main>
-      <section className="gutter mx-auto grid max-w-7xl gap-10 py-14 md:py-24 lg:grid-cols-12 lg:items-end">
+      <div className="gutter mx-auto max-w-7xl pt-2 md:pt-4">
+        <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Nosotros' }]} />
+      </div>
+      <section className="gutter mx-auto grid max-w-7xl gap-10 pt-6 pb-14 md:pt-12 md:pb-24 lg:grid-cols-12 lg:items-end">
         <div className="lg:col-span-7">
           <Eyebrow jp="私たち">Nosotros</Eyebrow>
           <h1 className={`mt-5 ${TITLE}`}>

@@ -66,9 +66,10 @@ describe('formulario de contacto', () => {
     await submit(page.querySelector('form'))
 
     expect(sendContactMessage).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ana Prueba', email: 'ana@sokko.test', website: '' }))
-    const status = page.querySelector('[role="status"]')
-    expect(status.textContent).toContain('Mensaje recibido')
-    expect(status.textContent).toContain('届')
+    expect(page.textContent).toContain('Mensaje recibido')
+    expect(page.textContent).toContain('届')
+    // Sin el formulario, el foco pasa al título de la confirmación.
+    expect(document.activeElement.textContent).toBe('Mensaje recibido')
   })
 
   it('si la API limita los envíos, lo explica y conserva lo escrito', async () => {

@@ -7,9 +7,10 @@ const TABS = [
   { to: '/cuenta/favoritos', label: 'Favoritos' },
 ]
 
-// Mismo subrayado que el encabezado de la tienda; NavLink pone aria-current="page" (también en el detalle de un pedido).
+// Mismo subrayado laca que el encabezado, sobre la línea de la barra, y texto más firme en la activa.
+// NavLink pone aria-current="page" (también en el detalle de un pedido).
 const TAB =
-  'relative inline-flex min-h-11 items-center text-[12.5px] tracking-[.16em] whitespace-nowrap text-ink-soft uppercase transition-colors hover:text-ink aria-[current=page]:text-ink aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-0 aria-[current=page]:after:bottom-0 aria-[current=page]:after:h-px aria-[current=page]:after:bg-ink'
+  'relative inline-flex min-h-11 items-center text-[12.5px] tracking-[.16em] whitespace-nowrap text-ink-soft uppercase transition-colors hover:text-ink aria-[current=page]:font-normal aria-[current=page]:text-ink aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-0 aria-[current=page]:after:-bottom-px aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-laca'
 
 /** Pestañas de las vistas con sesión: Mis pedidos · Mi perfil · Favoritos · Cerrar sesión. */
 export default function AccountTabs() {

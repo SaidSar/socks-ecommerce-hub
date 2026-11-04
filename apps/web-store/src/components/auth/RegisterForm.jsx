@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useShake } from '../../hooks/useShake'
+import { useToast } from '../../hooks/useToast'
+import { AUTH_TOASTS } from '../../domain/account'
 import { AuthError } from '../../services/authService'
 import { MESSAGES, emailError, passwordStrength, reviewCount } from '../../utils/authValidation'
 import AuthField, { AuthAlert, AuthCheckbox, AuthSubmit } from './AuthField'
@@ -19,8 +21,9 @@ const focusFirstError = (errors) => {
 }
 
 /** Crear cuenta (DESIGN_AUTH.md §4.3). Como LoginForm, la navegación posterior la hace la guarda de Account. */
-export default function RegisterForm({ onAuthStart, search = '' }) {
+export default function RegisterForm({ search = '' }) {
   const { register } = useAuth()
+  const toast = useToast()
   const [f, setF] = useState({ first: '', last: '', email: '', pw: '', pw2: '', size: '', news: true, terms: false })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -64,9 +67,9 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
 
     setErrors({})
     setLoading(true)
-    onAuthStart?.('register')
+    let user
     try {
-      await register({
+      user = await register({
         firstName: f.first,
         lastName: f.last,
         email: f.email.trim(),
@@ -82,7 +85,10 @@ export default function RegisterForm({ onAuthStart, search = '' }) {
         setFormError(MESSAGES.network)
         shake()
       }
+      return
     }
+    // El registro deja la sesión iniciada: la guarda de Account lleva al inicio (o a ?redirect=).
+    toast.success(AUTH_TOASTS.register(user.firstName), { key: 'auth' })
   }
 
   const errorCount = Object.values(errors).filter(Boolean).length

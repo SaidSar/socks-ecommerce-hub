@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ProtectedLayout, RequirePermission } from './components/layout/Guards'
 import { NAV } from './config/navigation'
 import { AdminAuthProvider } from './context/AdminAuthContext'
+import { ToastProvider } from './context/ToastContext'
 import Brands from './pages/Brands'
 import Collections from './pages/Collections'
 import ComingSoon from './pages/ComingSoon'
@@ -46,7 +47,9 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AdminAuthProvider>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </AdminAuthProvider>
   )
 }
