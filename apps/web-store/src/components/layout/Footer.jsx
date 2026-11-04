@@ -1,11 +1,8 @@
+import { Link } from 'react-router-dom'
 import { label, PAYMENT_METHOD_LABELS } from '../../config/enums'
+import { FOOTER_COLUMNS } from '../../config/footer'
+import { BUSINESS_HOURS, STORE_EMAIL } from '../../content/legal'
 import Logo from '../brand/Logo'
-
-// TODO(design): los enlaces del footer apuntan a #origen como en el mockup; definir rutas reales.
-const COLUMNS = [
-  { title: 'Atelier', links: ['Colección Tabi', 'Tejidos Botánicos', 'Ediciones limitadas', 'Tarjeta de regalo'] },
-  { title: 'Atención', links: ['Guía de tallas en cm', 'Envíos y cortesías', 'Cambios y cuidado', 'Cita personalizada'] },
-]
 
 const SUSTAINABILITY = ['Algodón trazable', 'Tintes de bajo impacto', 'Empaque sin plástico']
 // Redes que acepta el método `tarjeta` (no son valores de enum) más OXXO Pay desde el mapa único de §1.6.
@@ -26,7 +23,7 @@ export default function Footer() {
           <figcaption className="mt-4 text-[11px] tracking-[.3em] text-ink-soft uppercase">— Manifiesto SOKKO</figcaption>
         </figure>
 
-        <div className="mt-16 grid gap-10 md:grid-cols-[1.3fr_1fr_1fr_1.2fr]">
+        <div className="mt-16 grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1.2fr]">
           <div>
             <Logo variant="vertical" className="h-28" />
             <p className="mt-5 max-w-xs text-[13px] leading-relaxed text-ink-soft">
@@ -34,15 +31,15 @@ export default function Footer() {
             </p>
           </div>
 
-          {COLUMNS.map(({ title, links }) => (
+          {FOOTER_COLUMNS.map(({ title, links }) => (
             <nav key={title} aria-label={title}>
               <h2 className="mb-4 text-[11px] font-normal tracking-[.3em] text-matcha uppercase">{title}</h2>
               <ul className="space-y-1">
                 {links.map((l) => (
-                  <li key={l}>
-                    <a href="#origen" className="inline-flex min-h-8 items-center font-serif text-[17px] text-ink/80 hover:text-laca">
-                      {l}
-                    </a>
+                  <li key={l.to}>
+                    <Link to={l.to} className="inline-flex min-h-8 items-center font-serif text-[17px] text-ink/80 hover:text-laca">
+                      {l.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -51,8 +48,8 @@ export default function Footer() {
 
           <div>
             <h2 className="mb-4 text-[11px] font-normal tracking-[.3em] text-matcha uppercase">Atención personalizada</h2>
-            <p className="font-serif text-[18px] select-all">hola@sokko.mx</p>
-            <p className="mt-1 text-[12.5px] text-ink-soft">Lunes a viernes, 9:00 a 18:00 (hora del Pacífico)</p>
+            <p className="font-serif text-[18px] select-all">{STORE_EMAIL}</p>
+            <p className="mt-1 text-[12.5px] text-ink-soft">{BUSINESS_HOURS}</p>
             <ul className="mt-5 flex flex-wrap gap-2" aria-label="Compromisos de sostenibilidad">
               {SUSTAINABILITY.map((s) => (
                 <li
@@ -76,12 +73,6 @@ export default function Footer() {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <a href="#origen" className="inline-flex min-h-8 items-center hover:text-ink">
-              Aviso de privacidad
-            </a>
-            <a href="#origen" className="inline-flex min-h-8 items-center hover:text-ink">
-              Términos
-            </a>
             <span>
               © 2026 SOKKO{' '}
               <span className="font-jp" lang="ja">
