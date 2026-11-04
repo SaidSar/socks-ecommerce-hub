@@ -1,8 +1,9 @@
 import { Link, NavLink } from 'react-router-dom'
 import { label, LINE_LABELS, LINES } from '../../config/enums'
 import { useCart } from '../../hooks/useCart'
+import { useWishlist } from '../../hooks/useWishlist'
 import Logo from '../brand/Logo'
-import { BagIcon, SearchIcon } from '../brand/Icons'
+import { BagIcon, HeartIcon, SearchIcon } from '../brand/Icons'
 import AccountMenu from './AccountMenu'
 
 // Subrayado de 1 px en el ítem activo (aria-current="page", que NavLink pone solo).
@@ -30,6 +31,7 @@ function LineLink({ line, compact = false }) {
  */
 export default function Header() {
   const { count, open: openCart } = useCart()
+  const { count: favorites } = useWishlist()
 
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-ink/10 bg-linen/95 backdrop-blur">
@@ -51,6 +53,20 @@ export default function Header() {
             className="flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink aria-[current=page]:text-ink"
           >
             <SearchIcon className="h-[21px] w-[21px]" />
+          </NavLink>
+          <NavLink
+            to="/cuenta/favoritos"
+            aria-label={`Favoritos, ${favorites} ${favorites === 1 ? 'pieza' : 'piezas'}`}
+            className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 text-ink-soft transition-colors hover:text-laca aria-[current=page]:text-ink"
+          >
+            <HeartIcon className="h-[21px] w-[21px]" />
+            {/* Con las cuatro líneas a lo ancho, la palabra solo cabe desde xl. */}
+            <span aria-hidden="true" className="hidden text-[13px] tracking-[.12em] uppercase xl:inline">
+              Favoritos
+            </span>
+            <span key={favorites} aria-hidden="true" className="tnum animate-fade font-serif text-[16px]">
+              ({favorites})
+            </span>
           </NavLink>
           <AccountMenu />
           <button

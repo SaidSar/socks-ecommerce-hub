@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { label, LINE_LABELS, unitText } from '../../config/enums'
+import FavoriteButton from './FavoriteButton'
 import Price from './Price'
 import ProductArt from './ProductArt'
 
@@ -19,52 +20,56 @@ function eyebrow(product, showLine) {
 
 /**
  * Tarjeta de producto (DESIGN_CATALOG_UI.md §3.4). Todo lo que muestra (precio, insignia, pocas unidades)
- * ya viene calculado por el servicio de catálogo.
+ * ya viene calculado por el servicio de catálogo. El corazón va fuera del enlace (un botón no puede ir dentro de <a>),
+ * encima de la esquina de la imagen.
  */
 export default function ProductCard({ product, showLine = false }) {
   const isSokko = product.line === 'sokko'
   const cover = product.images?.[0]
   return (
-    <Link to={`/producto/${product.slug}`} className="group flex min-w-0 flex-col gap-3">
-      <div
-        className={`relative flex aspect-[4/5] max-w-full items-center justify-center overflow-hidden transition-colors ${
-          cover ? 'bg-sand' : isSokko ? 'linen-tex bg-sand p-6 group-hover:bg-sand-2' : 'bg-shelf p-6 group-hover:bg-sand'
-        }`}
-      >
-        {cover ? (
-          <img
-            src={cover.url}
-            alt={cover.alt || product.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          />
-        ) : (
-          <div className="h-[86%] w-[78%] transition-transform duration-300 group-hover:-translate-y-1">
-            <ProductArt product={product} />
+    <div className="relative min-w-0">
+      <Link to={`/producto/${product.slug}`} className="group flex min-w-0 flex-col gap-3">
+        <div
+          className={`relative flex aspect-[4/5] max-w-full items-center justify-center overflow-hidden transition-colors ${
+            cover ? 'bg-sand' : isSokko ? 'linen-tex bg-sand p-6 group-hover:bg-sand-2' : 'bg-shelf p-6 group-hover:bg-sand'
+          }`}
+        >
+          {cover ? (
+            <img
+              src={cover.url}
+              alt={cover.alt || product.name}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          ) : (
+            <div className="h-[86%] w-[78%] transition-transform duration-300 group-hover:-translate-y-1">
+              <ProductArt product={product} />
+            </div>
+          )}
+          <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+            <SeasonTag product={product} />
           </div>
-        )}
-        <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
-          <SeasonTag product={product} />
+          {isSokko && product.nameJp && (
+            <span lang="ja" className="absolute right-3 bottom-3 font-jp text-[15px] text-ink-soft">
+              {product.nameJp}
+            </span>
+          )}
         </div>
-        {isSokko && product.nameJp && (
-          <span lang="ja" className="absolute right-3 bottom-3 font-jp text-[15px] text-ink-soft">
-            {product.nameJp}
+        <div className="flex min-w-0 flex-col gap-1">
+          {/* Altura fija: la fila mide lo mismo con o sin "Quedan N". */}
+          <div className="flex h-4 items-center justify-between gap-2">
+            <span className="truncate text-[11px] font-normal tracking-[.22em] text-ink-soft uppercase">{eyebrow(product, showLine)}</span>
+            {product.fewUnits && <span className="shrink-0 text-[10.5px] font-medium tracking-[.14em] text-laca uppercase">Quedan {product.stock}</span>}
+          </div>
+          <span className={isSokko ? 'font-serif text-[21px] leading-tight' : 'text-[15px] leading-snug font-normal'}>{product.name}</span>
+          <span className="flex items-baseline justify-between gap-2">
+            <Price product={product} />
+            <span className="shrink-0 text-[12px] text-ink-soft">{unitText(product.type.unit, product.unitsPerPack)}</span>
           </span>
-        )}
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        {/* Altura fija: la fila mide lo mismo con o sin "Quedan N". */}
-        <div className="flex h-4 items-center justify-between gap-2">
-          <span className="truncate text-[11px] font-normal tracking-[.22em] text-ink-soft uppercase">{eyebrow(product, showLine)}</span>
-          {product.fewUnits && <span className="shrink-0 text-[10.5px] font-medium tracking-[.14em] text-laca uppercase">Quedan {product.stock}</span>}
         </div>
-        <span className={isSokko ? 'font-serif text-[21px] leading-tight' : 'text-[15px] leading-snug font-normal'}>{product.name}</span>
-        <span className="flex items-baseline justify-between gap-2">
-          <Price product={product} />
-          <span className="shrink-0 text-[12px] text-ink-soft">{unitText(product.type.unit, product.unitsPerPack)}</span>
-        </span>
-      </div>
-    </Link>
+      </Link>
+      <FavoriteButton slug={product.slug} name={product.name} className="absolute top-1 right-1 h-11 w-11 bg-linen/70 backdrop-blur-sm" />
+    </div>
   )
 }
