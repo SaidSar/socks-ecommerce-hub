@@ -4,7 +4,7 @@
 
 La suscripción (Azure for Students), sus regiones permitidas y el MFA obligatorio están en [`docs/infra/AZURE.md`](../docs/infra/AZURE.md).
 
-**Estado:** los recursos ya existen en `rg-sokko-prod` (`westus`). La API se publica con el workflow `deploy.yml`.
+**Estado:** los recursos de `main.bicep` ya existen en `rg-sokko-prod` (`westus`) y `storage.bicep` se desplegó el 4 de noviembre de 2026. La API se publica con el workflow `deploy.yml`.
 
 ## Lo que necesita el dueño de la suscripción
 
@@ -25,9 +25,11 @@ Sin `jwtSigningKey`, un despliegue posterior conserva la clave que ya está en K
 
 ## Fotos de producto (`storage.bicep`)
 
+**Desplegado el 4 de noviembre de 2026**, con la app setting `Images__BlobServiceUrl` ya configurada. Se probó en producción subir una foto desde el panel, verla en la tienda y borrarla, y el archivo también se borra.
+
 Va aparte de `main.bicep` para no volver a desplegar el plan ni la BD. Crea `stsokkoqifdnnh6tfjpc` (StorageV2, Standard_LRS, Hot, TLS 1.2, sin Shared Key) en `westus`, con el contenedor `product-images` de lectura pública solo de blobs (nadie puede listarlo), y le da a la identidad de la API el rol **Storage Blob Data Contributor** sobre esa cuenta.
 
-Requiere `Microsoft.Storage` registrado (no está entre los siete de `docs/infra/AZURE.md` §3):
+Requiere `Microsoft.Storage` registrado (`docs/infra/AZURE.md` §3). Para reproducirlo:
 
 ```bash
 az provider register --namespace Microsoft.Storage --wait
@@ -51,6 +53,19 @@ az webapp config appsettings set -g rg-sokko-prod -n app-sokko-qifdnnh6tfjpc --s
   Sin el parámetro (vacío por omisión), el redespliegue quita la setting y las fotos quedan de solo lectura hasta volver a ponerla.
 - El rol tarda unos minutos en propagarse; mientras tanto, subir una foto responde 500 (403 de Storage en el registro).
 - En Development, sin la setting, las fotos van a `apps/api-service/wwwroot/uploads` y las sirve la API en `/uploads`.
+
+### Subir fotos desde el panel
+
+Solo el **Dueño** puede, porque se necesita el permiso `catalog.edit`. Operaciones ve las fotos, pero no puede cambiarlas.
+
+1. En el panel, **Catálogo → Productos**, abra el producto. Las fotos se agregan a un producto ya guardado: en uno nuevo, primero guárdelo.
+2. En la sección **Fotos**, arrastre los archivos o use **Elegir fotos**. Se aceptan JPG, PNG o WebP, hasta **6 por producto**.
+3. El navegador reduce cada foto a 1600 px por lado largo y la convierte a WebP antes de subirla. La API rechaza archivos de más de 5 MB (413) y los que no son JPG, PNG ni WebP por sus bytes (400).
+4. La **primera foto es la portada**: es la de la tarjeta en la tienda. Para cambiar el orden, use las flechas o arrastre las miniaturas.
+5. Escriba el **texto alternativo** de cada foto (qué se ve en ella). Se guarda al salir del campo. Si queda vacío, la tienda usa el nombre del producto.
+6. Para borrar, pulse **×** y confirme con **¿Borrar?**. Se borra también el archivo de la cuenta de Storage.
+
+Los cambios de fotos se aplican al instante, sin **Guardar producto**. Un producto sin fotos sigue mostrando su ilustración. Cuando hay más de una foto, la ficha de la tienda muestra una galería con miniaturas.
 
 ## GitHub
 
