@@ -91,7 +91,11 @@ export default function Shipping() {
               <Link to="/cuenta/pedidos" className="underline decoration-ink/25 underline-offset-4 hover:text-laca">
                 Mis pedidos
               </Link>
-              .
+              ; si compró como invitado, en{' '}
+              <Link to="/rastreo" className="underline decoration-ink/25 underline-offset-4 hover:text-laca">
+                Rastrear pedido
+              </Link>
+              , con su folio y su correo.
             </p>
           </section>
 

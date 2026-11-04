@@ -60,7 +60,8 @@ export const FAQ = [
     topic: 'envios',
     question: '¿Cómo consulto el estado de mi pedido?',
     answer: () =>
-      'Si compró con cuenta, entre a Mis pedidos. En todos los casos le enviamos por correo el folio (SKK-####) y, al salir el paquete, su número de guía.',
+      'Si compró con cuenta, entre a Mis pedidos. Si compró como invitado, use Rastrear pedido con su folio (SKK-####) y su correo. En todos los casos le enviamos por correo el folio y, al salir el paquete, su número de guía.',
+    link: { to: '/rastreo', label: 'Rastrear pedido' },
   },
   {
     id: 'oxxo',

@@ -179,6 +179,8 @@ function placeMockOrder(payload) {
       lineTotal: product.price * item.quantity,
     })),
     timeline: [{ status: isCard ? 'pagado' : 'por_preparar', at: now.toISOString() }],
+    // Lo llena el panel al despachar; el mock nunca sale del atelier.
+    shipment: null,
     ownerEmail: getSession()?.email ?? null,
   }
   saveOrders([...orders, order])
@@ -240,6 +242,26 @@ export async function getOrder(folio) {
   await latency()
   const order = loadOrders().find((o) => o.folio === folio)
   return order && canReadMock(order) ? withExpiry(order) : null
+}
+
+/**
+ * Rastreo de invitado: folio y correo de la compra (X-Customer-Email). Null si no coinciden, igual que si no existe.
+ * Un pedido hecho con cuenta solo lo abre su dueño con sesión.
+ */
+export async function trackOrder(folio, email) {
+  const normalizedFolio = String(folio ?? '').trim().toUpperCase()
+  const normalizedEmail = String(email ?? '').trim().toLowerCase()
+  if (USE_API) {
+    const response = await send(`/api/orders/${encodeURIComponent(normalizedFolio)}`, { headers: { 'X-Customer-Email': normalizedEmail } })
+    if (response.status === 404) return null
+    if (!response.ok) throw await apiError(response)
+    return response.json()
+  }
+  await latency()
+  const order = loadOrders().find((o) => o.folio === normalizedFolio)
+  if (!order) return null
+  const readable = order.ownerEmail ? order.ownerEmail === getSession()?.email : order.email === normalizedEmail
+  return readable ? withExpiry(order) : null
 }
 
 /** Pedidos de la sesión, del más reciente al más antiguo. */

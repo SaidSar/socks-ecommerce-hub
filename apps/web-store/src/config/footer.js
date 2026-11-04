@@ -11,6 +11,7 @@ export const FOOTER_COLUMNS = [
     links: [
       { to: '/preguntas-frecuentes', label: 'Preguntas frecuentes' },
       { to: '/envios', label: 'Envíos' },
+      { to: '/rastreo', label: 'Rastrear pedido' },
       { to: '/devoluciones', label: 'Cambios y devoluciones' },
       { to: '/contacto', label: 'Contacto' },
     ],
