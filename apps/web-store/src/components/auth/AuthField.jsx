@@ -15,6 +15,8 @@ export default function AuthField({
   placeholder,
   right,
   inputRef,
+  inputMode,
+  maxLength,
 }) {
   const describedBy = error ? `${id}-err` : hint ? `${id}-hint` : undefined
 
@@ -29,10 +31,12 @@ export default function AuthField({
           id={id}
           type={type}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value, e)}
           onBlur={onBlur}
           autoComplete={autoComplete}
           placeholder={placeholder}
+          inputMode={inputMode}
+          maxLength={maxLength}
           aria-invalid={error ? 'true' : 'false'}
           aria-describedby={describedBy}
           className={`w-full rounded-none border-0 border-b border-ink/25 bg-transparent pt-2.5 pb-[9px] text-[16px] font-normal text-ink outline-none transition-colors placeholder:font-light placeholder:text-ink-soft/75 focus:border-ink aria-invalid:border-laca ${

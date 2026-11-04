@@ -1,9 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthField, { AuthAlert, AuthSubmit } from '../components/auth/AuthField'
 import CheckoutLayout, { EYEBROW, TotalsRow } from '../components/checkout/CheckoutLayout'
+import { AmexLogo, MastercardLogo, VisaLogo } from '../components/brand/CardBrands'
 import ProductArt from '../components/product/ProductArt'
-import { CHECKOUT_MESSAGES, deliveryLabel, digitsOnly, taxIncluded, validateCheckout } from '../domain/checkout'
+import {
+  CARD_BRANDS,
+  caretAfterDigits,
+  cardRules,
+  CHECKOUT_MESSAGES,
+  deliveryLabel,
+  detectCardBrand,
+  digitsOnly,
+  formatCardNumber,
+  taxIncluded,
+  validateCheckout,
+} from '../domain/checkout'
 import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
 import { useConfig } from '../hooks/useConfig'
@@ -18,9 +30,135 @@ const DELIVERY_DETAIL = { local: 'Los Mochis y ejidos vecinos, con repartidor.',
 
 const newKey = () => crypto.randomUUID()
 
-function Section({ number, title, children }) {
+/** Logotipo de una marca reconocida (Visa, Mastercard o American Express). */
+function BrandLogo({ brand, className }) {
+  if (brand === 'visa') return <VisaLogo className={className} />
+  if (brand === 'mastercard') return <MastercardLogo className={className} />
+  if (brand === 'amex') return <AmexLogo className={className} />
+  return null
+}
+
+/**
+ * Número de tarjeta con formato automático (4-4-4-4, o 4-6-5 con American Express) y el logotipo de la marca
+ * dentro del campo en cuanto se reconoce. Mientras está vacío, debajo se ven en gris las marcas aceptadas.
+ * El cursor se queda junto al mismo dígito aunque se editen los de en medio.
+ */
+function CardNumberField({ value, onChange, error }) {
+  const inputRef = useRef(null)
+  const caretRef = useRef(null)
+  const brand = detectCardBrand(value)
+
+  useLayoutEffect(() => {
+    const input = inputRef.current
+    if (caretRef.current != null && input && document.activeElement === input) input.setSelectionRange(caretRef.current, caretRef.current)
+    caretRef.current = null
+  }, [value])
+
+  const change = (raw, event) => {
+    let digits = digitsOnly(raw)
+    let before = digitsOnly(raw.slice(0, event?.target.selectionStart ?? raw.length)).length
+    // Borrar un espacio no cambia los dígitos: se borra el dígito de ese lado, como esperaría quien escribe.
+    if (digits === digitsOnly(value) && raw.length < value.length) {
+      const inputType = event?.nativeEvent?.inputType
+      if (inputType === 'deleteContentBackward' && before > 0) {
+        digits = digits.slice(0, before - 1) + digits.slice(before)
+        before -= 1
+      } else if (inputType === 'deleteContentForward') {
+        digits = digits.slice(0, before) + digits.slice(before + 1)
+      }
+    }
+    const formatted = formatCardNumber(digits)
+    caretRef.current = caretAfterDigits(formatted, before)
+    onChange(formatted)
+  }
+
   return (
-    <section className="border-t border-ink/10 pt-7">
+    <div>
+      <AuthField
+        id="checkout-cardNumber"
+        inputRef={inputRef}
+        label="Número de tarjeta"
+        value={value}
+        onChange={change}
+        error={error}
+        autoComplete="cc-number"
+        inputMode="numeric"
+        placeholder="0000 0000 0000 0000"
+        right={brand ? <BrandLogo key={brand} brand={brand} className="animate-fade h-6 w-[38px]" /> : null}
+      />
+      <p className="sr-only" aria-live="polite">
+        {brand ? `Tarjeta ${CARD_BRANDS[brand].name}` : ''}
+      </p>
+      {!value && (
+        <ul aria-label="Tarjetas aceptadas" className="mt-2.5 flex items-center gap-2 opacity-60 grayscale">
+          {Object.keys(CARD_BRANDS).map((b) => (
+            <li key={b}>
+              <BrandLogo brand={b} className="h-5 w-8" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// Pasos visibles del formulario (una sola página): cada uno agrupa secciones y los campos que lo completan.
+const STEPS = [
+  { id: 'datos', label: 'Datos', fields: ['firstName', 'lastName', 'email', 'phone'] },
+  { id: 'envio', label: 'Envío', fields: ['street', 'neighborhood', 'postalCode', 'city', 'state'] },
+  { id: 'pago', label: 'Pago', fields: ['cardNumber', 'cardName', 'cardExpiry', 'cardCvc'] },
+]
+
+/**
+ * Datos · Envío · Pago. El paso actual es el de la sección donde está el foco (aria-current="step");
+ * los que ya no tienen campos por revisar llevan palomita. Cada paso lleva a su sección.
+ */
+function CheckoutSteps({ current, done }) {
+  return (
+    <nav aria-label="Pasos del pedido" className="sticky top-0 z-10 -mx-4 bg-linen/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
+      <ol className="flex items-stretch border-b border-ink/10">
+        {STEPS.map((step, i) => {
+          const active = step.id === current
+          const complete = done.includes(step.id) && !active
+          return (
+            <li key={step.id} className="flex-1">
+              <a
+                href={`#paso-${step.id}`}
+                onClick={(e) => {
+                  // Sin cambiar la URL: lleva a la sección y pone el foco en su primer campo (así el paso queda marcado).
+                  e.preventDefault()
+                  const section = document.getElementById(`paso-${step.id}`)
+                  section?.scrollIntoView({ block: 'start' })
+                  section?.querySelector('input, select, textarea')?.focus({ preventScroll: true })
+                }}
+                aria-current={active ? 'step' : undefined}
+                className={`relative flex min-h-12 items-center justify-center gap-2 text-[11.5px] tracking-[.2em] uppercase transition-colors ${
+                  active ? 'text-ink after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:bg-laca' : 'text-ink-soft hover:text-ink'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`tnum flex h-5 w-5 items-center justify-center rounded-full border text-[11px] tracking-normal ${
+                    active ? 'border-laca bg-laca text-linen' : complete ? 'border-matcha bg-matcha text-linen' : 'border-ink/25'
+                  }`}
+                >
+                  {complete ? '✓' : i + 1}
+                </span>
+                {step.label}
+                {complete && <span className="sr-only">, completo</span>}
+              </a>
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
+/** `anchor`: la primera sección de cada paso recibe el id al que lleva el indicador. */
+function Section({ number, title, step, anchor = true, children }) {
+  return (
+    <section data-step={step} id={anchor ? `paso-${step}` : undefined} className="scroll-mt-16 border-t border-ink/10 pt-7">
       <h2 className="mb-6 font-serif text-[24px] leading-tight">
         <span className="tnum mr-3 text-[15px] text-ink-soft">{number}</span>
         {title}
@@ -144,6 +282,7 @@ export default function Checkout() {
   const [quote, setQuote] = useState({ status: 'idle' })
   const [loading, setLoading] = useState(false)
   const [placed, setPlaced] = useState(false)
+  const [step, setStep] = useState('datos')
   const [shaking, shake] = useShake()
   const keyRef = useRef(null)
   const { subtotal, items } = cart
@@ -170,6 +309,10 @@ export default function Checkout() {
   const shippingCost = currentQuote.status === 'ready' ? currentQuote.cost : null
   const computedTotal = subtotal + (shippingCost ?? 0)
   const total = serverTotal ?? computedTotal
+  const cvcLength = cardRules(detectCardBrand(card.number)).cvc
+  // Pasos sin campos por revisar (la validación es pura y barata: se recalcula en cada render).
+  const pending = validateCheckout({ contact, card, paymentMethod })
+  const doneSteps = STEPS.filter((st) => st.fields.every((f) => !pending[f])).map((st) => st.id)
 
   // `errorKey`: en la tarjeta, el error se llama distinto del campo (number → cardNumber).
   const setField = (setter, key, errorKey = key) => (value) => {
@@ -278,7 +421,15 @@ export default function Checkout() {
 
   return (
     <CheckoutLayout title="Complete su pedido" aside={<Summary cart={cart} shippingCost={shippingCost} total={total} ivaRate={ivaRate} />}>
-      <form onSubmit={submit} noValidate className={`flex flex-col gap-9 ${shaking ? 'animate-shake' : ''}`}>
+      <form
+        onSubmit={submit}
+        noValidate
+        onFocus={(e) => {
+          const section = e.target.closest('[data-step]')
+          if (section) setStep(section.dataset.step)
+        }}
+        className={`flex flex-col gap-9 ${shaking ? 'animate-shake' : ''}`}
+      >
         <header>
           <p className={EYEBROW}>Último paso</p>
           <h1 className="mt-3 font-serif text-[clamp(34px,4vw,48px)] leading-[1.05] font-light">Complete su pedido</h1>
@@ -305,6 +456,8 @@ export default function Checkout() {
           </p>
         </header>
 
+        <CheckoutSteps current={step} done={doneSteps} />
+
         {formError && <AuthAlert>{formError}</AuthAlert>}
         {shortages.length > 0 && (
           <AuthAlert>
@@ -329,7 +482,7 @@ export default function Checkout() {
           </AuthAlert>
         )}
 
-        <Section number="1" title="Sus datos">
+        <Section number="1" title="Sus datos" step="datos">
           <div className="grid gap-7 sm:grid-cols-2">
             <AuthField {...field('firstName', { label: 'Nombre', autoComplete: 'given-name' })} />
             <AuthField {...field('lastName', { label: 'Apellido', autoComplete: 'family-name' })} />
@@ -338,7 +491,7 @@ export default function Checkout() {
           </div>
         </Section>
 
-        <Section number="2" title="Dirección de entrega">
+        <Section number="2" title="Dirección de entrega" step="envio">
           <div className="grid gap-7 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <AuthField {...field('street', { label: 'Calle y número', autoComplete: 'address-line1' })} />
@@ -353,11 +506,11 @@ export default function Checkout() {
           </div>
         </Section>
 
-        <Section number="3" title="Método de entrega">
+        <Section number="3" title="Método de entrega" step="envio" anchor={false}>
           <DeliveryQuote quote={currentQuote} />
         </Section>
 
-        <Section number="4" title="Forma de pago">
+        <Section number="4" title="Forma de pago" step="pago">
           <fieldset className="flex flex-col gap-3">
             <legend className="sr-only">Forma de pago</legend>
             <PaymentOption value="tarjeta" current={paymentMethod} onChange={setPaymentMethod} title="Tarjeta" detail="Crédito o débito." />
@@ -369,13 +522,22 @@ export default function Checkout() {
               {!paymentsDemoMode && <p className="mb-6 border-l-2 border-moss pl-3 text-[13px] text-ink-soft">Modo de prueba: no escriba los datos de una tarjeta real.</p>}
               <div className="grid gap-7 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <AuthField id="checkout-cardNumber" label="Número de tarjeta" value={card.number} onChange={setField(setCard, 'number', 'cardNumber')} error={errors.cardNumber} autoComplete="cc-number" />
+                  <CardNumberField value={card.number} onChange={setField(setCard, 'number', 'cardNumber')} error={errors.cardNumber} />
                 </div>
                 <div className="sm:col-span-2">
                   <AuthField id="checkout-cardName" label="Nombre en la tarjeta" value={card.name} onChange={setField(setCard, 'name', 'cardName')} error={errors.cardName} autoComplete="cc-name" />
                 </div>
                 <AuthField id="checkout-cardExpiry" label="Vencimiento (MM/AA)" value={card.expiry} onChange={setField(setCard, 'expiry', 'cardExpiry')} error={errors.cardExpiry} autoComplete="cc-exp" placeholder="08/29" />
-                <AuthField id="checkout-cardCvc" label="CVC" value={card.cvc} onChange={setField(setCard, 'cvc', 'cardCvc')} error={errors.cardCvc} autoComplete="cc-csc" />
+                <AuthField
+                  id="checkout-cardCvc"
+                  label={cvcLength === 4 ? 'CVC (4 dígitos al frente)' : 'CVC'}
+                  value={card.cvc}
+                  onChange={(v) => setField(setCard, 'cvc', 'cardCvc')(digitsOnly(v).slice(0, cvcLength))}
+                  error={errors.cardCvc}
+                  autoComplete="cc-csc"
+                  inputMode="numeric"
+                  maxLength={cvcLength}
+                />
               </div>
             </div>
           ) : (
