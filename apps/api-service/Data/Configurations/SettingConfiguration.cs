@@ -24,6 +24,7 @@ public class SettingConfiguration : IEntityTypeConfiguration<Setting>
         b.Property(s => s.Id).ValueGeneratedNever();
         b.Property(s => s.LocalFreeShipping).HasDbDefault(true);
         b.Property(s => s.IvaRate).HasPrecision(5, 4);
+        b.Property(s => s.ContactEmail).HasMaxLength(ContactMessageLimits.Email);
         b.Property(s => s.UpdatedAt).HasUtcNowDefault();
         b.Property(s => s.RowVersion).IsRowVersion();
 
