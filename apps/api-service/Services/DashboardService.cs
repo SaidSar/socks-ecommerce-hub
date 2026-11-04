@@ -47,23 +47,18 @@ public class DashboardService(
     private const int RecentOrders = 5;
     private const int TopPieces = 5;
     private const double LowEditionRatio = 0.2;
-    // Mediodía en America/Mazatlan (UTC−7, sin horario de verano): la fecha no cambia al mostrarla en el panel.
-    private const int NoonUtcHour = 19;
 
-    /// <summary>Lo que cuenta como venta: pagado y sin cancelar. Un OXXO pendiente todavía no es una venta.</summary>
+    /// <summary>Lo que cuenta como venta: <see cref="SalesFigures.IsSale"/>.</summary>
     private sealed record Sale(DateOnly Day, decimal Total, bool Free, Order Order);
 
-    private static double? PercentChange(decimal current, decimal previous) =>
-        previous == 0 ? null : (double)((current - previous) / previous) * 100;
+    private static double? PercentChange(decimal current, decimal previous) => SalesFigures.PercentChange(current, previous);
 
-    private static double? PercentChange(double current, double previous) =>
-        previous == 0 ? null : (current - previous) / previous * 100;
+    private static double? PercentChange(double current, double previous) => SalesFigures.PercentChange(current, previous);
 
     private static double FreePercent(IReadOnlyCollection<Sale> sales) =>
         sales.Count == 0 ? 0 : (double)sales.Count(s => s.Free) / sales.Count * 100;
 
-    private static decimal Ticket(IReadOnlyCollection<Sale> sales) =>
-        sales.Count == 0 ? 0 : Math.Round(sales.Sum(s => s.Total) / sales.Count, 2, MidpointRounding.AwayFromZero);
+    private static decimal Ticket(IReadOnlyCollection<Sale> sales) => SalesFigures.Ticket(sales.Sum(s => s.Total), sales.Count);
 
     public async Task<DashboardView?> GetAsync(string? range, CancellationToken cancellationToken = default)
     {
@@ -78,15 +73,9 @@ public class DashboardService(
         var today = clock.Today;
         var config = await settings.GetConfigAsync(cancellationToken);
 
-        // Dos periodos de la gráfica, con un día de margen por el cambio de zona horaria.
-        var since = DateTime.SpecifyKind(today.AddDays(-2 * ChartDays - 1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var loaded = await db.Orders
-            .AsNoTracking()
-            .Where(o => o.CreatedAt >= since && o.Status != OrderStatus.Cancelado && o.PaymentStatus == PaymentStatus.Pagado)
-            .Include(o => o.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Product).ThenInclude(p => p.Brand)
-            .AsSplitQuery()
-            .ToListAsync(cancellationToken);
-        var sales = loaded.Select(o => new Sale(SystemClock.ToBusinessDate(o.CreatedAt), o.Total, o.ShippingCost == 0, o)).ToList();
+        // Los dos periodos de la gráfica, por día local (misma definición de venta que Reportes).
+        var loaded = await SalesFigures.LoadSalesAsync(db, today.AddDays(-2 * ChartDays), today, cancellationToken);
+        var sales = loaded.Select(o => new Sale(BusinessTime.DateOf(o.CreatedAt), o.Total, o.ShippingCost == 0, o)).ToList();
 
         List<Sale> Between(DateOnly from, DateOnly to) => sales.Where(s => s.Day >= from && s.Day <= to).ToList();
 
@@ -125,7 +114,7 @@ public class DashboardService(
 
     private static DashboardMoneyDto Money(decimal current, decimal previous) => new(current, previous, PercentChange(current, previous));
 
-    private static DateTime Noon(DateOnly day) => DateTime.SpecifyKind(day.ToDateTime(new TimeOnly(NoonUtcHour, 0)), DateTimeKind.Utc);
+    private static DateTime Noon(DateOnly day) => BusinessTime.NoonUtc(day);
 
     private static DashboardDayDto DayOf(DateOnly day, Func<DateOnly, DateOnly, List<Sale>> between)
     {

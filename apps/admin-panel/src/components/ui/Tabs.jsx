@@ -72,7 +72,7 @@ export function Segmented({ options, value, onChange, label }) {
             aria-checked={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(o.key)}
-            className={`h-8 max-lg:h-11 px-3 rounded text-[13px] ${active ? 'bg-ink text-linen' : 'hover:bg-sand'}`}
+            className={`h-8 max-lg:h-11 px-3 rounded text-[13px] whitespace-nowrap ${active ? 'bg-ink text-linen' : 'hover:bg-sand'}`}
           >
             {o.label}
           </button>

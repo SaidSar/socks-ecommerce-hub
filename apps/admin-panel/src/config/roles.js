@@ -1,5 +1,5 @@
 // Roles y permisos del panel (DESIGN_ADMIN.md §3, DECISIONES_ADMIN.md). Contabilidad no existe en v1.
-// TODO(api): el servidor aplica los mismos permisos con [Authorize(Roles = "...")]; esto solo decide qué se muestra.
+// El servidor aplica los mismos permisos (Services/Permissions.cs con [Authorize(Policy = ...)]); esto solo decide qué se muestra.
 
 export const PERMISSIONS = [
   'money.view',
@@ -18,12 +18,13 @@ export const PERMISSIONS = [
   'promotions.manage',
   'shipping.view',
   'payments.confirm',
+  'messages.view',
 ]
 
 export const ROLES = {
   dueno: { label: 'Dueño', permissions: PERMISSIONS },
   // Catálogo (DESIGN_CATALOG_UI.md §4.1): Operaciones lo consulta; editar y ver costos es solo del Dueño.
-  operaciones: { label: 'Operaciones', permissions: ['orders.manage', 'inventory.adjust', 'shipping.view', 'catalog.view'] },
+  operaciones: { label: 'Operaciones', permissions: ['orders.manage', 'inventory.adjust', 'shipping.view', 'catalog.view', 'messages.view'] },
 }
 
 /** ¿El rol tiene el permiso? `null` como permiso = libre para cualquier rol con sesión. */

@@ -4,6 +4,7 @@ import CatalogCards from '../components/dashboard/CatalogCards'
 import InventoryAlerts from '../components/dashboard/InventoryAlerts'
 import KpiRow from '../components/dashboard/KpiRow'
 import LimitedEditions from '../components/dashboard/LimitedEditions'
+import NewMessages from '../components/dashboard/NewMessages'
 import RecentOrders from '../components/dashboard/RecentOrders'
 import SizeShare from '../components/dashboard/SizeShare'
 import TopPieces from '../components/dashboard/TopPieces'
@@ -91,7 +92,16 @@ export default function Dashboard() {
             <LimitedEditions editions={data.editions} />
           </div>
 
-          <RecentOrders orders={data.recent} showMoney={showMoney} now={data.now} />
+          {can('messages.view') ? (
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <div className="min-w-0">
+                <RecentOrders orders={data.recent} showMoney={showMoney} now={data.now} />
+              </div>
+              <NewMessages />
+            </div>
+          ) : (
+            <RecentOrders orders={data.recent} showMoney={showMoney} now={data.now} />
+          )}
         </div>
       )}
     </>

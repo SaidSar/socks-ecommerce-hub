@@ -28,6 +28,19 @@ const PATHS = {
       <path d="M16 4.5a3.5 3.5 0 010 7M18 15c2 .6 3.2 2.2 3.5 5" />
     </>
   ),
+  reply: <path d="M10 8L5 12.5l5 4.5M5.5 12.5H14a5 5 0 015 5V19" />,
+  archive: (
+    <>
+      <rect x="3" y="4" width="18" height="4.5" rx="1" />
+      <path d="M5 8.5V19a1 1 0 001 1h12a1 1 0 001-1V8.5M10 12.5h4" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="1.5" />
+      <path d="M3.5 7l8.5 6 8.5-6" />
+    </>
+  ),
   money: (
     <>
       <rect x="2.5" y="6" width="19" height="12" rx="1.5" />

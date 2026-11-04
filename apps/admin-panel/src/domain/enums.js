@@ -5,6 +5,8 @@ export const CARRIER_LABELS = { estafeta: 'Estafeta', dhl_express: 'DHL Express'
 
 export const PAYMENT_METHOD_LABELS = { tarjeta: 'Tarjeta', oxxo_pay: 'OXXO Pay' }
 
+export const DELIVERY_LABELS = { local: 'Entrega local', paqueteria: 'Paquetería' }
+
 export const PAYMENT_STATUS_LABELS = { pendiente: 'Pendiente de pago', pagado: 'Pagado', reembolsado: 'Reembolsado' }
 
 export const MOVEMENT_LABELS = {

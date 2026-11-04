@@ -4,7 +4,7 @@ import { STORE_URL } from '../../config/navigation'
 import Icon from '../ui/Icon'
 
 /** Barra lateral (sand) con logotipo, secciones permitidas y enlace a la tienda. */
-export default function Sidebar({ items, toPrepare = 0, onNavigate }) {
+export default function Sidebar({ items, toPrepare = 0, unread = 0, onNavigate }) {
   return (
     <nav aria-label="Secciones del panel" className="flex flex-col h-full">
       <div className="px-5 h-16 flex items-center border-b border-line shrink-0">
@@ -42,6 +42,12 @@ export default function Sidebar({ items, toPrepare = 0, onNavigate }) {
                 <span className="ml-auto tnum text-[11.5px] rounded-full bg-ocre text-ink px-2 py-0.5 font-medium">
                   {toPrepare}
                   <span className="sr-only"> por preparar</span>
+                </span>
+              )}
+              {n.key === 'mensajes' && unread > 0 && (
+                <span className="ml-auto tnum text-[11.5px] rounded-full bg-ai text-white px-2 py-0.5 font-medium">
+                  {unread}
+                  <span className="sr-only"> {unread === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}</span>
                 </span>
               )}
               {!n.ready && <span className="ml-auto text-[10.5px] text-ink-soft">Pronto</span>}

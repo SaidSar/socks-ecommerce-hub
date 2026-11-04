@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom'
 import { ProtectedLayout, RequirePermission } from './components/layout/Guards'
 import { NAV } from './config/navigation'
 import { AdminAuthProvider } from './context/AdminAuthContext'
@@ -6,17 +6,26 @@ import { ToastProvider } from './context/ToastContext'
 import Brands from './pages/Brands'
 import Collections from './pages/Collections'
 import ComingSoon from './pages/ComingSoon'
+import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import Login from './pages/Login'
+import Messages from './pages/Messages'
 import NotFound from './pages/NotFound'
 import Orders from './pages/Orders'
 import Products from './pages/Products'
 import ProductTypes from './pages/ProductTypes'
+import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Shipments from './pages/Shipments'
 
 const guard = (section, element) => <RequirePermission section={section}>{element}</RequirePermission>
+
+/** La sección se llamaba Finanzas: los enlaces viejos llegan a Reportes con el mismo periodo. */
+function ToReports() {
+  const { search } = useLocation()
+  return <Navigate to={`/reportes${search}`} replace />
+}
 
 const soonRoutes = NAV.filter((n) => !n.ready).map((n) => ({
   path: n.to.slice(1),
@@ -33,6 +42,10 @@ const router = createBrowserRouter([
       { path: 'pedidos/:folio', element: guard('pedidos', <Orders />) },
       { path: 'inventario', element: guard('inventario', <Inventory />) },
       { path: 'envios', element: guard('envios', <Shipments />) },
+      { path: 'clientes', element: guard('clientes', <Customers />) },
+      { path: 'reportes', element: guard('finanzas', <Reports />) },
+      { path: 'finanzas', element: <ToReports /> },
+      { path: 'mensajes', element: guard('mensajes', <Messages />) },
       { path: 'catalogo/productos', element: guard('productos', <Products />) },
       { path: 'catalogo/marcas', element: guard('marcas', <Brands />) },
       { path: 'catalogo/colecciones', element: guard('colecciones', <Collections />) },

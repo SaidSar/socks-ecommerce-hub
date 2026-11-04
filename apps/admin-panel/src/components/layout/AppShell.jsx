@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { NAV } from '../../config/navigation'
+import { NAV, navForPath, pageTitle } from '../../config/navigation'
 import { roleLabel } from '../../config/roles'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { useAdminData } from '../../hooks/useAdminData'
@@ -33,7 +33,7 @@ export default function AppShell() {
   const [menu, setMenu] = useState(false)
   const toast = useToast()
   const { user, logout, can } = useAdminAuth()
-  const { summary, api, usesApi } = useAdminData()
+  const { summary, unread, api, usesApi } = useAdminData()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
@@ -44,7 +44,13 @@ export default function AppShell() {
 
   // La barra lateral solo muestra las secciones que el rol puede abrir.
   const items = NAV.filter((n) => can(n.perm))
-  const sidebar = <Sidebar items={items} toPrepare={summary.toPrepare} onNavigate={() => setMenu(false)} />
+  const sidebar = <Sidebar items={items} toPrepare={summary.toPrepare} unread={unread} onNavigate={() => setMenu(false)} />
+
+  // El título de la pestaña dice en qué sección está (y el lector de pantalla lo anuncia al cambiar de ruta).
+  const section = navForPath(pathname)
+  useEffect(() => {
+    document.title = pageTitle(section?.label ?? 'Página no encontrada')
+  }, [section])
 
   const onLogout = () => {
     logout()
