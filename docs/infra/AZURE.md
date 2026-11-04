@@ -1,8 +1,8 @@
 # Infraestructura en Azure — SOKKO
 
-> Estado al 1 de noviembre de 2026. Este documento describe la **base** de la cuenta de Azure
-> (suscripción, grupo de recursos, permisos y proveedores). Todavía **no hay recursos desplegados**
-> (App Service, Azure SQL, etc.); se documentarán aquí conforme se creen.
+> Estado al 4 de noviembre de 2026. Este documento describe la **base** de la cuenta de Azure
+> (suscripción, grupo de recursos, permisos y proveedores) y los recursos desplegados en
+> `rg-sokko-prod` (§7). Cómo se despliegan: [`infra/README.md`](../../infra/README.md).
 
 ## 1. Resumen
 
@@ -63,7 +63,7 @@ de escritura falla por MFA:
 
 ## 3. Proveedores de recursos registrados
 
-Los siete quedan en estado `Registered` en la suscripción:
+Los ocho quedan en estado `Registered` en la suscripción:
 
 | Proveedor | Para qué |
 |---|---|
@@ -74,6 +74,7 @@ Los siete quedan en estado `Registered` en la suscripción:
 | `Microsoft.Insights` | Application Insights y alertas |
 | `Microsoft.OperationalInsights` | Log Analytics (espacio de trabajo de registros) |
 | `Microsoft.ManagedIdentity` | Identidades administradas (acceso de la API a Key Vault y SQL sin contraseñas) |
+| `Microsoft.Storage` | Cuenta de Storage de las fotos de producto (`infra/storage.bicep`). Se registró después que los otros siete |
 
 ## 4. Reproducir la configuración con Azure CLI
 
@@ -98,7 +99,7 @@ az role assignment create \
 
 # 4. Proveedores de recursos
 for p in Microsoft.Web Microsoft.Sql Microsoft.Communication Microsoft.KeyVault \
-         Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity; do
+         Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity Microsoft.Storage; do
   az provider register --namespace "$p"
 done
 ```
@@ -110,7 +111,7 @@ $rgId = az group show --name rg-sokko-prod --query id -o tsv
 az role assignment create --assignee 23020667@uadeo.mx --role Owner --scope $rgId
 
 "Microsoft.Web","Microsoft.Sql","Microsoft.Communication","Microsoft.KeyVault",
-"Microsoft.Insights","Microsoft.OperationalInsights","Microsoft.ManagedIdentity" |
+"Microsoft.Insights","Microsoft.OperationalInsights","Microsoft.ManagedIdentity","Microsoft.Storage" |
   ForEach-Object { az provider register --namespace $_ }
 ```
 
@@ -139,12 +140,12 @@ az role assignment list --resource-group rg-sokko-prod \
 
 # Estado de los proveedores
 az provider list \
-  --query "[?contains('Microsoft.Web Microsoft.Sql Microsoft.Communication Microsoft.KeyVault Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity', namespace)].{proveedor:namespace, estado:registrationState}" \
+  --query "[?contains('Microsoft.Web Microsoft.Sql Microsoft.Communication Microsoft.KeyVault Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity Microsoft.Storage', namespace)].{proveedor:namespace, estado:registrationState}" \
   -o table
 ```
 
 Resultado esperado: `rg-sokko-prod` en `westus2` con estado `Succeeded`; `23020667@uadeo.mx` como
-`Owner` con alcance `/subscriptions/24dec6f4-…/resourceGroups/rg-sokko-prod`; los 7 proveedores en
+`Owner` con alcance `/subscriptions/24dec6f4-…/resourceGroups/rg-sokko-prod`; los 8 proveedores en
 `Registered`.
 
 ## 6. Siguientes pasos
@@ -162,4 +163,27 @@ Resultado esperado: `rg-sokko-prod` en `westus2` con estado `Succeeded`; `230206
   contraseña. La clave JWT y la cadena de Communication Services van en Key Vault.
 - Las migraciones las aplica el workflow `deploy.yml` con un *migrations bundle*
   (`dotnet ef migrations bundle`), no al arrancar la API.
-- Al crear cada recurso, agregar su nombre, SKU y región a una tabla nueva en este documento.
+- Al crear cada recurso, agregar su nombre, SKU y región a la tabla de §7.
+
+## 7. Recursos desplegados
+
+Todos en `rg-sokko-prod`. `main.bicep` crea los de la API y `storage.bicep`, la cuenta de las fotos.
+
+| Recurso | Nombre | SKU / tipo | Región |
+|---|---|---|---|
+| Plan de App Service | `asp-sokko-prod` | B1 (Basic), Linux | `westus` |
+| App Service (API) | `app-sokko-qifdnnh6tfjpc` | .NET 10, identidad administrada del sistema | `westus` |
+| Servidor SQL | `sql-sokko-qifdnnh6tfjpc` | Solo autenticación de Microsoft Entra | `westus` |
+| Base de datos | `Sokko` | GP_S_Gen5, 1 vCore serverless, oferta gratuita | `westus` |
+| Key Vault | `kv-sokko-qifdnnh6tf` | Standard, RBAC | `westus` |
+| Communication Services | `acs-sokko-qifdnnh6tfjpc` y `email-sokko-qifdnnh6tfjpc` | Dominio administrado por Azure | `global` |
+| Application Insights | `appi-sokko-prod` | Sobre Log Analytics | `westus` |
+| Log Analytics | `log-sokko-prod` | PerGB2018, tope de 0.16 GB al día | `westus` |
+| Identidad del workflow | `id-sokko-deploy` | Identidad administrada asignada por el usuario (OIDC de GitHub) | `westus` |
+| Cuenta de Storage (fotos) | `stsokkoqifdnnh6tfjpc` | StorageV2, Standard_LRS, Hot, TLS 1.2, **sin Shared Key** | `westus` |
+| Contenedor | `product-images` (en `stsokkoqifdnnh6tfjpc`) | Lectura pública **solo de blobs**: se abre una foto con su URL, pero no se puede listar el contenedor | `westus` |
+
+La cuenta de Storage se creó el 4 de noviembre de 2026. La API escribe en ella con su identidad
+administrada (rol **Storage Blob Data Contributor** sobre la cuenta), sin claves. Su URL llega a la
+API por la app setting **`Images__BlobServiceUrl`** = `https://stsokkoqifdnnh6tfjpc.blob.core.windows.net/`.
+Sin esa setting, la API arranca igual, pero subir y borrar fotos responden 503.
