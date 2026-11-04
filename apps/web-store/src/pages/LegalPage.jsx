@@ -3,6 +3,7 @@ import PageIntro, { BODY, SideIndex } from '../components/info/PageIntro'
 import { ACADEMIC_NOTICE } from '../content/legal'
 import { usePageMeta } from '../hooks/usePageMeta'
 import { formatDate } from '../utils/orderDates'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 
 /** Aviso académico de los documentos legales: recuadro ocre-ink con 注. */
 export function AcademicNotice() {
@@ -32,7 +33,8 @@ export default function LegalPage({ doc }) {
   usePageMeta(doc.title, doc.description)
 
   return (
-    <main className="gutter mx-auto max-w-7xl py-14 md:py-20">
+    <main className="gutter mx-auto max-w-7xl pt-2 pb-14 md:pt-4 md:pb-20">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: doc.title }]} className="mb-8 md:mb-12" />
       <AcademicNotice />
 
       <PageIntro eyebrow="Legal" jp="規約" title={doc.title} className="mt-12">

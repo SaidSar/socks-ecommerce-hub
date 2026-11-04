@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 import ProductGrid from '../components/catalog/ProductGrid'
 import SectionHead, { EYEBROW } from '../components/catalog/SectionHead'
 import Price from '../components/product/Price'
@@ -11,6 +12,8 @@ import { label, LINE_LABELS, unitText } from '../config/enums'
 import { useAsync } from '../hooks/useAsync'
 import { useCart } from '../hooks/useCart'
 import { useConfig } from '../hooks/useConfig'
+import { useActiveLine } from '../hooks/useActiveLine'
+import { usePageMeta } from '../hooks/usePageMeta'
 import { useToast } from '../hooks/useToast'
 import { CART_MESSAGES } from '../domain/account'
 import { AVAILABILITY_TEXT, availabilityOf } from '../domain/availability'
@@ -54,6 +57,8 @@ function ProductDetail({ product }) {
   const [size, setSize] = useState(single ? product.sizes[0].code : null)
   const [error, setError] = useState(false)
   const toast = useToast()
+  usePageMeta(product.name, product.note)
+  useActiveLine(product.line)
   const errorId = useId()
   const isSokko = product.line === 'sokko'
   const swatch = product.colors.find((c) => c.code === color)
@@ -83,26 +88,8 @@ function ProductDetail({ product }) {
 
   return (
     <main>
-      <div className="gutter mx-auto max-w-7xl pt-6">
-        <nav aria-label="Ruta" className="text-[12px] text-ink-soft">
-          <ol className="flex flex-wrap items-center gap-2">
-            <li>
-              <Link to="/" className="hover:text-ink">
-                Inicio
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link to={`/linea/${product.line}`} className="hover:text-ink">
-                {label(LINE_LABELS, product.line)}
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li aria-current="page" className="truncate text-ink">
-              {product.name}
-            </li>
-          </ol>
-        </nav>
+      <div className="gutter mx-auto max-w-7xl pt-2 md:pt-4">
+        <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: label(LINE_LABELS, product.line), to: `/linea/${product.line}` }, { label: product.name }]} />
       </div>
 
       <section className="gutter mx-auto grid max-w-7xl items-start gap-8 py-8 md:grid-cols-[1.1fr_1fr] md:gap-14 md:py-12">

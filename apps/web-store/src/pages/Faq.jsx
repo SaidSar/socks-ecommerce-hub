@@ -5,6 +5,7 @@ import PageIntro, { BUTTON_INK, H2 } from '../components/info/PageIntro'
 import { FAQ, FAQ_TOPICS } from '../content/faq'
 import { useConfig } from '../hooks/useConfig'
 import { usePageMeta } from '../hooks/usePageMeta'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 
 /** Una pregunta: botón con aria-expanded que controla su respuesta (region etiquetada por el botón). */
 function FaqItem({ item, open, onToggle, config }) {
@@ -58,7 +59,8 @@ export default function Faq() {
     })
 
   return (
-    <main className="gutter mx-auto max-w-7xl py-14 md:py-20">
+    <main className="gutter mx-auto max-w-7xl pt-2 pb-14 md:pt-4 md:pb-20">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Preguntas frecuentes' }]} className="mb-8 md:mb-12" />
       <PageIntro eyebrow="Ayuda" jp="よくある質問" title="Preguntas frecuentes">
         <p>Lo que más nos preguntan sobre tallas, envíos, pagos y el cuidado de sus piezas.</p>
       </PageIntro>

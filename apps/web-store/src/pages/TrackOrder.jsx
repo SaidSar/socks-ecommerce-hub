@@ -10,6 +10,7 @@ import { usePageMeta } from '../hooks/usePageMeta'
 import { useToast } from '../hooks/useToast'
 import { OrderError, trackOrder } from '../services/orderService'
 import { emailError } from '../utils/authValidation'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 
 /** Rastrear pedido (/rastreo): el invitado escribe folio y correo y ve el mismo detalle que Mis pedidos. */
 export default function TrackOrder() {
@@ -49,7 +50,8 @@ export default function TrackOrder() {
   }
 
   return (
-    <main className="gutter mx-auto max-w-7xl pt-12 pb-20 md:pt-16">
+    <main className="gutter mx-auto max-w-7xl pt-2 pb-20 md:pt-4">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Rastrear pedido' }]} className="mb-8 md:mb-12" />
       <PageIntro eyebrow="Ayuda" jp="追跡" title="Rastrear pedido">
         <p>Escriba el folio (SKK-####) que le enviamos por correo y el correo con el que compró.</p>
         {isAuthenticated ? (

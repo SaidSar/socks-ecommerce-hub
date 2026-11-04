@@ -4,7 +4,9 @@ import ProductGrid from '../components/catalog/ProductGrid'
 import { EYEBROW } from '../components/catalog/SectionHead'
 import { label, LINE_LABELS } from '../config/enums'
 import { LINE_COPY } from '../config/lines'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 import { useAsync } from '../hooks/useAsync'
+import { usePageMeta } from '../hooks/usePageMeta'
 import { getLinePage } from '../services/catalogService'
 import NotFound from './NotFound'
 
@@ -16,6 +18,7 @@ function LineContent({ line }) {
   const { status, data, retry } = useAsync(() => getLinePage(line, Object.fromEntries(params)), `${line}?${params}`)
   const isSokko = line === 'sokko'
   const copy = LINE_COPY[line]
+  usePageMeta(label(LINE_LABELS, line), copy.blurb)
 
   const choose = (key, value) => {
     const next = new URLSearchParams(params)
@@ -27,7 +30,10 @@ function LineContent({ line }) {
   return (
     <main>
       <section className={`border-b border-ink/10 ${isSokko ? 'linen-tex' : ''}`}>
-        <div className="gutter mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-6 py-10 md:py-14">
+        <div className="gutter mx-auto max-w-7xl pt-2 md:pt-4">
+          <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: label(LINE_LABELS, line) }]} />
+        </div>
+        <div className="gutter mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-6 pt-4 pb-10 md:pt-6 md:pb-14">
           <div className="flex min-w-0 flex-col gap-3">
             <span className={EYEBROW}>{copy.eyebrow}</span>
             <h1

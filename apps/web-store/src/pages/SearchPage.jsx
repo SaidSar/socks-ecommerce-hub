@@ -1,5 +1,7 @@
 import { useId } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
+import { usePageMeta } from '../hooks/usePageMeta'
 import { SearchIcon } from '../components/brand/Icons'
 import Chip from '../components/catalog/Chip'
 import ProductGrid from '../components/catalog/ProductGrid'
@@ -23,10 +25,13 @@ export default function SearchPage() {
   const results = data ?? []
   const offSeason = results.filter((p) => p.offSeasonPct)
 
+  usePageMeta(term ? `Buscar “${term}”` : 'Buscar', 'Busque piezas de SOKKO por nombre, tono o colección.')
+
   const setQuery = (value) => setParams(value ? { q: value } : {}, { replace: true })
 
   return (
-    <main className="gutter mx-auto flex max-w-7xl flex-col gap-8 py-10 md:py-14">
+    <main className="gutter mx-auto flex max-w-7xl flex-col gap-8 pt-2 pb-10 md:pt-4 md:pb-14">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Buscar' }]} className="-mb-4" />
       <h1 className="sr-only">Buscar</h1>
       <form role="search" onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
         <label htmlFor={inputId} className={EYEBROW}>

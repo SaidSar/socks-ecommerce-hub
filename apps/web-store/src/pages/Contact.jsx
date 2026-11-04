@@ -8,6 +8,7 @@ import { usePageMeta } from '../hooks/usePageMeta'
 import { useToast } from '../hooks/useToast'
 import { ContactError, sendContactMessage } from '../services/contactService'
 import { reviewCount } from '../utils/authValidation'
+import Breadcrumbs from '../components/layout/Breadcrumbs'
 
 const LABEL = 'block text-[11px] tracking-[.24em] text-ink-soft uppercase'
 const LINE_INPUT =
@@ -170,7 +171,8 @@ export default function Contact() {
   usePageMeta('Contacto', `Escriba a SOKKO: ${STORE_EMAIL}, ${BUSINESS_HOURS.toLowerCase()}, o use el formulario de contacto.`)
 
   return (
-    <main className="gutter mx-auto max-w-7xl py-14 md:py-20">
+    <main className="gutter mx-auto max-w-7xl pt-2 pb-14 md:pt-4 md:pb-20">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Contacto' }]} className="mb-8 md:mb-12" />
       <PageIntro eyebrow="Contacto" jp="お問い合わせ" title="Hablemos">
         <p>Una duda sobre tallas, un pedido o una colaboración: escríbanos y le responde una persona del taller.</p>
       </PageIntro>

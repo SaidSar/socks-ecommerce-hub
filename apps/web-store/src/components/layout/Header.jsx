@@ -1,19 +1,25 @@
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation, useMatch } from 'react-router-dom'
 import { label, LINE_LABELS, LINES } from '../../config/enums'
+import { useActiveLineValue } from '../../hooks/useActiveLine'
 import { useCart } from '../../hooks/useCart'
 import { useWishlist } from '../../hooks/useWishlist'
 import Logo from '../brand/Logo'
 import { BagIcon, HeartIcon, SearchIcon } from '../brand/Icons'
 import AccountMenu from './AccountMenu'
 
-// Subrayado de 1 px en el ítem activo (aria-current="page", que NavLink pone solo).
-const NAV_ITEM =
-  'relative flex items-center gap-2 py-2.5 text-[13px] tracking-[.12em] whitespace-nowrap text-ink-soft uppercase transition-colors hover:text-ink aria-[current=page]:text-ink aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-0 aria-[current=page]:after:bottom-0.5 aria-[current=page]:after:h-px aria-[current=page]:after:bg-ink'
+// Subrayado laca en el ítem activo, guiado por aria-current="page".
+const CURRENT_LINE =
+  'aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-0 aria-[current=page]:after:bottom-0.5 aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-laca'
+const NAV_ITEM = `relative flex items-center gap-2 py-2.5 text-[13px] tracking-[.12em] whitespace-nowrap text-ink-soft uppercase transition-colors hover:text-ink aria-[current=page]:text-ink ${CURRENT_LINE}`
 
+/** Activa en /linea/:line y en la ficha de un producto de esa línea. */
 function LineLink({ line, compact = false }) {
   const isSokko = line === 'sokko'
+  const onLine = useMatch(`/linea/${line}`)
+  const productLine = useActiveLineValue()
+  const active = Boolean(onLine) || productLine === line
   return (
-    <NavLink to={`/linea/${line}`} className={`${NAV_ITEM} ${compact ? 'text-[12px]' : ''}`}>
+    <Link to={`/linea/${line}`} aria-current={active ? 'page' : undefined} className={`${NAV_ITEM} ${compact ? 'text-[12px]' : ''}`}>
       {isSokko && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-laca" />}
       {label(LINE_LABELS, line)}
       {isSokko && !compact && (
@@ -21,7 +27,7 @@ function LineLink({ line, compact = false }) {
           日本
         </span>
       )}
-    </NavLink>
+    </Link>
   )
 }
 
@@ -32,6 +38,9 @@ function LineLink({ line, compact = false }) {
 export default function Header() {
   const { count, open: openCart } = useCart()
   const { count: favorites } = useWishlist()
+  const { pathname } = useLocation()
+  // "Cuenta" activa en Mis pedidos, Mi perfil, el detalle y Mi carnet; Favoritos se marca solo.
+  const inAccount = pathname.startsWith('/cuenta/') && !pathname.startsWith('/cuenta/favoritos')
 
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-ink/10 bg-linen/95 backdrop-blur">
@@ -57,7 +66,7 @@ export default function Header() {
           <NavLink
             to="/cuenta/favoritos"
             aria-label={`Favoritos, ${favorites} ${favorites === 1 ? 'pieza' : 'piezas'}`}
-            className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 text-ink-soft transition-colors hover:text-laca aria-[current=page]:text-ink"
+            className={`relative flex min-h-11 min-w-11 items-center justify-center gap-1.5 text-ink-soft transition-colors hover:text-laca aria-[current=page]:text-ink ${CURRENT_LINE}`}
           >
             <HeartIcon className="h-[21px] w-[21px]" />
             {/* Con las cuatro líneas a lo ancho, la palabra solo cabe desde xl. */}
@@ -68,7 +77,7 @@ export default function Header() {
               ({favorites})
             </span>
           </NavLink>
-          <AccountMenu />
+          <AccountMenu current={inAccount} />
           <button
             type="button"
             onClick={openCart}
