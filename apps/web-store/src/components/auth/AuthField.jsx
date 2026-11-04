@@ -109,3 +109,33 @@ export function AuthAlert({ children }) {
     </div>
   )
 }
+
+/**
+ * Botón de guardar con tres estados visibles: su texto → "Guardando…" con indicador → "Guardado ✓" (2 s).
+ * Usa aria-disabled en lugar de disabled: sin cambios o mientras guarda no hace nada, pero conserva el foco
+ * y el lector lo anuncia como atenuado. El formulario ignora los envíos en esos casos.
+ */
+export function SaveSubmit({ status, dirty, savingText = 'Guardando…', savedText = 'Guardado', children }) {
+  const inactive = status === 'saving' || !dirty
+  return (
+    <button
+      type="submit"
+      aria-disabled={inactive ? 'true' : undefined}
+      aria-busy={status === 'saving' ? 'true' : undefined}
+      className={`flex h-[52px] w-full items-center justify-center gap-3 text-[12px] tracking-[.28em] uppercase transition-colors ${
+        status === 'saved'
+          ? 'bg-matcha text-linen'
+          : inactive && status !== 'saving'
+            ? 'cursor-not-allowed bg-ink/10 text-ink-soft'
+            : 'bg-laca text-linen hover:bg-laca-hover aria-disabled:hover:bg-laca'
+      }`}
+    >
+      {status === 'saving' && (
+        <svg viewBox="0 0 24 24" className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <path d="M12 3a9 9 0 019 9" />
+        </svg>
+      )}
+      {status === 'saving' ? savingText : status === 'saved' ? `${savedText} ✓` : children}
+    </button>
+  )
+}

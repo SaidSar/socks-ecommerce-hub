@@ -86,3 +86,23 @@ export function MenuIcon(props) {
     </svg>
   )
 }
+
+/** Palomita dentro de un círculo: aviso de éxito. */
+export function CheckCircleIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.3l2.7 2.7L16.2 9.5" />
+    </svg>
+  )
+}
+
+/** Signo de admiración dentro de un círculo: aviso de error. */
+export function AlertCircleIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5M12 16.2v.3" />
+    </svg>
+  )
+}

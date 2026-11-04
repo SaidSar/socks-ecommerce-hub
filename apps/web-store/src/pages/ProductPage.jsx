@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ProductGrid from '../components/catalog/ProductGrid'
 import SectionHead, { EYEBROW } from '../components/catalog/SectionHead'
@@ -11,13 +11,13 @@ import { label, LINE_LABELS, unitText } from '../config/enums'
 import { useAsync } from '../hooks/useAsync'
 import { useCart } from '../hooks/useCart'
 import { useConfig } from '../hooks/useConfig'
+import { useToast } from '../hooks/useToast'
+import { CART_MESSAGES } from '../domain/account'
 import { AVAILABILITY_TEXT, availabilityOf } from '../domain/availability'
 import { getProduct, listProducts } from '../services/catalogService'
 import { formatPrice } from '../utils/currency'
 import { formatMonthDay, formatWindow } from '../utils/dates'
 import NotFound from './NotFound'
-
-const OPEN_CART_DELAY_MS = 500
 
 /** Aviso de temporada: fuera (ocre-ink, con descuento) o activa hasta su fin (matcha). */
 function SeasonNotice({ product }) {
@@ -53,7 +53,7 @@ function ProductDetail({ product }) {
   const single = product.sizes.length === 1
   const [size, setSize] = useState(single ? product.sizes[0].code : null)
   const [error, setError] = useState(false)
-  const openTimer = useRef(null)
+  const toast = useToast()
   const errorId = useId()
   const isSokko = product.line === 'sokko'
   const swatch = product.colors.find((c) => c.code === color)
@@ -64,8 +64,6 @@ function ProductDetail({ product }) {
   const soldOut = availability === 'agotado'
   const { data: related } = useAsync(() => listProducts({ line: 'accesorios' }), 'accesorios')
 
-  useEffect(() => () => clearTimeout(openTimer.current), [])
-
   const addToBag = () => {
     if (!size) {
       setError(true)
@@ -73,8 +71,8 @@ function ProductDetail({ product }) {
     }
     if (soldOut) return
     add(product, color, size)
-    clearTimeout(openTimer.current)
-    openTimer.current = setTimeout(open, OPEN_CART_DELAY_MS)
+    // La bolsa no se abre sola: el aviso confirma y ofrece abrirla, sin sacar a la persona de la ficha.
+    toast.success(CART_MESSAGES.added, { key: 'cart', action: { label: CART_MESSAGES.view, onClick: open } })
   }
 
   const eyebrowParts = [

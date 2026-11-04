@@ -7,6 +7,7 @@ import { TRACK_MESSAGES } from '../domain/account'
 import { normalizeFolio } from '../domain/tracking'
 import { useAuth } from '../hooks/useAuth'
 import { usePageMeta } from '../hooks/usePageMeta'
+import { useToast } from '../hooks/useToast'
 import { OrderError, trackOrder } from '../services/orderService'
 import { emailError } from '../utils/authValidation'
 
@@ -17,6 +18,7 @@ export default function TrackOrder() {
   const [errors, setErrors] = useState({})
   const [state, setState] = useState({ status: 'idle', order: null, message: '' })
   const resultRef = useRef(null)
+  const toast = useToast()
   usePageMeta('Rastrear pedido', 'Consulte el estado y la guía de su pedido de SOKKO con su folio y su correo.')
 
   const set = (key) => (value) => {
@@ -38,6 +40,7 @@ export default function TrackOrder() {
     try {
       const order = await trackOrder(folio, f.email)
       setState(order ? { status: 'found', order, message: '' } : { status: 'missing', order: null, message: TRACK_MESSAGES.notFound })
+      if (order) toast.success(TRACK_MESSAGES.found(order.folio), { key: 'track' })
     } catch (err) {
       const message = err instanceof OrderError && err.code === 'RATE_LIMITED' ? TRACK_MESSAGES.rateLimited : TRACK_MESSAGES.network
       setState({ status: 'error', order: null, message })
@@ -89,9 +92,9 @@ export default function TrackOrder() {
 
       {/* Tras buscar, el foco pasa aquí: se lee el aviso o el folio encontrado sin anunciar todo el detalle. */}
       <div ref={resultRef} tabIndex={-1} aria-label="Resultado de la búsqueda" className="mt-14 outline-none">
+        {/* El hallazgo lo anuncia el aviso flotante; aquí solo la búsqueda en curso. */}
         <p role="status" className="sr-only">
           {state.status === 'loading' && 'Buscando su pedido…'}
-          {state.status === 'found' && `Encontramos el pedido ${state.order.folio}.`}
         </p>
         {(state.status === 'missing' || state.status === 'error') && (
           <p role="alert" className="max-w-2xl border-l-2 border-laca bg-sand/70 px-4 py-3 text-[14px]">

@@ -14,6 +14,7 @@ export const CONTACT_MESSAGES = {
   messageLong: `El mensaje admite hasta ${MESSAGE_MAX} caracteres.`,
   rateLimited: 'Ya recibimos varios mensajes desde su conexión. Intente de nuevo en una hora o escríbanos por correo.',
   network: 'No pudimos enviar su mensaje. Revise su conexión e intente de nuevo.',
+  sent: 'Recibimos su mensaje. Le responderemos en un día hábil.',
 }
 
 export const EMPTY_CONTACT = { name: '', email: '', subject: '', message: '', website: '' }

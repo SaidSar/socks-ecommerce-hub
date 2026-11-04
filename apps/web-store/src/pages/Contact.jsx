@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AuthField, { AuthAlert, AuthSubmit } from '../components/auth/AuthField'
 import PageIntro from '../components/info/PageIntro'
 import { BUSINESS_HOURS, STORE_EMAIL } from '../content/legal'
 import { CONTACT_MESSAGES, CONTACT_SUBJECTS, EMPTY_CONTACT, MESSAGE_MAX, validateContact } from '../domain/contact'
 import { usePageMeta } from '../hooks/usePageMeta'
+import { useToast } from '../hooks/useToast'
 import { ContactError, sendContactMessage } from '../services/contactService'
 import { reviewCount } from '../utils/authValidation'
 
@@ -21,10 +22,15 @@ function FieldError({ id, children }) {
   )
 }
 
-/** Confirmación tras el envío: sello rotado 届. */
+/** Confirmación tras el envío: sello rotado 届. El aviso flotante lo anuncia; el foco pasa al título porque el formulario ya no está. */
 function Sent({ onAgain }) {
+  const titleRef = useRef(null)
+  useEffect(() => {
+    titleRef.current?.focus()
+  }, [])
+
   return (
-    <div role="status" className="flex flex-col items-start gap-6 py-6">
+    <div className="flex flex-col items-start gap-6 py-6">
       <span
         aria-hidden="true"
         lang="ja"
@@ -33,7 +39,9 @@ function Sent({ onAgain }) {
         届
       </span>
       <div>
-        <h2 className="font-serif text-[34px] leading-tight font-light">Mensaje recibido</h2>
+        <h2 ref={titleRef} tabIndex={-1} className="font-serif text-[34px] leading-tight font-light outline-none">
+          Mensaje recibido
+        </h2>
         <p className="mt-2 max-w-sm text-[14.5px] leading-relaxed text-ink-soft">
           Gracias por escribirnos. Le responderemos a su correo en un día hábil.
         </p>
@@ -51,6 +59,7 @@ export function ContactForm() {
   const [status, setStatus] = useState('idle') // idle | sending | sent
   const [alert, setAlert] = useState(null)
   const formRef = useRef(null)
+  const toast = useToast()
 
   const set = (field) => (value) => {
     setValues((v) => ({ ...v, [field]: value }))
@@ -76,6 +85,7 @@ export function ContactForm() {
       await sendContactMessage(values)
       setStatus('sent')
       setValues(EMPTY_CONTACT)
+      toast.success(CONTACT_MESSAGES.sent)
     } catch (error) {
       setStatus('idle')
       if (error instanceof ContactError && error.code === 'VALIDATION' && Object.keys(error.fieldErrors).length > 0) {
