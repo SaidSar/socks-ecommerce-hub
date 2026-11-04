@@ -652,9 +652,11 @@ Reglas CHECK de coherencia por tipo:
 | `PaymentStatus` | `VARCHAR(12)` | | `'Pendiente'` | `CK`: `IN ('Pendiente','Pagado','Reembolsado')`. Tarjeta nace `Pagado`; OXXO Pay nace `Pendiente`. Ver **P-03** |
 | `PaymentReference` | `NVARCHAR(100)` | N | | Id de la pasarela o referencia OXXO (`TODO(api)`) |
 | `PaidAt` | `DATETIME2(3)` | N | | `CK_Orders_PaidAt`: `PaymentStatus = 'Pendiente' OR PaidAt IS NOT NULL` |
-| `Subtotal` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Σ `OrderItems.LineTotal` (lo garantiza el servicio) |
+| `Subtotal` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Σ `OrderItems.LineTotal` (lo garantiza el servicio), con precios de oferta y **antes** del descuento |
+| `CouponCode` | `VARCHAR(30)` | N | | v0.5. Copia del código del cupón aplicado (sin FK, D-40). Se conserva aunque el pedido se cancele. Índice filtrado `IX_Orders_CouponCode` |
+| `DiscountAmount` | `DECIMAL(10,2)` | | `0` | v0.5. Descuento del cupón sobre la mercancía. `CK_Orders_DiscountAmount`: `>= 0 AND <= Subtotal` |
 | `ShippingCost` | `DECIMAL(10,2)` | | | `CK`: `>= 0`. Tarifa cobrada (0, 49, 99) **congelada** al comprar |
-| `Total` | `DECIMAL(10,2)` | | | `CK_Orders_Total`: `Total = Subtotal + ShippingCost` |
+| `Total` | `DECIMAL(10,2)` | | | `CK_Orders_Total`: `Total = Subtotal − DiscountAmount + ShippingCost` (v0.5). `TaxIncluded` sale de aquí, así que el IVA baja con el descuento |
 | `TaxRate` | `DECIMAL(5,4)` | | | IVA vigente al comprar (0.1600). Copia de `Settings.IvaRate`. `CK_Orders_TaxRate`: `BETWEEN 0 AND 1` |
 | `TaxIncluded` | `AS (CAST(ROUND(Total - Total / (1 + TaxRate), 2) AS DECIMAL(10,2))) PERSISTED` | | | IVA incluido, informativo (`DESIGN` §4.4). Para el reporte del contador. v0.4.3: el `CAST` deja la columna en `DECIMAL(10,2)` (sin él, SQL Server la tipa con 9 decimales) |
 | `GiftWrap` | `BIT` | | `1` | Furoshiki, **true por defecto** y sin costo (`DESIGN` §4.4) |
@@ -849,6 +851,39 @@ Rutas de administración (solo Dueño, `[Authorize(Roles = "Owner")]`): CRUD de 
 - **Índices:** el `UQ` cubre la consulta `WHERE @cp BETWEEN PostalCodeFrom AND PostalCodeTo AND IsActive = 1`.
 - **Se guarda como rango y no como texto `"81200–81299"`** (como en el panel) para poder consultar con `BETWEEN` y validar `From <= To` en la BD. La API convierte a texto (`formatZone`) y viceversa (`parseZone`).
 - Que dos rangos no se encimen no se puede expresar con un CHECK de fila: lo valida el servicio (§4).
+
+### 3.13a `Coupons` — cupones de descuento · v0.5
+
+**Para qué sirve:** códigos que el Dueño crea en Promociones (`promotions.manage`) y el cliente escribe en el checkout (D-40).
+
+| Columna | Tipo | N | Default | Notas |
+|---|---|---|---|---|
+| `Id` | `INT IDENTITY` | | | **PK** |
+| `Code` | `VARCHAR(30)` | | | **UQ** `UQ_Coupons_Code`. Mayúsculas, sin espacios: `CK_Coupons_Code` (3–30 de `A-Z0-9-`, intercalación binaria) |
+| `Description` | `NVARCHAR(200)` | N | | Nota interna; la tienda ve una descripción generada ("10% de descuento") |
+| `Type` | `VARCHAR(12)` | | | `CK`: `IN ('Percent','Fixed','FreeShipping')`. API: `percent`, `fixed`, `free_shipping` |
+| `Value` | `DECIMAL(10,2)` | | | `CK_Coupons_Value`: `Percent` 1–90, `Fixed` > 0, `FreeShipping` = 0 |
+| `MinSubtotal` | `DECIMAL(10,2)` | N | | Mercancía mínima (antes del descuento). `CK`: `NULL OR > 0` |
+| `StartsOn`, `EndsOn` | `DATE` | N | | Días locales de Los Mochis (`BusinessTime`), **inclusivos**: a las 23:30 del último día aún vale. `CK_Coupons_Dates`: `EndsOn >= StartsOn` |
+| `MaxRedemptions` | `INT` | N | | Usos totales; `NULL` = sin límite. `CK`: `>= 1` |
+| `OnePerCustomer` | `BIT` | | `0` | Un uso por correo normalizado (invitados y cuentas) |
+| `IsActive` | `BIT` | | `1` | Un cupón usado no se borra: se desactiva |
+| `CreatedAt`, `UpdatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
+| `RowVersion` | `ROWVERSION` | | | R-25 en la edición del panel |
+
+### 3.13b `CouponRedemptions` — usos de un cupón · v0.5
+
+| Columna | Tipo | N | Default | Notas |
+|---|---|---|---|---|
+| `Id` | `INT IDENTITY` | | | **PK** |
+| `CouponId` | `INT` | | | **FK** → `Coupons(Id)` `NO ACTION` |
+| `OrderId` | `INT` | | | **FK** → `Orders(Id)` `NO ACTION`. **UQ** `UQ_CouponRedemptions_OrderId`: un cupón por pedido |
+| `CustomerEmail` | `NVARCHAR(254)` | | | Correo normalizado del pedido. Índice `IX_CouponRedemptions_CouponId_CustomerEmail` |
+| `DiscountAmount` | `DECIMAL(10,2)` | | | Copia de `Orders.DiscountAmount`. `CK`: `>= 0` |
+| `CreatedAt` | `DATETIME2(3)` | | `SYSUTCDATETIME()` | |
+
+- Solo existen usos de pedidos vivos: al cancelar (`FulfillOrder.CancelAsync`) o al vencer un OXXO (`ExpireOxxoOrders`) se borra la fila en la misma transacción y el uso queda libre. El pedido conserva `CouponCode` y `DiscountAmount`.
+- **Concurrencia:** el checkout lee el cupón con `WITH (UPDLOCK, HOLDLOCK)` dentro de su transacción, cuenta los usos y los del correo, y escribe el uso antes del `COMMIT`. Dos compras simultáneas con el mismo cupón se forman en fila; la segunda ya ve el uso de la primera.
 
 ### 3.14 Tablas consideradas y descartadas (v1)
 
@@ -1248,6 +1283,7 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-36 | 2026-10-26 | Temporadas como **ventana anual recurrente** (`StartMonth`, `StartDay`, `EndMonth`, `EndDay`, inclusiva, puede cruzar de año) con `StartKey`/`EndKey` calculadas | Navidad y Halloween se repiten cada año; con fechas fijas habría que volver a capturarlas cada año | `StartsAt`/`EndsAt` (`DATETIME2`) de la v0.4 | Aprobada (v0.4.2) |
 | D-37 | 2026-10-26 | Licencias como marca (Marvel, Pokémon…); "Sin marca" para genéricos con `Brands.ShowInFilters = 0` | Filtro y reportes por licencia; los genéricos no ensucian el filtro (P-15) | Marca "Genérica"; distribuidor como marca | Aprobada (v0.4.2) |
 | D-38 | 2026-10-26 | Precio efectivo (R-29) y temporada (R-28) como capacidades de `CatalogService` (entidad): `GetEffectivePrice` e `IsInSeason` | En Erl la utilidad no tiene lógica de negocio; el precio sí la tiene y es de un producto (P-17) | `PricingService` como utilidad; tarea `PriceProduct` | Aprobada (v0.4.2), cambia D-30 |
+| D-40 | 2026-11-04 | Cupones en `Coupons` + `CouponRedemptions`; `Orders.CouponCode` (copia, sin FK) y `Orders.DiscountAmount`; `Total = Subtotal − DiscountAmount + ShippingCost`. El descuento aplica sobre la mercancía (precios de oferta), nunca sobre el envío salvo `FreeShipping`; `Percent` redondea a centavos `AwayFromZero` y `Fixed` no pasa del subtotal. El **envío de cortesía** (`Settings.FreeShippingThreshold`) se evalúa con la mercancía **después** del descuento. Un solo cupón por pedido. La fórmula vive en `QuoteOrder` y la usan el checkout y `POST /api/coupons/preview`. Límites validados con `UPDLOCK, HOLDLOCK` en la transacción del checkout; cancelar o vencer un OXXO borra el uso | Una sola fuente del total; el cliente ve en la vista previa exactamente lo que se cobra; el umbral no se alcanza con un descuento; el historial del pedido no depende de que el cupón siga existiendo | Contador `TimesRedeemed` en `Coupons` (se desincroniza al cancelar); descuento por línea en `OrderItems` (sin pantalla que lo necesite); umbral antes del descuento (regala envío a quien ya recibió descuento) | Propuesta |
 | D-39 | 2026-11-03 | `WishlistItems` (favoritos): PK `UserId`+`ProductId`, `CASCADE` desde `Users` y `NO ACTION` desde `Products`; máximo 100 por cliente, contando solo productos activos | Como los tokens de D-07, un favorito no tiene valor contable: se va con la cuenta. El producto se da de baja lógica y el favorito deja de mostrarse | Columna JSON en `Users`; `CASCADE` también desde `Products` | Aprobada, amplía D-07 |
 
 ### 8.2 Registro de cambios del documento
@@ -1265,6 +1301,7 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | 0.4.3 | 2026-10-30 | `carlos/db-efcore` (PR #10) | Said (revisión de arquitectura) | Revisión y aprobación de la v0.4.3 con el merge del PR #10. Decisiones en Propuesta pasan a Aprobada |
 | 0.4.4 | 2026-10-30 | `said/seed-align` | Said | Semilla alineada con `apps/web-store/src/data/catalogSeed.js`: migración `AlignCatalogWithStore` (14 colores, Marvel, Superhéroes, etiquetas de talla) y 24 productos con 120 SKU (§5). §3.12 documenta el contrato real: `colors`, `sizes`, `featuredSlug`, paginación, cotización de envío y `variants[].stock` como disponible por combinación |
 | 0.4.5 | 2026-10-30 | `said/checkout` | Said | Migración `AddOrderIdempotency`: `Orders.IdempotencyKey` e `IdempotencyHash` (§3.8), para la idempotencia de `POST /api/orders` (`DESIGN_CHECKOUT` §6). La referencia OXXO usa `PaymentReference`, que ya existía |
+| 0.5 | 2026-11-04 | `feat/cupones` | Said | Migración `AddCoupons`: tablas `Coupons` (§3.13a) y `CouponRedemptions` (§3.13b); `Orders.CouponCode`, `Orders.DiscountAmount`, `CK_Orders_DiscountAmount` y `CK_Orders_Total` con el descuento (§3.8). D-40 |
 | 0.4.6 | 2026-10-30 | `said/api-admin-catalog` | Said | Migración `AddCatalogRowVersions`: `RowVersion` en `Products`, `Brands`, `ProductTypes` y `Collections`, para R-25 en las ediciones del panel |
 
 > Al aprobarse, la siguiente versión marca las decisiones como **Aprobada** o **Cambiada** (con la nueva alternativa y su motivo) y registra la revisión de Said aquí.

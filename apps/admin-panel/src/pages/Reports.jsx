@@ -175,6 +175,7 @@ export default function Reports() {
             <Kpi title="Pares vendidos" value={formatInt(k.units.value)} delta={k.units.delta} note="unidades, incluye piezas" />
             <Kpi title="IVA incluido" value={formatMXN(k.taxIncluded.value, 2)} delta={k.taxIncluded.delta} note="16 % dentro de las ventas" />
             <Kpi title="Envíos cobrados" value={formatMXN(k.shipping.value, 2)} delta={k.shipping.delta} note="lo que pagaron los clientes" />
+            {k.discounts && <Kpi title="Descuentos" value={formatMXN(k.discounts.value, 2)} delta={k.discounts.delta} inverse note="cupones; las ventas ya van netas" />}
             <Kpi title="Pedidos cancelados" value={formatInt(k.cancelled.value)} delta={k.cancelled.delta} inverse note="no cuentan como venta" />
           </div>
 

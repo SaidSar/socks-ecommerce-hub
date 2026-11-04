@@ -79,7 +79,7 @@ public class ReportService(SokkoDbContext db) : IReportService
     public static readonly string[] CsvHeader =
     [
         "Folio", "Fecha (hora de Los Mochis)", "Cliente", "Correo", "Método de pago", "Estado de pago", "Estado del pedido",
-        "Subtotal", "Envío", "IVA incluido", "Total",
+        "Subtotal", "Cupón", "Descuento", "Envío", "IVA incluido", "Total",
     ];
 
     public static string PaymentMethodLabel(PaymentMethod method) => method == PaymentMethod.Tarjeta ? "Tarjeta" : "OXXO Pay";
@@ -141,7 +141,8 @@ public class ReportService(SokkoDbContext db) : IReportService
             Money(current.Sum(o => o.TaxIncluded), before.Sum(o => o.TaxIncluded)),
             Money(current.Sum(o => o.ShippingCost), before.Sum(o => o.ShippingCost)),
             Count(cancelled.Count(period.Contains), cancelled.Count(previous.Contains)),
-            Count(Units(current), Units(before)));
+            Count(Units(current), Units(before)),
+            Money(current.Sum(o => o.DiscountAmount), before.Sum(o => o.DiscountAmount)));
 
         var daily = Enumerable.Range(0, period.Days).Select(i =>
         {
@@ -210,6 +211,8 @@ public class ReportService(SokkoDbContext db) : IReportService
                 PaymentStatusLabel(o.PaymentStatus),
                 OrderStatusLabel(o.Status),
                 o.Subtotal,
+                o.CouponCode ?? "",
+                o.DiscountAmount,
                 o.ShippingCost,
                 o.TaxIncluded,
                 o.Total);

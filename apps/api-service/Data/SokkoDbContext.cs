@@ -34,6 +34,8 @@ public class SokkoDbContext(DbContextOptions<SokkoDbContext> options) : DbContex
     public DbSet<LocalDeliveryZone> LocalDeliveryZones => Set<LocalDeliveryZone>();
     public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
     public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

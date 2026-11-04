@@ -9,7 +9,7 @@ public interface IExpireOxxoOrders
     Task<int> RunAsync(CancellationToken cancellationToken = default);
 }
 
-public class ExpireOxxoOrders(IUnitOfWork unitOfWork, IOrderService orders, IInventoryService inventory, IClock clock, IConfiguration configuration) : IExpireOxxoOrders
+public class ExpireOxxoOrders(IUnitOfWork unitOfWork, IOrderService orders, IInventoryService inventory, ICouponService coupons, IClock clock, IConfiguration configuration) : IExpireOxxoOrders
 {
     public const string ExpiredNote = "Referencia OXXO vencida";
 
@@ -30,6 +30,7 @@ public class ExpireOxxoOrders(IUnitOfWork unitOfWork, IOrderService orders, IInv
                     return (false, false);
                 }
                 await inventory.ReleaseAsync(lines, ct);
+                await coupons.ReleaseAsync(orderId, ct);
                 return (true, true);
             }, cancellationToken);
             cancelled += done ? 1 : 0;

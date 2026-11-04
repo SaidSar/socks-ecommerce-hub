@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthField, { AuthAlert, AuthSubmit } from '../components/auth/AuthField'
 import CheckoutLayout, { EYEBROW, TotalsRow } from '../components/checkout/CheckoutLayout'
+import CouponField from '../components/checkout/CouponField'
 import { AmexLogo, MastercardLogo, VisaLogo } from '../components/brand/CardBrands'
 import ProductArt from '../components/product/ProductArt'
 import {
@@ -16,11 +17,13 @@ import {
   taxIncluded,
   validateCheckout,
 } from '../domain/checkout'
+import { appliedToast, readSavedCoupon, saveCoupon } from '../domain/coupons'
 import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
 import { useConfig } from '../hooks/useConfig'
 import { useShake } from '../hooks/useShake'
-import { OrderError, placeOrder, quoteShipping } from '../services/orderService'
+import { useToast } from '../hooks/useToast'
+import { CouponError, OrderError, placeOrder, previewCoupon, quoteShipping } from '../services/orderService'
 import { TEST_CARDS, tokenizeCard } from '../services/paymentToken'
 import { formatMXN, formatPrice } from '../utils/currency'
 
@@ -196,8 +199,28 @@ function PaymentOption({ value, current, onChange, title, detail }) {
   )
 }
 
+/** "Descuento (BIENVENIDA10) −$55.90", en verde matcha. */
+function DiscountRow({ code, amount }) {
+  return (
+    <div className="flex justify-between gap-4 text-matcha">
+      <dt>Descuento ({code})</dt>
+      <dd>−{formatMXN(amount, 2)}</dd>
+    </div>
+  )
+}
+
+/** "Le faltan $X para envío de cortesía" (con la mercancía ya con descuento). */
+function FreeShippingHint({ remaining }) {
+  if (!remaining) return null
+  return (
+    <p className="text-[12.5px] text-ink-soft" role="status">
+      Le faltan <span className="tnum text-ink">{formatMXN(remaining, 2)}</span> para envío de cortesía.
+    </p>
+  )
+}
+
 /** Hoja derecha: líneas, furoshiki y totales (DESIGN_CHECKOUT.md §3.5). */
-function Summary({ cart, shippingCost, total, ivaRate }) {
+function Summary({ cart, shippingCost, total, ivaRate, discount, couponCode, remaining, coupon }) {
   return (
     <>
       <p className={EYEBROW}>Su pedido</p>
@@ -240,7 +263,9 @@ function Summary({ cart, shippingCost, total, ivaRate }) {
 
       <dl className="tnum mt-5 space-y-2 text-[14px]">
         <TotalsRow label="Subtotal">{formatMXN(cart.subtotal, 2)}</TotalsRow>
+        {discount > 0 && <DiscountRow code={couponCode} amount={discount} />}
         <TotalsRow label="Envío">{shippingCost === null ? '—' : shippingCost === 0 ? <span className="text-matcha">Cortesía</span> : formatMXN(shippingCost, 2)}</TotalsRow>
+        <FreeShippingHint remaining={remaining} />
         <TotalsRow label={`IVA incluido (${Math.round(ivaRate * 100)} %)`} muted>
           {formatMXN(taxIncluded(total, ivaRate), 2)}
         </TotalsRow>
@@ -251,6 +276,8 @@ function Summary({ cart, shippingCost, total, ivaRate }) {
           </dd>
         </div>
       </dl>
+      {/* En móvil el campo va junto al botón de pago (el resumen queda debajo del formulario). */}
+      <div className="hidden lg:block">{coupon('summary')}</div>
     </>
   )
 }
@@ -259,7 +286,8 @@ function Summary({ cart, shippingCost, total, ivaRate }) {
 export default function Checkout() {
   const cart = useCart()
   const { user, isAuthenticated } = useAuth()
-  const { ivaRate, paymentsDemoMode } = useConfig()
+  const { ivaRate, paymentsDemoMode, freeShippingThreshold, localFreeShipping } = useConfig()
+  const toast = useToast()
   const navigate = useNavigate()
   const [contact, setContact] = useState({
     firstName: user?.firstName ?? '',
@@ -287,6 +315,13 @@ export default function Checkout() {
   const keyRef = useRef(null)
   const { subtotal, items } = cart
 
+  // Cupón (D-40): el código aplicado vive en el estado y en sessionStorage; la cotización la hace el servidor.
+  const [couponCode, setCouponCode] = useState(readSavedCoupon)
+  const [couponQuote, setCouponQuote] = useState(null)
+  const [couponStatus, setCouponStatus] = useState('idle')
+  const [couponError, setCouponError] = useState('')
+  const [couponNotice, setCouponNotice] = useState('')
+
   // Cotización en vivo; una respuesta vieja nunca pisa a una nueva.
   const postalCode = contact.postalCode.trim()
   useEffect(() => {
@@ -306,9 +341,106 @@ export default function Checkout() {
     return quote.for === `${postalCode}|${subtotal}` ? quote : { status: 'loading' }
   }, [quote, postalCode, subtotal])
 
-  const shippingCost = currentQuote.status === 'ready' ? currentQuote.cost : null
-  const computedTotal = subtotal + (shippingCost ?? 0)
+  // Recotiza el cupón si cambia la bolsa o el CP; si deja de aplicar, se quita y se explica por qué.
+  const lineItems = useMemo(() => items.map((i) => ({ sku: i.sku, slug: i.slug, quantity: i.qty })), [items])
+  const itemsKey = lineItems.map((i) => `${i.sku}:${i.quantity}`).join(',')
+  const validPostal = /^\d{5}$/.test(postalCode) ? postalCode : ''
+  const couponKey = couponCode ? `${couponCode}|${validPostal}|${itemsKey}` : null
+  const emailRef = useRef(contact.email)
+  emailRef.current = contact.email
+
+  const dropCoupon = (code, reason) => {
+    setCouponCode(null)
+    setCouponQuote(null)
+    setCouponStatus('idle')
+    saveCoupon(null)
+    keyRef.current = null
+    setCouponNotice(reason ? `Quitamos el código ${code}: ${reason}` : '')
+  }
+
+  useEffect(() => {
+    if (!couponKey || items.length === 0) return
+    let cancelled = false
+    const code = couponCode
+    previewCoupon({ code, items: lineItems, postalCode: validPostal, email: emailRef.current }).then(
+      (preview) => {
+        if (cancelled) return
+        setCouponQuote({ for: couponKey, ...preview })
+        setCouponStatus('applied')
+      },
+      (err) => {
+        if (cancelled) return
+        if (err instanceof CouponError && err.code === 'COUPON_INVALID') {
+          dropCoupon(code, err.message)
+          toast.error(`Quitamos el código ${code}: ${err.message}`, { key: 'coupon' })
+        } else setCouponQuote({ for: couponKey, error: true })
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `couponKey` resume el código, el CP y la bolsa
+  }, [couponKey])
+
+  const applyCoupon = async (code) => {
+    setCouponStatus('applying')
+    setCouponError('')
+    setCouponNotice('')
+    try {
+      const preview = await previewCoupon({ code, items: lineItems, postalCode: validPostal, email: contact.email })
+      saveCoupon(preview.code)
+      keyRef.current = null
+      setServerTotal(null)
+      setFormError('')
+      setCouponQuote({ for: `${preview.code}|${validPostal}|${itemsKey}`, ...preview })
+      setCouponCode(preview.code)
+      setCouponStatus('applied')
+      toast.success(appliedToast(preview), { key: 'coupon' })
+    } catch (err) {
+      setCouponStatus('idle')
+      if (err instanceof CouponError && err.code === 'COUPON_INVALID') setCouponError(err.message)
+      else if (err?.code === 'RATE_LIMITED') setCouponError(CHECKOUT_MESSAGES.rateLimited)
+      else setCouponError('No pudimos revisar el código. Intente de nuevo en un momento.')
+    }
+  }
+
+  const removeCoupon = () => {
+    const code = couponCode
+    dropCoupon(code)
+    setServerTotal(null)
+    toast.success(`Quitamos el código ${code}.`, { key: 'coupon' })
+  }
+
+  const couponReady = Boolean(couponCode && couponQuote?.for === couponKey && !couponQuote.error)
+  const couponPending = Boolean(couponCode && !couponReady)
+  const discount = couponReady ? couponQuote.discount : 0
+
+  const baseShipping = currentQuote.status === 'ready' ? currentQuote.cost : null
+  // Con cupón, el envío sale de su cotización: el umbral de cortesía se mide después del descuento.
+  const shippingCost = couponCode ? (couponReady && validPostal && couponQuote.shippingCost != null ? couponQuote.shippingCost : null) : baseShipping
+  const deliveryQuote =
+    couponCode && currentQuote.status === 'ready' ? (shippingCost === null ? { status: 'loading' } : { ...currentQuote, cost: shippingCost }) : currentQuote
+  const computedTotal = couponReady && validPostal ? couponQuote.total : subtotal - discount + (shippingCost ?? 0)
   const total = serverTotal ?? computedTotal
+  const remaining = couponReady
+    ? couponQuote.freeShippingRemaining
+    : shippingCost > 0 && (currentQuote.method === 'paqueteria' || localFreeShipping)
+      ? Math.max(0, freeShippingThreshold - subtotal)
+      : null
+
+  const coupon = (idPrefix) => (
+    <CouponField
+      idPrefix={idPrefix}
+      applied={couponCode && couponStatus !== 'applying' ? couponCode : null}
+      description={couponReady ? couponQuote.description : couponPending ? 'Revisando…' : ''}
+      status={couponStatus}
+      error={couponError}
+      notice={couponNotice}
+      onApply={applyCoupon}
+      onRemove={removeCoupon}
+      onEdit={() => couponError && setCouponError('')}
+    />
+  )
   const cvcLength = cardRules(detectCardBrand(card.number)).cvc
   // Pasos sin campos por revisar (la validación es pura y barata: se recalcula en cada render).
   const pending = validateCheckout({ contact, card, paymentMethod })
@@ -351,6 +483,11 @@ export default function Checkout() {
       return
     }
 
+    if (couponPending) {
+      fail('Estamos revisando su código de descuento. Intente de nuevo en un momento.')
+      return
+    }
+
     keyRef.current ??= newKey()
     setLoading(true)
     try {
@@ -371,11 +508,13 @@ export default function Checkout() {
           paymentToken: paymentMethod === 'tarjeta' ? tokenizeCard(card.number) : null,
           // Solo se compara si el cliente ya vio el total con envío: nunca se cobra este valor.
           expectedTotal: shippingCost === null ? null : total,
+          couponCode: couponCode ?? null,
           items: items.map((i) => ({ sku: i.sku, slug: i.slug, quantity: i.qty })),
         },
         keyRef.current,
       )
       setPlaced(true)
+      saveCoupon(null)
       cart.clear()
       navigate(`/checkout/confirmacion/${order.folio}`, { replace: true })
     } catch (err) {
@@ -388,6 +527,12 @@ export default function Checkout() {
       } else if (code === 'PRICE_CHANGED') {
         setServerTotal(err.total)
         fail(`El total de su pedido cambió a ${formatMXN(err.total, 2)}. Revíselo y confirme de nuevo.`)
+      } else if (code === 'COUPON_INVALID') {
+        // No se cobra un total distinto al que vio el cliente: se quita el código, se muestra el total nuevo y se pide confirmar.
+        const lost = couponCode
+        dropCoupon(lost, err.message)
+        setServerTotal(err.total)
+        fail(`${err.message} Quitamos el código ${lost}; su total ahora es ${formatMXN(err.total, 2)}. Revíselo y confirme de nuevo.`)
       } else if (code === 'SESSION_EXPIRED') fail(CHECKOUT_MESSAGES.sessionExpired)
       else if (code === 'RATE_LIMITED') fail(CHECKOUT_MESSAGES.rateLimited)
       else if (code === 'ORDER_CHANGED') {
@@ -420,7 +565,19 @@ export default function Checkout() {
   const nameOf = (sku) => items.find((i) => i.sku === sku)?.name ?? sku
 
   return (
-    <CheckoutLayout title="Complete su pedido" aside={<Summary cart={cart} shippingCost={shippingCost} total={total} ivaRate={ivaRate} />}>
+    <CheckoutLayout title="Complete su pedido" aside={
+        <Summary
+          cart={cart}
+          shippingCost={shippingCost}
+          total={total}
+          ivaRate={ivaRate}
+          discount={discount}
+          couponCode={couponCode}
+          remaining={remaining}
+          coupon={coupon}
+        />
+      }
+    >
       <form
         onSubmit={submit}
         noValidate
@@ -507,7 +664,7 @@ export default function Checkout() {
         </Section>
 
         <Section number="3" title="Método de entrega" step="envio" anchor={false}>
-          <DeliveryQuote quote={currentQuote} />
+          <DeliveryQuote quote={deliveryQuote} />
         </Section>
 
         <Section number="4" title="Forma de pago" step="pago">
@@ -548,6 +705,16 @@ export default function Checkout() {
         </Section>
 
         <div className="border-t border-ink/10 pt-7">
+          {/* Móvil (390 px): el código y el descuento quedan a la vista antes de pagar. */}
+          <div className="-mt-5 mb-6 lg:hidden">
+            {coupon('mobile')}
+            {(discount > 0 || remaining > 0) && (
+              <dl className="tnum mt-4 space-y-2 text-[14px]">
+                {discount > 0 && <DiscountRow code={couponCode} amount={discount} />}
+                <FreeShippingHint remaining={remaining} />
+              </dl>
+            )}
+          </div>
           <AuthSubmit loading={loading} loadingText={paymentMethod === 'tarjeta' ? 'Procesando su pago…' : 'Generando su referencia…'}>
             {paymentMethod === 'tarjeta' ? `Pagar ${formatMXN(total, 2)}` : 'Generar referencia OXXO'}
           </AuthSubmit>

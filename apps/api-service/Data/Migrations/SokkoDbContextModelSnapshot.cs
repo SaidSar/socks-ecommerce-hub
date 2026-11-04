@@ -616,6 +616,137 @@ namespace Sokko.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Sokko.Api.Models.Coupon", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)")
+                        .IsFixedLength(false);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MinSubtotal")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<bool>("OnePerCustomer")
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateOnly?>("StartsOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(12)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Coupons_Code");
+
+                    b.ToTable("Coupons", "dbo", t =>
+                        {
+                            t.HasCheckConstraint("CK_Coupons_Code", "LEN([Code]) BETWEEN 3 AND 30 AND [Code] COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^A-Z0-9-]%'");
+
+                            t.HasCheckConstraint("CK_Coupons_Dates", "[StartsOn] IS NULL OR [EndsOn] IS NULL OR [EndsOn] >= [StartsOn]");
+
+                            t.HasCheckConstraint("CK_Coupons_MaxRedemptions", "[MaxRedemptions] IS NULL OR [MaxRedemptions] >= 1");
+
+                            t.HasCheckConstraint("CK_Coupons_MinSubtotal", "[MinSubtotal] IS NULL OR [MinSubtotal] > 0");
+
+                            t.HasCheckConstraint("CK_Coupons_Type", "[Type] IN ('Percent', 'Fixed', 'FreeShipping')");
+
+                            t.HasCheckConstraint("CK_Coupons_Value", "([Type] = 'Percent' AND [Value] BETWEEN 1 AND 90) OR ([Type] = 'Fixed' AND [Value] > 0) OR ([Type] = 'FreeShipping' AND [Value] = 0)");
+                        });
+                });
+
+            modelBuilder.Entity("Sokko.Api.Models.CouponRedemption", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CouponId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("CustomerEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_CouponRedemptions_OrderId");
+
+                    b.HasIndex("CouponId", "CustomerEmail")
+                        .HasDatabaseName("IX_CouponRedemptions_CouponId_CustomerEmail");
+
+                    b.ToTable("CouponRedemptions", "dbo", t =>
+                        {
+                            t.HasCheckConstraint("CK_CouponRedemptions_DiscountAmount", "[DiscountAmount] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Sokko.Api.Models.InventoryMovement", b =>
                 {
                     b.Property<long>("Id")
@@ -774,6 +905,11 @@ namespace Sokko.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2(3)")
@@ -806,6 +942,11 @@ namespace Sokko.Api.Data.Migrations
                         .HasMaxLength(12)
                         .IsUnicode(false)
                         .HasColumnType("varchar(12)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<string>("Folio")
                         .IsRequired()
@@ -935,6 +1076,10 @@ namespace Sokko.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CouponCode")
+                        .HasDatabaseName("IX_Orders_CouponCode")
+                        .HasFilter("[CouponCode] IS NOT NULL");
+
                     b.HasIndex("CreatedAt")
                         .HasDatabaseName("IX_Orders_CreatedAt");
 
@@ -974,6 +1119,8 @@ namespace Sokko.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_Orders_DeliveryMethod", "[DeliveryMethod] IN ('Local', 'Paqueteria')");
 
+                            t.HasCheckConstraint("CK_Orders_DiscountAmount", "[DiscountAmount] >= 0 AND [DiscountAmount] <= [Subtotal]");
+
                             t.HasCheckConstraint("CK_Orders_FolioNumber", "[FolioNumber] >= 1000");
 
                             t.HasCheckConstraint("CK_Orders_PaidAt", "[PaymentStatus] = 'Pendiente' OR [PaidAt] IS NOT NULL");
@@ -996,7 +1143,7 @@ namespace Sokko.Api.Data.Migrations
 
                             t.HasCheckConstraint("CK_Orders_TaxRate", "[TaxRate] BETWEEN 0 AND 1");
 
-                            t.HasCheckConstraint("CK_Orders_Total", "[Total] = [Subtotal] + [ShippingCost]");
+                            t.HasCheckConstraint("CK_Orders_Total", "[Total] = [Subtotal] - [DiscountAmount] + [ShippingCost]");
                         });
                 });
 
@@ -1954,6 +2101,27 @@ namespace Sokko.Api.Data.Migrations
                     b.Navigation("HandledBy");
                 });
 
+            modelBuilder.Entity("Sokko.Api.Models.CouponRedemption", b =>
+                {
+                    b.HasOne("Sokko.Api.Models.Coupon", "Coupon")
+                        .WithMany("Redemptions")
+                        .HasForeignKey("CouponId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_CouponRedemptions_Coupons");
+
+                    b.HasOne("Sokko.Api.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_CouponRedemptions_Orders");
+
+                    b.Navigation("Coupon");
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("Sokko.Api.Models.InventoryMovement", b =>
                 {
                     b.HasOne("Sokko.Api.Models.User", "CreatedByUser")
@@ -2196,6 +2364,11 @@ namespace Sokko.Api.Data.Migrations
             modelBuilder.Entity("Sokko.Api.Models.Collection", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Sokko.Api.Models.Coupon", b =>
+                {
+                    b.Navigation("Redemptions");
                 });
 
             modelBuilder.Entity("Sokko.Api.Models.Order", b =>

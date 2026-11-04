@@ -125,4 +125,12 @@ describe('reporte del mock', () => {
       { method: 'oxxo_pay', orders: 0, sales: 0 },
     ])
   })
+
+  it('KPI Descuentos; las ventas son el total cobrado, ya neto del cupón', () => {
+    const withCoupon = order('2026-11-02T18:00:00Z', { couponCode: 'BIENVENIDA10', discountAmount: 40, total: 459 })
+    const r = buildSalesReport([withCoupon, order('2026-11-02T19:00:00Z')], '2026-11-02', '2026-11-02')
+    expect(r.kpis.discounts.value).toBe(40)
+    expect(r.kpis.sales.value).toBe(459 + 499)
+    expect(r.kpis.taxIncluded.value).toBe(taxIncluded(459) + taxIncluded(499))
+  })
 })

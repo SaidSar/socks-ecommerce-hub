@@ -51,6 +51,12 @@ export default function OrderDetail({ order }) {
 
           <dl className="tnum mt-5 space-y-2 text-[14px]">
             <TotalsRow label="Subtotal">{formatMXN(order.subtotal, 2)}</TotalsRow>
+            {order.discountAmount > 0 && (
+              <div className="flex justify-between gap-4 text-matcha">
+                <dt>Descuento{order.couponCode ? ` (${order.couponCode})` : ''}</dt>
+                <dd>−{formatMXN(order.discountAmount, 2)}</dd>
+              </div>
+            )}
             <TotalsRow label={deliveryLabel(order.deliveryMethod)}>
               {order.shippingCost === 0 ? <span className="text-matcha">Cortesía</span> : formatMXN(order.shippingCost, 2)}
             </TotalsRow>

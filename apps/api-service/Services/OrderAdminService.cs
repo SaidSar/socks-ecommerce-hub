@@ -21,7 +21,7 @@ public record AdminOrderView(OwnerOrderDto Owner)
         Owner.Id, Owner.Created, Owner.Status,
         Owner.Items.Select(i => new OperationsOrderItemDto(i.Sku, i.Name, i.Tone, i.ToneName, i.ToneHex, i.Size, i.Qty, i.Unit)).ToList(),
         Owner.Pay, Owner.PaymentStatus, Owner.PaidAt, Owner.Customer, Owner.Delivery, Owner.GiftWrap, Owner.FreeShipping,
-        Owner.Carrier, Owner.Tracking, Owner.Courier, Owner.Note, Owner.History, Owner.RowVersion);
+        Owner.Carrier, Owner.Tracking, Owner.Courier, Owner.Note, Owner.History, Owner.RowVersion, Owner.CouponCode);
 }
 
 public record AdminOrderListView(IReadOnlyList<AdminOrderView> Orders, IReadOnlyDictionary<string, int> Counts, int Count, DateTime Now)
@@ -138,7 +138,9 @@ public class OrderAdminService(SokkoDbContext db, IUserService users, IClock clo
         o.Subtotal,
         o.ShippingCost,
         o.Total,
-        o.TaxIncluded));
+        o.TaxIncluded,
+        o.CouponCode,
+        o.DiscountAmount));
 
     private async Task<Dictionary<string, int>> OrdersByEmailAsync(IReadOnlyCollection<string> emails, CancellationToken cancellationToken) =>
         (await db.Orders

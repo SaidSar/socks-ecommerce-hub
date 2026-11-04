@@ -1,6 +1,7 @@
 // Checkout y pedidos (DESIGN_CHECKOUT.md §6–§7). Con USE_API habla con apps/api-service; sin ella simula lo mismo con el catálogo.
 import { DEFAULT_CONFIG } from '../config/commerce'
-import { quoteShippingLocal, taxIncluded } from '../domain/checkout'
+import { taxIncluded } from '../domain/checkout'
+import { checkCoupon, couponDescription, MOCK_COUPONS, normalizeCouponCode, quoteWithCoupon } from '../domain/coupons'
 import { API_URL, USE_API } from './api'
 import { authFetch, getSession } from './authService'
 import { getProductSync } from './catalogService'
@@ -11,7 +12,7 @@ const OXXO_HOURS = 72
 const MOCK_LATENCY_MS = 400
 
 export class OrderError extends Error {
-  /** @param {'OUT_OF_STOCK' | 'PRICE_CHANGED' | 'DECLINED' | 'ORDER_CHANGED' | 'SESSION_EXPIRED' | 'RATE_LIMITED' | 'NETWORK'} code */
+  /** @param {'OUT_OF_STOCK' | 'PRICE_CHANGED' | 'COUPON_INVALID' | 'DECLINED' | 'ORDER_CHANGED' | 'SESSION_EXPIRED' | 'RATE_LIMITED' | 'NETWORK'} code */
   constructor(code, details = {}) {
     super(code)
     this.name = 'OrderError'
@@ -60,6 +61,7 @@ async function apiError(response) {
   if (response.status === 402) return new OrderError('DECLINED', { declineCode: body.declineCode })
   if (response.status === 409 && body.code === 'out_of_stock') return new OrderError('OUT_OF_STOCK', { lines: body.lines })
   if (response.status === 409 && body.code === 'price_changed') return new OrderError('PRICE_CHANGED', { total: body.total })
+  if (body.code === 'coupon_invalid') return new OrderError('COUPON_INVALID', { reason: body.reason, message: body.message ?? body.title, total: body.total })
   if (response.status === 422) return new OrderError('ORDER_CHANGED')
   if (response.status === 429) return new OrderError('RATE_LIMITED')
   return new OrderError('NETWORK')
@@ -133,8 +135,15 @@ function placeMockOrder(payload) {
   }
 
   const subtotal = lines.reduce((sum, l) => sum + l.product.price * l.item.quantity, 0)
-  const { method, cost } = quoteShippingLocal(payload.postalCode, subtotal, DEFAULT_CONFIG)
-  const total = subtotal + cost
+  const email = payload.email.trim().toLowerCase()
+  const code = payload.couponCode ? normalizeCouponCode(payload.couponCode) : null
+  const coupon = code ? MOCK_COUPONS.find((c) => c.code === code) : null
+  if (code) {
+    const rejection = mockRejection(coupon, subtotal, email)
+    if (rejection) throw new OrderError('COUPON_INVALID', { ...rejection, total: quoteWithCoupon(subtotal, payload.postalCode, null, DEFAULT_CONFIG).total })
+  }
+  const quote = quoteWithCoupon(subtotal, payload.postalCode, coupon, DEFAULT_CONFIG)
+  const { deliveryMethod: method, shippingCost: cost, total, discount } = quote
   if (payload.expectedTotal != null && payload.expectedTotal !== total) throw new OrderError('PRICE_CHANGED', { total })
   if (payload.paymentMethod === 'tarjeta' && payload.paymentToken !== 'tok_fake_approved') {
     throw new OrderError('DECLINED', { declineCode: payload.paymentToken === 'tok_fake_insufficient_funds' ? 'insufficient_funds' : 'declined' })
@@ -154,7 +163,7 @@ function placeMockOrder(payload) {
     deliveryMethod: method,
     firstName: payload.firstName,
     lastName: payload.lastName,
-    email: payload.email.trim().toLowerCase(),
+    email,
     phone: payload.phone,
     street: payload.street,
     neighborhood: payload.neighborhood,
@@ -164,6 +173,8 @@ function placeMockOrder(payload) {
     references: payload.references || null,
     giftWrap: payload.giftWrap,
     subtotal,
+    couponCode: coupon?.code ?? null,
+    discountAmount: discount,
     shippingCost: cost,
     total,
     taxRate: DEFAULT_CONFIG.ivaRate,
@@ -187,6 +198,65 @@ function placeMockOrder(payload) {
   return order
 }
 
+/** Fecha local de hoy (AAAA-MM-DD) en Los Mochis, como BusinessTime en el servidor. */
+const todayLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan' }).format(new Date())
+
+/** Reglas del servidor con los pedidos simulados: usos vivos (no cancelados) y por correo. */
+function mockRejection(coupon, subtotal, email) {
+  if (!coupon) return checkCoupon(null, {})
+  const live = loadOrders()
+    .map((o) => withExpiry(o))
+    .filter((o) => o.couponCode === coupon.code && o.status !== 'cancelado')
+  const usedByEmail = email ? live.some((o) => o.email === email) : null
+  return checkCoupon(coupon, { subtotal, todayIso: todayLocal(), redemptions: live.length, usedByEmail })
+}
+
+export class CouponError extends Error {
+  /** @param {'COUPON_INVALID' | 'RATE_LIMITED' | 'NETWORK'} code */
+  constructor(code, details = {}) {
+    super(code)
+    this.name = 'CouponError'
+    this.code = code
+    Object.assign(this, details)
+  }
+}
+
+/**
+ * Vista previa del cupón: el servidor pone los precios y usa la misma fórmula que el checkout.
+ * `items`: `{ sku, quantity, slug }` (a la API solo van SKU y cantidad).
+ * @returns {Promise<{ code, type, description, subtotal, discount, deliveryMethod, shippingCost, total, freeShippingRemaining }>}
+ * @throws {CouponError}
+ */
+export async function previewCoupon({ code, items, postalCode, email }) {
+  const normalized = normalizeCouponCode(code)
+  const cp = /^\d{5}$/.test(postalCode ?? '') ? postalCode : null
+  const mail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email ?? '').trim()) ? String(email).trim() : null
+  if (USE_API) {
+    let response
+    try {
+      response = await fetch(`${API_URL}/api/coupons/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: normalized, items: items.map(({ sku, quantity }) => ({ sku, quantity })), postalCode: cp, email: mail }),
+      })
+    } catch {
+      throw new CouponError('NETWORK')
+    }
+    if (response.ok) return response.json()
+    const body = isJson(response) ? await response.json() : {}
+    if (response.status === 429) throw new CouponError('RATE_LIMITED')
+    if (body.code === 'coupon_invalid') throw new CouponError('COUPON_INVALID', { reason: body.reason, message: body.message ?? body.title })
+    if (response.status === 400) throw new CouponError('COUPON_INVALID', { reason: 'not_found', message: 'Este código no existe.' })
+    throw new CouponError('NETWORK')
+  }
+  await latency()
+  const subtotal = items.reduce((sum, i) => sum + (getProductSync(i.slug)?.price ?? 0) * i.quantity, 0)
+  const coupon = MOCK_COUPONS.find((c) => c.code === normalized)
+  const rejection = mockRejection(coupon, subtotal, mail?.toLowerCase())
+  if (rejection) throw new CouponError('COUPON_INVALID', rejection)
+  return { code: coupon.code, type: coupon.type, description: couponDescription(coupon), ...quoteWithCoupon(subtotal, cp, coupon, DEFAULT_CONFIG) }
+}
+
 const canReadMock = (order) => {
   const session = getSession()
   return order.ownerEmail ? order.ownerEmail === session?.email : guestEmail(order.folio) === order.email
@@ -206,7 +276,8 @@ export async function quoteShipping(postalCode, subtotal) {
     return response.json()
   }
   await latency()
-  return quoteShippingLocal(postalCode, subtotal, DEFAULT_CONFIG)
+  const { deliveryMethod: method, shippingCost: cost } = quoteWithCoupon(subtotal, postalCode, null, DEFAULT_CONFIG)
+  return { method, cost }
 }
 
 /**

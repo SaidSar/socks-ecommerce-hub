@@ -53,7 +53,7 @@ describe('mock: reportes', () => {
     const { blob, fileName } = await api.downloadSalesCsv({ from: '2026-10-01', to: '2026-10-31' }, OWNER)
     expect(fileName).toBe('sokko-ventas-2026-10.csv')
     const [header, ...rows] = (await blob.text()).trim().split('\r\n')
-    expect(header).toBe('Folio,Fecha (hora de Los Mochis),Cliente,Correo,Método de pago,Estado de pago,Estado del pedido,Subtotal,Envío,IVA incluido,Total')
+    expect(header).toBe('Folio,Fecha (hora de Los Mochis),Cliente,Correo,Método de pago,Estado de pago,Estado del pedido,Subtotal,Cupón,Descuento,Envío,IVA incluido,Total')
     expect(rows.length).toBe(34)
     expect(rows[0]).toMatch(/^SKK-\d+,2026-10-\d{2} \d{2}:\d{2},/)
   })

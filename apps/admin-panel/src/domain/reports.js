@@ -198,6 +198,8 @@ export function buildSalesReport(orders, from, to) {
       ticket: stat(ticket(cur), ticket(before)),
       taxIncluded: stat(sum(cur, (o) => taxIncluded(o.total)), sum(before, (o) => taxIncluded(o.total))),
       shipping: stat(sum(cur, (o) => o.shipping), sum(before, (o) => o.shipping)),
+      // Descuentos de cupón. Las ventas ya son el total cobrado (neto de descuento).
+      discounts: stat(sum(cur, (o) => o.discountAmount ?? 0), sum(before, (o) => o.discountAmount ?? 0)),
       cancelled: stat(cancelled({ from, to }), cancelled(prev)),
       units: stat(units(cur), units(before)),
     },

@@ -7,6 +7,7 @@ import { normalizeContactEmail, validateContactEmail } from '../domain/contact'
 import { toCsv } from '../domain/csv'
 import { buildCustomers, customersCsv, customersCsvName, marketingCsv, marketingCsvName, queryCustomers } from '../domain/customers'
 import { MESSAGE_STATUSES, statusOf } from '../domain/messages'
+import { couponPayload, couponStatus, validateCoupon } from '../domain/coupons'
 import { buildSalesReport, salesCsvName, taxIncluded, todayIso, validatePeriod } from '../domain/reports'
 import { buildDashboard } from '../domain/dashboard'
 import { LINES, PAYMENT_METHOD_LABELS, stockUnit } from '../domain/enums'
@@ -20,6 +21,7 @@ import { COLORS } from '../data/catalogSeed'
 import { COURIERS, createSeed, DEMO_NOW, SEED_VERSION, SIZES } from '../data/seed'
 import { listUsers, shortName } from './adminAuth'
 import * as catalogApi from './adminCatalogApi'
+import * as couponsApi from './adminCouponsApi'
 import * as customersApi from './adminCustomersApi'
 import * as messagesApi from './adminMessagesApi'
 import * as opsApi from './adminOpsApi'
@@ -82,8 +84,10 @@ const withTone = (x) => ({ ...x, toneName: colorOf(x.tone)?.name ?? x.tone, tone
 // Sin `money.view` el servidor no manda importes (Operaciones).
 function redactOrder(order, role) {
   const items = order.items.map(withTone)
-  if (can(role, 'money.view')) return { ...order, items }
-  const { subtotal: _s, total: _t, shipping, ...rest } = order
+  if (can(role, 'money.view')) return { couponCode: null, discountAmount: 0, ...order, items }
+  // R-24: Operaciones ve el código del cupón, nunca el monto descontado.
+  const { subtotal: _s, total: _t, shipping, discountAmount: _d, ...rest } = order
+  rest.couponCode ??= null
   return { ...rest, freeShipping: !shipping, items: items.map(({ price: _p, ...it }) => it) }
 }
 
@@ -739,7 +743,7 @@ export async function getSalesReport(period, user) {
 
 const STATUS_CSV = { por_preparar: 'Por preparar', preparando: 'Preparando', enviado: 'Enviado', en_ruta: 'En ruta', entregado: 'Entregado', cancelado: 'Cancelado' }
 const PAYMENT_CSV = { pendiente: 'Pendiente', pagado: 'Pagado', reembolsado: 'Reembolsado' }
-const SALES_CSV_HEADER = ['Folio', 'Fecha (hora de Los Mochis)', 'Cliente', 'Correo', 'Método de pago', 'Estado de pago', 'Estado del pedido', 'Subtotal', 'Envío', 'IVA incluido', 'Total']
+const SALES_CSV_HEADER = ['Folio', 'Fecha (hora de Los Mochis)', 'Cliente', 'Correo', 'Método de pago', 'Estado de pago', 'Estado del pedido', 'Subtotal', 'Cupón', 'Descuento', 'Envío', 'IVA incluido', 'Total']
 const localStamp = (instant) => new Date(instant).toLocaleString('sv-SE', { timeZone: 'America/Mazatlan', hour12: false }).slice(0, 16)
 
 /** GET /api/admin/reports/sales.csv?from=&to=: una fila por pedido, para el contador. */
@@ -763,11 +767,13 @@ export async function downloadSalesCsv(period, user) {
       PAYMENT_CSV[o.paymentStatus],
       STATUS_CSV[o.status],
       o.subtotal,
+      o.couponCode ?? '',
+      o.discountAmount ?? 0,
       o.shipping,
       taxIncluded(o.total),
       o.total,
     ])
-  return csvFile(toCsv(SALES_CSV_HEADER, rows, [7, 8, 9, 10]), salesCsvName(period.from, period.to))
+  return csvFile(toCsv(SALES_CSV_HEADER, rows, [7, 9, 10, 11, 12]), salesCsvName(period.from, period.to))
 }
 
 // ---------------------------------------------------------------- Mensajes de contacto (los dos roles)
@@ -810,6 +816,91 @@ export async function updateMessage(id, action, user) {
     save()
   }
   return copy(message)
+}
+
+// ---------------------------------------------------------------- Cupones (Promociones, solo el Dueño)
+
+/** Usos, descuento y ventas: solo pedidos no cancelados (al cancelar se libera el uso). */
+function couponView(coupon) {
+  const live = db().orders.filter((o) => o.couponCode === coupon.code && o.status !== 'cancelado')
+  const ever = db().orders.some((o) => o.couponCode === coupon.code)
+  const view = {
+    ...coupon,
+    redemptions: live.length,
+    discountGiven: live.reduce((a, o) => a + (o.discountAmount ?? 0), 0),
+    sales: live.reduce((a, o) => a + o.total, 0),
+    canDelete: !ever,
+  }
+  return { ...view, status: couponStatus(view, currentToday()) }
+}
+
+const findCoupon = (id) => {
+  const c = (db().coupons ??= []).find((x) => x.id === Number(id))
+  if (!c) throw new ApiError('No encontramos ese cupón.', 404)
+  return c
+}
+
+/** GET /api/admin/coupons */
+export async function getCoupons(user) {
+  if (USE_API) return couponsApi.getCoupons()
+  await latency()
+  forbidden(user, 'promotions.manage', 'Solo el Dueño administra las promociones.')
+  return copy([...(db().coupons ??= [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).map(couponView))
+}
+
+/** POST /api/admin/coupons o PUT /api/admin/coupons/{id} */
+export async function saveCoupon(form, user) {
+  const payload = couponPayload(form)
+  if (USE_API) return couponsApi.saveCoupon(form.id, payload)
+  await latency()
+  forbidden(user, 'promotions.manage', 'Solo el Dueño administra las promociones.')
+  const errors = validateCoupon(form)
+  const list = (db().coupons ??= [])
+  if (!errors.code && list.some((c) => c.code === payload.code && c.id !== form.id)) errors.code = 'Ya existe un cupón con ese código.'
+  if (form.id) {
+    const current = findCoupon(form.id)
+    if (current.rowVersion !== payload.rowVersion) throw new ApiError('Otra persona modificó este registro mientras lo editaba. Recargue la página y vuelva a intentarlo.', 409)
+    if (current.code !== payload.code && db().orders.some((o) => o.couponCode === current.code))
+      errors.code = 'Este cupón ya se usó en pedidos: su código no se puede cambiar.'
+  }
+  if (Object.keys(errors).length) throw invalid(errors)
+  const now = stamp()
+  const { rowVersion: _r, ...fields } = payload
+  let saved
+  if (form.id) {
+    saved = { ...findCoupon(form.id), ...fields, updatedAt: now, rowVersion: `v${Date.now()}` }
+    db().coupons = list.map((c) => (c.id === saved.id ? saved : c))
+  } else {
+    saved = { id: Math.max(0, ...list.map((c) => c.id)) + 1, ...fields, createdAt: now, updatedAt: now, rowVersion: `v${Date.now()}` }
+    db().coupons = [...list, saved]
+  }
+  save()
+  return copy(couponView(saved))
+}
+
+/** POST /api/admin/coupons/{id}/activate | deactivate. Idempotente. */
+export async function setCouponActive(id, active, user) {
+  if (USE_API) return couponsApi.setCouponActive(id, active)
+  await latency()
+  forbidden(user, 'promotions.manage', 'Solo el Dueño administra las promociones.')
+  const coupon = findCoupon(id)
+  coupon.isActive = active
+  coupon.updatedAt = stamp()
+  coupon.rowVersion = `v${Date.now()}`
+  save()
+  return copy(couponView(coupon))
+}
+
+/** DELETE /api/admin/coupons/{id}: solo si ningún pedido lo usó. */
+export async function deleteCoupon(id, user) {
+  if (USE_API) return couponsApi.deleteCoupon(id)
+  await latency()
+  forbidden(user, 'promotions.manage', 'Solo el Dueño administra las promociones.')
+  const coupon = findCoupon(id)
+  if (!couponView(coupon).canDelete) throw new ApiError('Este cupón ya se usó en pedidos: desactívelo en lugar de borrarlo.', 409)
+  db().coupons = db().coupons.filter((c) => c.id !== coupon.id)
+  save()
+  return null
 }
 
 /** Solo DEV: vuelve a la semilla. */

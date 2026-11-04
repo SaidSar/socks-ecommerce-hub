@@ -156,6 +156,6 @@ public class AdminReportsApiTests(AdminApiFactory factory) : AdminOpsTestBase(fa
         Assert.Equal(string.Join(',', ReportService.CsvHeader), lines[0]);
         var row = lines.Single(l => l.StartsWith(folio + ",", StringComparison.Ordinal));
         Assert.Contains(",\"'=HYPERLINK(\"\"http://malo.example\"\") López\",", row);
-        Assert.EndsWith(",Tarjeta,Pagado,Por preparar,100.00,99.00,27.45,199.00", row);
+        Assert.EndsWith(",Tarjeta,Pagado,Por preparar,100.00,,0.00,99.00,27.45,199.00", row);
     }
 }

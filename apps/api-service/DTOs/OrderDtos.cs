@@ -66,6 +66,10 @@ public class OrderRequestDto : IValidatableObject
     [StringLength(200)]
     public string? PaymentToken { get; init; }
 
+    /// <summary>Solo el código: el descuento lo calcula el servidor (R-13, D-40).</summary>
+    [StringLength(40, ErrorMessage = "Este código no existe.")]
+    public string? CouponCode { get; init; }
+
     /// <summary>El total que vio el cliente. Nunca se cobra: solo evita cobrar algo distinto.</summary>
     public decimal? ExpectedTotal { get; init; }
 
@@ -99,7 +103,8 @@ public class OrderRequestDto : IValidatableObject
         PaymentToken,
         ExpectedTotal,
         Items!.Select(i => new CheckoutLine(i.Sku!, i.Quantity)).ToList(),
-        idempotencyKey);
+        idempotencyKey,
+        CouponRules.Normalize(CouponCode));
 }
 
 public record OrderItemDto(string Sku, string Name, string Color, string Size, int Quantity, decimal UnitPrice, decimal LineTotal);
@@ -143,7 +148,10 @@ public record OrderDto(
     IReadOnlyList<OrderItemDto> Items,
     IReadOnlyList<OrderTimelineDto> Timeline,
     /// <summary><c>null</c> mientras el pedido no sale del atelier.</summary>
-    OrderShipmentDto? Shipment)
+    OrderShipmentDto? Shipment,
+    /// <summary>Código del cupón aplicado; <c>Total = Subtotal − DiscountAmount + ShippingCost</c>.</summary>
+    string? CouponCode,
+    decimal DiscountAmount)
 {
     public static OrderDto From(Order o, TimeSpan oxxoLifetime) => new(
         o.Folio,
@@ -175,5 +183,7 @@ public record OrderDto(
         o.CreatedAt,
         o.Items.OrderBy(i => i.Id).Select(i => new OrderItemDto(i.SkuSnapshot, i.ProductNameSnapshot, i.ToneNameSnapshot, i.SizeCodeSnapshot, i.Quantity, i.UnitPrice, i.LineTotal)).ToList(),
         o.StatusHistory.OrderBy(h => h.ChangedAt).ThenBy(h => h.Id).Select(h => new OrderTimelineDto(h.Status, h.ChangedAt)).ToList(),
-        o.Shipment is null ? null : OrderShipmentDto.From(o.Shipment));
+        o.Shipment is null ? null : OrderShipmentDto.From(o.Shipment),
+        o.CouponCode,
+        o.DiscountAmount);
 }

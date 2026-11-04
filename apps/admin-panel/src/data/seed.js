@@ -6,7 +6,7 @@ import { BRANDS, COLLECTIONS, COLORS, PRODUCT_TYPES, PRODUCTS, SIZES_BY_SYSTEM }
 import { computeShipping } from '../domain/shipping'
 
 // Versión de la forma de los datos guardados; si cambia, adminApi descarta lo guardado y vuelve a sembrar.
-export const SEED_VERSION = 7
+export const SEED_VERSION = 8
 
 // TODO(api): usar fecha del servidor. Domingo 18 de octubre de 2026, 09:30.
 export const DEMO_NOW = new Date(2026, 9, 18, 9, 30)
@@ -92,6 +92,40 @@ const OVERRIDES = {
 }
 
 const STAFF = ['Aiko M.', 'Daniel R.']
+
+/**
+ * Cupones de ejemplo (Promociones). Sin consumir el PRNG: los pedidos, el kárdex y las ventas no cambian.
+ * Un pedido entregado lleva BIENVENIDA10 para que el detalle muestre el chip y el descuento.
+ */
+function createCoupons(orders, at, iso) {
+  const used = orders.find((o) => o.status === 'entregado' && o.subtotal >= 400)
+  if (used) {
+    const discount = Math.round(used.subtotal * 10) / 100
+    Object.assign(used, { couponCode: 'BIENVENIDA10', discountAmount: discount, total: used.subtotal - discount + used.shipping })
+  }
+  const created = iso(at(1, 9, 0))
+  const coupon = (id, fields) => ({
+    id,
+    description: null,
+    value: 0,
+    minSubtotal: null,
+    startsOn: null,
+    endsOn: null,
+    maxRedemptions: null,
+    onePerCustomer: false,
+    isActive: true,
+    createdAt: created,
+    updatedAt: created,
+    rowVersion: `v${id}`,
+    ...fields,
+  })
+  return [
+    coupon(1, { code: 'BIENVENIDA10', description: 'Primera compra', type: 'percent', value: 10, onePerCustomer: true }),
+    coupon(2, { code: 'ENVIOGRATIS', description: 'Campaña de redes', type: 'free_shipping', minSubtotal: 300 }),
+    coupon(3, { code: 'BUENFIN-2026', description: 'El Buen Fin', type: 'fixed', value: 100, minSubtotal: 600, startsOn: '2026-11-13', endsOn: '2026-11-16', maxRedemptions: 50 }),
+    coupon(4, { code: 'VERANO25', description: 'Temporada pasada', type: 'percent', value: 25, startsOn: '2026-06-01', endsOn: '2026-08-31' }),
+  ]
+}
 
 export function createSeed() {
   const rnd = mulberry32(20261018)
@@ -327,8 +361,9 @@ export function createSeed() {
     })
 
   const { accounts, messages } = createPeople(orders, at, iso)
+  const coupons = createCoupons(orders, at, iso)
 
-  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES), catalog, accounts, messages }
+  return { version: SEED_VERSION, orders, inventory, movements, daily, settings, pieces: structuredClone(PIECES), catalog, accounts, messages, coupons }
 }
 
 /**

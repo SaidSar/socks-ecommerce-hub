@@ -79,6 +79,15 @@ public class OrdersController(
                     ["total"] = changed.Total,
                 });
 
+            case CheckoutResult.CouponInvalid invalid:
+                return ProblemWith(StatusCodes.Status409Conflict, invalid.Message, new()
+                {
+                    ["code"] = "coupon_invalid",
+                    ["reason"] = invalid.Reason,
+                    ["message"] = invalid.Message,
+                    ["total"] = invalid.Total,
+                });
+
             case CheckoutResult.Declined declined:
                 return ProblemWith(
                     StatusCodes.Status402PaymentRequired,

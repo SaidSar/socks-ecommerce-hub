@@ -25,7 +25,9 @@ public record CheckoutCommand(
     string? PaymentToken,
     decimal? ExpectedTotal,
     IReadOnlyList<CheckoutLine> Items,
-    string? IdempotencyKey);
+    string? IdempotencyKey,
+    /// <summary>Ya normalizado (mayúsculas, sin espacios). Forma parte del hash de idempotencia.</summary>
+    string? CouponCode = null);
 
 public record ShortageLine(string Sku, int Requested, int Available);
 
@@ -36,6 +38,9 @@ public abstract record CheckoutResult
     public sealed record OutOfStock(IReadOnlyList<ShortageLine> Lines) : CheckoutResult;
 
     public sealed record PriceChanged(decimal Total) : CheckoutResult;
+
+    /// <summary>El cupón dejó de aplicar entre la vista previa y la compra. <c>Total</c> es el total sin cupón.</summary>
+    public sealed record CouponInvalid(string Reason, string Message, decimal Total) : CheckoutResult;
 
     public sealed record Declined(string Code) : CheckoutResult;
 
@@ -54,13 +59,16 @@ public class CheckoutOrder(
     IOrderService orders,
     ICatalogService catalog,
     ISettingsService settings,
-    IQuoteShipping quoteShipping,
+    IQuoteOrder quoteOrder,
+    ICouponService coupons,
     IPaymentGateway gateway,
     IOrderConfirmation confirmation,
     IClock clock) : ICheckoutOrder
 {
     public async Task<CheckoutResult> PlaceAsync(CheckoutCommand command, CancellationToken cancellationToken = default)
     {
+        // " bienvenida10 " y "BIENVENIDA10" son la misma compra para la idempotencia.
+        command = command with { CouponCode = CouponRules.Normalize(command.CouponCode) };
         var hash = RequestHash(command);
         if (command.IdempotencyKey is not null)
         {
@@ -107,10 +115,7 @@ public class CheckoutOrder(
     private async Task<CheckoutResult> PlaceInTransactionAsync(
         CheckoutCommand command, byte[] hash, string gatewayKey, Action<string> onApproved, CancellationToken cancellationToken)
     {
-        var requested = command.Items
-            .GroupBy(i => i.Sku, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new CheckoutLine(g.Key.ToUpperInvariant(), g.Sum(i => i.Quantity)))
-            .ToList();
+        var requested = QuoteOrder.Merge(command.Items);
         var variants = (await inventory.GetForSaleAsync(requested.Select(l => l.Sku).ToList(), cancellationToken))
             .ToDictionary(v => v.Sku, StringComparer.OrdinalIgnoreCase);
 
@@ -126,24 +131,24 @@ public class CheckoutOrder(
 
         var today = clock.Today;
         var now = clock.UtcNow;
-        var items = requested.Select(line =>
-        {
-            var variant = variants[line.Sku];
-            return new OrderItem
-            {
-                VariantId = variant.Id,
-                SkuSnapshot = variant.Sku,
-                ProductNameSnapshot = variant.Product.Name,
-                ToneNameSnapshot = variant.Color.Name,
-                SizeCodeSnapshot = variant.Size.Code,
-                Quantity = line.Quantity,
-                UnitPrice = catalog.GetEffectivePrice(variant.Product, today).FinalPrice,
-            };
-        }).ToList();
-
+        var items = QuoteOrder.BuildItems(requested, variants, catalog, today);
         var subtotal = items.Sum(i => i.Quantity * i.UnitPrice);
-        var quote = await quoteShipping.QuoteAsync(command.PostalCode, subtotal, cancellationToken);
-        var total = subtotal + quote.Cost;
+
+        // D-40: el cupón se vuelve a validar aquí, con su fila bloqueada hasta el COMMIT (usos totales y por correo).
+        Coupon? coupon = null;
+        if (command.CouponCode is not null)
+        {
+            var lookup = await coupons.FindApplicableAsync(command.CouponCode, subtotal, command.Email, forCheckout: true, cancellationToken);
+            if (lookup.Rejection is { } rejection)
+            {
+                var without = await quoteOrder.QuoteAsync(subtotal, command.PostalCode, null, cancellationToken);
+                return new CheckoutResult.CouponInvalid(rejection.Reason, rejection.Message, without.Total);
+            }
+            coupon = lookup.Coupon;
+        }
+
+        var quote = await quoteOrder.QuoteAsync(subtotal, command.PostalCode, coupon, cancellationToken);
+        var total = quote.Total;
         if (command.ExpectedTotal is { } expected && expected != total)
         {
             return new CheckoutResult.PriceChanged(total);
@@ -163,10 +168,12 @@ public class CheckoutOrder(
             ShipState = command.State.Trim(),
             ShipPostalCode = command.PostalCode,
             ShipReferences = string.IsNullOrWhiteSpace(command.References) ? null : command.References.Trim(),
-            DeliveryMethod = quote.Method,
+            DeliveryMethod = quote.Method!.Value,
             PaymentMethod = command.PaymentMethod,
             Subtotal = subtotal,
-            ShippingCost = quote.Cost,
+            CouponCode = coupon?.Code,
+            DiscountAmount = quote.Discount,
+            ShippingCost = quote.ShippingCost!.Value,
             Total = total,
             TaxRate = config.IvaRate,
             GiftWrap = command.GiftWrap,
@@ -179,6 +186,10 @@ public class CheckoutOrder(
         if (!await orders.CreateAsync(order, cancellationToken))
         {
             return new CheckoutResult.IdempotencyConflict();
+        }
+        if (coupon is not null)
+        {
+            await coupons.RedeemAsync(coupon.Id, order.Id, order.CustomerEmail, quote.Discount, now, cancellationToken);
         }
 
         var payment = await gateway.ChargeAsync(
