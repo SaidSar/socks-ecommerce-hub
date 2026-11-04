@@ -1248,6 +1248,7 @@ Bitácora de auditoría. Cada decisión tiene un identificador para citarla en P
 | D-36 | 2026-10-26 | Temporadas como **ventana anual recurrente** (`StartMonth`, `StartDay`, `EndMonth`, `EndDay`, inclusiva, puede cruzar de año) con `StartKey`/`EndKey` calculadas | Navidad y Halloween se repiten cada año; con fechas fijas habría que volver a capturarlas cada año | `StartsAt`/`EndsAt` (`DATETIME2`) de la v0.4 | Aprobada (v0.4.2) |
 | D-37 | 2026-10-26 | Licencias como marca (Marvel, Pokémon…); "Sin marca" para genéricos con `Brands.ShowInFilters = 0` | Filtro y reportes por licencia; los genéricos no ensucian el filtro (P-15) | Marca "Genérica"; distribuidor como marca | Aprobada (v0.4.2) |
 | D-38 | 2026-10-26 | Precio efectivo (R-29) y temporada (R-28) como capacidades de `CatalogService` (entidad): `GetEffectivePrice` e `IsInSeason` | En Erl la utilidad no tiene lógica de negocio; el precio sí la tiene y es de un producto (P-17) | `PricingService` como utilidad; tarea `PriceProduct` | Aprobada (v0.4.2), cambia D-30 |
+| D-39 | 2026-11-03 | `WishlistItems` (favoritos): PK `UserId`+`ProductId`, `CASCADE` desde `Users` y `NO ACTION` desde `Products`; máximo 100 por cliente, contando solo productos activos | Como los tokens de D-07, un favorito no tiene valor contable: se va con la cuenta. El producto se da de baja lógica y el favorito deja de mostrarse | Columna JSON en `Users`; `CASCADE` también desde `Products` | Aprobada, amplía D-07 |
 
 ### 8.2 Registro de cambios del documento
 
