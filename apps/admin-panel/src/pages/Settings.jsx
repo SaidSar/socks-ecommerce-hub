@@ -12,6 +12,7 @@ import Icon from '../components/ui/Icon'
 import Modal from '../components/ui/Modal'
 import { normalizeContactEmail } from '../domain/contact'
 import { useAdminData, useAdminQuery } from '../hooks/useAdminData'
+import { useToast } from '../hooks/useToast'
 
 const toDraft = (s) => ({
   freeShippingThreshold: String(s.freeShippingThreshold),
@@ -39,6 +40,7 @@ function SettingsForm({ initial, users }) {
   const [draft, setDraft] = useState(() => toDraft(initial))
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('')
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [formMessage, setFormMessage] = useState('')
   const dirty = JSON.stringify(toSettings(draft)) !== JSON.stringify(toSettings(toDraft(saved)))
@@ -75,7 +77,8 @@ function SettingsForm({ initial, users }) {
       const res = await api.saveSettings({ ...next, rowVersion: saved.rowVersion })
       setSaved(res)
       setDraft(toDraft(res))
-      setStatus('Cambios guardados. La tienda los toma de GET /api/config.')
+      setStatus('saved')
+      toast.success('Cambios guardados. La tienda ya los muestra.', { key: 'settings' })
     } catch (e) {
       setErrors(e.errors ?? {})
       // Un conflicto (otra persona guardó antes) no trae errores por campo: el mensaje se muestra tal cual.
@@ -100,7 +103,7 @@ function SettingsForm({ initial, users }) {
           {busy ? 'Guardando…' : 'Guardar cambios'}
         </Button>
         <span role="status" className={`text-[13px] ${hasErrors || formMessage ? 'text-laca' : 'text-matcha'}`}>
-          {formMessage || (hasErrors ? 'Revise los campos marcados.' : status)}
+          {formMessage || (hasErrors ? 'Revise los campos marcados.' : '')}
         </span>
         {dirty && !status && !hasErrors && <span className="text-[12.5px] text-ink-soft">Hay cambios sin guardar.</span>}
       </div>

@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import { countNoun, label, MOVEMENT_LABELS } from '../../domain/enums'
 import { checkMovement, MANUAL_MOVEMENTS, needsFolio, needsNote } from '../../domain/inventory'
+import { useToast } from '../../hooks/useToast'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 
@@ -22,7 +23,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
   const [folio, setFolio] = useState('')
   // `field` dice junto a qué campo va el error: 'folio' se muestra en línea; el resto, al pie.
   const [error, setError] = useState({ message: '', field: '' })
-  const [done, setDone] = useState('')
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
   const qtyRef = useRef(null)
   const noteRef = useRef(null)
@@ -64,7 +65,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
     setBusy(true)
     try {
       await onSubmit({ type, qty, note, folio: withFolio ? folio : undefined })
-      setDone(`${label(MOVEMENT_LABELS, type)} registrada`)
+      toast.success(`${label(MOVEMENT_LABELS, type)} registrada: ${row.sku}.`, { key: 'movement' })
       setQty('')
       setNote('')
       setFolio('')
@@ -113,7 +114,6 @@ export default function MovementForm({ row, onSubmit, onDone }) {
           onChange={(e) => {
             setQty(e.target.value.replace(/\D/g, ''))
             clearError()
-            setDone('')
           }}
           aria-invalid={error.field === 'qty'}
           className={`mt-1 h-10 max-lg:h-11 w-full rounded-md border bg-paper px-3 text-[14px] tnum outline-none focus:border-ai ${error.field === 'qty' ? 'border-laca' : 'border-line'}`}
@@ -140,8 +140,7 @@ export default function MovementForm({ row, onSubmit, onDone }) {
             onChange={(e) => {
               setFolio(e.target.value.toUpperCase())
               clearError()
-              setDone('')
-            }}
+              }}
             placeholder="SKK-1042"
             aria-invalid={Boolean(folioError)}
             aria-describedby={folioError ? `${ids.folioErr} ${ids.folioHint}` : ids.folioHint}
@@ -184,9 +183,6 @@ export default function MovementForm({ row, onSubmit, onDone }) {
           <Icon name="check" className="w-4 h-4" />
           {busy ? 'Registrando…' : 'Registrar'}
         </Button>
-        <span className="text-[12.5px] text-matcha" role="status">
-          {done}
-        </span>
       </div>
     </form>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { NAV } from '../../config/navigation'
 import { roleLabel } from '../../config/roles'
@@ -6,6 +6,7 @@ import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { useAdminData } from '../../hooks/useAdminData'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
+import { useToast } from '../../hooks/useToast'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -30,7 +31,7 @@ function MobileNav({ onClose, children }) {
 /** Estructura del panel: barra lateral fija (lg+) o panel (móvil), barra superior y área de trabajo. */
 export default function AppShell() {
   const [menu, setMenu] = useState(false)
-  const [toast, setToast] = useState('')
+  const toast = useToast()
   const { user, logout, can } = useAdminAuth()
   const { summary, api, usesApi } = useAdminData()
   const navigate = useNavigate()
@@ -40,12 +41,6 @@ export default function AppShell() {
     setLastPath(pathname)
     setMenu(false)
   }
-
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(''), 3200)
-    return () => clearTimeout(t)
-  }, [toast])
 
   // La barra lateral solo muestra las secciones que el rol puede abrir.
   const items = NAV.filter((n) => can(n.perm))
@@ -59,7 +54,7 @@ export default function AppShell() {
   const onResetDemo = import.meta.env.DEV && !usesApi
     ? async () => {
         await api.resetDemoData()
-        setToast('Datos demo restablecidos.')
+        toast.success('Datos demo restablecidos.')
       }
     : undefined
 
@@ -89,10 +84,6 @@ export default function AppShell() {
         <main id="main" tabIndex={-1} className="gutter py-6 lg:py-8 max-w-[1600px] outline-none">
           <Outlet />
         </main>
-      </div>
-
-      <div role="status" aria-live="polite" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] pointer-events-none">
-        {toast && <p className="animate-fade bg-ink text-linen rounded-md px-4 py-2.5 text-[13px] shadow-lg">{toast}</p>}
       </div>
     </div>
   )

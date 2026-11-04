@@ -5,6 +5,7 @@ import Card from '../ui/Card'
 import CardHead from '../ui/CardHead'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
+import { useToast } from '../../hooks/useToast'
 
 const FIELD = 'h-11 w-full rounded-md border bg-paper px-3 text-[14px] outline-none focus:border-ai'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -106,12 +107,12 @@ function InviteModal({ onInvite, onClose }) {
 /** Usuarios internos: solo el Dueño invita. */
 export default function InternalUsers({ users, onInvite }) {
   const [inviting, setInviting] = useState(false)
-  const [status, setStatus] = useState('')
+  const toast = useToast()
 
   const invite = async (form) => {
     const user = await onInvite(form)
     setInviting(false)
-    setStatus(`Invitación enviada a ${user.email}.`)
+    toast.success(`Invitación enviada a ${user.email}.`)
   }
 
   return (
@@ -127,9 +128,6 @@ export default function InternalUsers({ users, onInvite }) {
           </Button>
         }
       />
-      <p role="status" className="px-5 pb-3 text-[13px] text-matcha empty:hidden">
-        {status}
-      </p>
       <ul className="border-t border-line divide-y divide-line">
         {users.map((u) => (
           <li key={u.email} className="px-5 py-3 flex items-center gap-3">

@@ -7,6 +7,7 @@ import EmptyState, { Loading } from '../components/ui/EmptyState'
 import Icon from '../components/ui/Icon'
 import { useAdminAuth } from '../hooks/useAdminAuth'
 import { useAdminData, useAdminQuery } from '../hooks/useAdminData'
+import { useToast } from '../hooks/useToast'
 
 /** Interruptor accesible (role="switch"). */
 function Switch({ checked, onChange, disabled, label }) {
@@ -82,20 +83,20 @@ export default function Brands() {
   const { api } = useAdminData()
   const { data, error } = useAdminQuery(() => api.getCatalog(), [])
   const [adding, setAdding] = useState(false)
-  const [status, setStatus] = useState('')
+  const toast = useToast()
   const canEdit = can('brands.edit')
 
   const create = async (name) => {
     const brand = await api.addBrand(name)
     setAdding(false)
-    setStatus(`Marca ${brand.name} creada.`)
+    toast.success(`Marca ${brand.name} creada.`)
   }
   const toggle = async (b) => {
     try {
       await api.setBrandVisibility(b.slug, !b.showInFilters, b.rowVersion)
-      setStatus(`${b.name}: ${b.showInFilters ? 'oculta' : 'visible'} en el filtro de la tienda.`)
+      toast.success(`${b.name}: ${b.showInFilters ? 'oculta' : 'visible'} en el filtro de la tienda.`, { key: `brand-${b.slug}` })
     } catch (ex) {
-      setStatus(ex.message)
+      toast.error(ex.message)
     }
   }
 
@@ -113,9 +114,6 @@ export default function Brands() {
       <div className="space-y-5">
         {!canEdit && <Banner>Solo el Dueño puede crear o editar marcas.</Banner>}
         {adding && <NewBrand onCreate={create} onCancel={() => setAdding(false)} />}
-        <p role="status" className="text-[13px] text-matcha empty:hidden">
-          {status}
-        </p>
 
         {error && <EmptyState icon="alert" title="No pudimos cargar las marcas." />}
         {!data && !error && <Loading label="Cargando marcas…" />}

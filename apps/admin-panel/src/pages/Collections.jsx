@@ -10,6 +10,7 @@ import { COLLECTION_KIND_LABELS, dayMonth, label, MONTHS, MONTHS_SHORT } from '.
 import { effectivePrice, isInSeason, roundMoney } from '../domain/season'
 import { useAdminAuth } from '../hooks/useAdminAuth'
 import { useAdminData, useAdminQuery } from '../hooks/useAdminData'
+import { useToast } from '../hooks/useToast'
 import { formatMXN } from '../utils/format'
 
 const YEAR = 365
@@ -244,14 +245,14 @@ export default function Collections() {
   const { api } = useAdminData()
   const { data, error } = useAdminQuery(() => api.getCatalog(), [])
   const [selected, setSelected] = useState('navidad')
-  const [status, setStatus] = useState('')
+  const toast = useToast()
   const canEdit = can('collections.edit')
   const canSeeMoney = can('money.view')
   const current = data?.collections.find((c) => c.slug === selected) ?? data?.collections[0]
 
   const save = async (form) => {
     await api.saveCollection(form)
-    setStatus(`Colección ${form.name} guardada.`)
+    toast.success(`Colección ${form.name} guardada.`)
   }
 
   return (
@@ -259,9 +260,6 @@ export default function Collections() {
       <PageHeader title="Colecciones" sub="Temporadas que se repiten cada año y colecciones temáticas de Especiales." />
       <div className="space-y-5">
         {!canEdit && <Banner>Solo el Dueño puede editar colecciones, fechas y descuentos.</Banner>}
-        <p role="status" className="text-[13px] text-matcha empty:hidden">
-          {status}
-        </p>
         {error && <EmptyState icon="alert" title="No pudimos cargar las colecciones." />}
         {!data && !error && <Loading label="Cargando colecciones…" />}
         {data && (
