@@ -18,6 +18,20 @@ describe('versión de Configuración (R-25)', () => {
     await saveSettings({ freeShippingThreshold: 799, rowVersion: 'del-formulario' })
     expect(bodies[0].rowVersion).toBe('del-formulario')
   })
+
+  it('el PUT lleva el correo de contacto (null si se dejó vacío)', async () => {
+    const bodies = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url, options) => {
+        bodies.push(JSON.parse(options.body))
+        return new Response('{}', { headers: { 'content-type': 'application/json' } })
+      }),
+    )
+    await saveSettings({ freeShippingThreshold: 799, contactEmail: 'tienda@sokko.mx', rowVersion: 'v' })
+    await saveSettings({ freeShippingThreshold: 799, contactEmail: null, rowVersion: 'v' })
+    expect(bodies.map((b) => b.contactEmail)).toEqual(['tienda@sokko.mx', null])
+  })
 })
 
 describe('errores de la API', () => {

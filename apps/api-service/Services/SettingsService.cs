@@ -28,6 +28,10 @@ public partial class SettingsService(SokkoDbContext db, IClock clock) : ISetting
     private const string UnconfirmedSuffix = " · por confirmar";
     private const string AmountError = "Escriba un monto entero de 0 o más.";
     private const string ThresholdError = "El umbral debe ser mayor a 0.";
+    private const string ContactEmailError = "Revise el formato del correo, por ejemplo nombre@dominio.com.";
+
+    [GeneratedRegex(AuthRules.Email)]
+    private static partial Regex EmailPattern();
 
     [GeneratedRegex(@"^([0-9]{5})(?:\s*[–-]\s*([0-9]{5}))?$")]
     private static partial Regex ZonePattern();
@@ -47,6 +51,7 @@ public partial class SettingsService(SokkoDbContext db, IClock clock) : ISetting
             settings.LocalFreeShipping,
             settings.FewUnitsThreshold,
             settings.IvaRate,
+            settings.ContactEmail,
             zones.Select(ToZoneDto).ToList(),
             settings.RowVersion);
     }
@@ -76,6 +81,11 @@ public partial class SettingsService(SokkoDbContext db, IClock clock) : ISetting
         if (request.FewUnitsThreshold is not > 0)
         {
             errors["fewUnitsThreshold"] = ThresholdError;
+        }
+        var contactEmail = string.IsNullOrWhiteSpace(request.ContactEmail) ? null : request.ContactEmail.Trim().ToLowerInvariant();
+        if (contactEmail is not null && (contactEmail.Length > ContactMessageLimits.Email || !EmailPattern().IsMatch(contactEmail)))
+        {
+            errors["contactEmail"] = ContactEmailError;
         }
         if (request.RowVersion is null)
         {
@@ -125,6 +135,7 @@ public partial class SettingsService(SokkoDbContext db, IClock clock) : ISetting
         settings.LocalShippingCost = request.LocalShippingCost!.Value;
         settings.LocalFreeShipping = request.LocalFreeShipping;
         settings.FewUnitsThreshold = request.FewUnitsThreshold!.Value;
+        settings.ContactEmail = contactEmail;
         settings.UpdatedByUserId = userId;
         // Siempre cambia: así toda edición pasa por la comprobación de RowVersion.
         settings.UpdatedAt = now;

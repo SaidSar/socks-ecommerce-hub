@@ -345,7 +345,7 @@ describe('importación y configuración', () => {
 
   it('la configuración tiene la forma de GET /api/config (DESIGN_DB.md §3.12) más las zonas', async () => {
     const { localZones, ...config } = await api.getSettings()
-    expect(config).toEqual({ freeShippingThreshold: 799, parcelShippingCost: 99, localShippingCost: 49, localFreeShipping: true, fewUnitsThreshold: 4, ivaRate: 0.16 })
+    expect(config).toEqual({ freeShippingThreshold: 799, parcelShippingCost: 99, localShippingCost: 49, localFreeShipping: true, fewUnitsThreshold: 4, ivaRate: 0.16, contactEmail: null })
     expect(localZones).toHaveLength(2)
     const saved = await api.saveSettings({ ...(await api.getSettings()), ivaRate: 0.5 })
     expect(saved.ivaRate).toBe(0.16)
@@ -355,6 +355,20 @@ describe('importación y configuración', () => {
     const s = await api.getSettings()
     await api.saveSettings({ ...s, localShippingCost: 59 })
     expect(await api.quoteShipping({ subtotal: 420, postalCode: '81250' })).toEqual({ method: 'local', cost: 59 })
+  })
+
+  it('el correo de contacto se guarda normalizado y vacío queda en null', async () => {
+    const s = await api.getSettings()
+    expect((await api.saveSettings({ ...s, contactEmail: '  Tienda@SOKKO.mx ' })).contactEmail).toBe('tienda@sokko.mx')
+    expect((await api.getSettings()).contactEmail).toBe('tienda@sokko.mx')
+    expect((await api.saveSettings({ ...s, contactEmail: '   ' })).contactEmail).toBeNull()
+  })
+
+  it('rechaza un correo de contacto mal escrito', async () => {
+    const s = await api.getSettings()
+    await expect(api.saveSettings({ ...s, contactEmail: 'tienda@sokko' })).rejects.toMatchObject({
+      errors: { contactEmail: 'Revise el formato del correo, por ejemplo nombre@dominio.com.' },
+    })
   })
 
   it('valida montos, umbral y zona', async () => {
