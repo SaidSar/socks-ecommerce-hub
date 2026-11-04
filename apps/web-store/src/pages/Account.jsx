@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout'
 import AuthTabs from '../components/auth/AuthTabs'
@@ -38,8 +38,6 @@ export default function Account({ view }) {
   const { isAuthenticated } = useAuth()
   const [searchParams] = useSearchParams()
   const location = useLocation()
-  // Modo de la última autenticación hecha aquí: decide el sello de la bienvenida (歓迎 u お帰).
-  const [authMode, setAuthMode] = useState('login')
   const redirect = safeRedirect(searchParams.get('redirect'))
   const isTabView = view === 'login' || view === 'register'
 
@@ -55,10 +53,11 @@ export default function Account({ view }) {
     window.scrollTo(0, 0)
   }, [view])
 
-  // Con sesión, login/registro llevan a la bienvenida (o a ?redirect=). Esta misma guarda hace la
-  // navegación tras un envío exitoso, así no compite con un navigate() del formulario.
+  // Con sesión, login/registro llevan al inicio (o a ?redirect=, p. ej. el checkout o una ruta protegida). Esta misma
+  // guarda hace la navegación tras un envío exitoso, así no compite con un navigate() del formulario; el saludo lo da
+  // el aviso flotante. La bienvenida (Mi carnet) sigue en el menú de la cuenta.
   if (isAuthenticated && isTabView) {
-    return <Navigate to={redirect ?? '/cuenta/bienvenida'} replace state={{ mode: authMode }} />
+    return <Navigate to={redirect ?? '/'} replace />
   }
   if (!isAuthenticated && view === 'welcome') {
     return <Navigate to="/cuenta" replace />
@@ -87,8 +86,8 @@ export default function Account({ view }) {
         role={isTabView ? 'tabpanel' : undefined}
         aria-labelledby={isTabView ? `tab-${view}` : undefined}
       >
-        {view === 'login' && <LoginForm onAuthStart={setAuthMode} search={location.search} />}
-        {view === 'register' && <RegisterForm onAuthStart={setAuthMode} search={location.search} />}
+        {view === 'login' && <LoginForm search={location.search} />}
+        {view === 'register' && <RegisterForm search={location.search} />}
         {view === 'forgot' && <ForgotForm />}
         {view === 'reset' && <ResetForm />}
         {view === 'welcome' && <Welcome mode={location.state?.mode} />}

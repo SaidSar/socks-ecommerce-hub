@@ -6,9 +6,9 @@ import { useCart } from '../../hooks/useCart'
 import { listMyOrders } from '../../services/orderService'
 
 /**
- * Bienvenida (DESIGN_AUTH.md §4.5). `mode` llega en el state de la navegación desde login/registro;
- * si se entra desde "Mi carnet" no hay state y se usa el modo login. Al cerrar sesión, la guarda de
- * Account lleva a /cuenta.
+ * Bienvenida (DESIGN_AUTH.md §4.5). Ya no es el destino tras entrar (eso es el inicio con un aviso): se abre
+ * desde "Mi carnet" en el menú de la cuenta. `mode` llega en el state de la navegación si alguien la enlaza
+ * con él; sin state se usa el modo login. Al cerrar sesión, la guarda de Account lleva a /cuenta.
  */
 export default function Welcome({ mode = 'login' }) {
   const { user, logout } = useAuth()
