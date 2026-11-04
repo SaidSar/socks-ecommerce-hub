@@ -5,12 +5,18 @@ import { CartProvider } from './context/CartContext'
 import { ConfigProvider } from './context/ConfigContext'
 import Checkout from './pages/Checkout'
 import OrderConfirmation from './pages/OrderConfirmation'
+import About from './pages/About'
 import Account from './pages/Account'
+import Contact from './pages/Contact'
+import Faq from './pages/Faq'
 import Home from './pages/Home'
+import LegalPage from './pages/LegalPage'
 import LinePage from './pages/LinePage'
 import NotFound from './pages/NotFound'
 import ProductPage from './pages/ProductPage'
 import SearchPage from './pages/SearchPage'
+import Shipping from './pages/Shipping'
+import { PRIVACY, RETURNS, TERMS } from './content/legal'
 
 function App() {
   return (
@@ -25,6 +31,13 @@ function App() {
                 <Route path="/linea/:line" element={<LinePage />} />
                 <Route path="/buscar" element={<SearchPage />} />
                 <Route path="/producto/:slug" element={<ProductPage />} />
+                <Route path="/nosotros" element={<About />} />
+                <Route path="/contacto" element={<Contact />} />
+                <Route path="/preguntas-frecuentes" element={<Faq />} />
+                <Route path="/envios" element={<Shipping />} />
+                <Route path="/privacidad" element={<LegalPage doc={PRIVACY} />} />
+                <Route path="/terminos" element={<LegalPage doc={TERMS} />} />
+                <Route path="/devoluciones" element={<LegalPage doc={RETURNS} />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
               <Route path="/checkout" element={<Checkout />} />
