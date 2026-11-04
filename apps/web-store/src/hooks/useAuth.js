@@ -9,6 +9,8 @@ import { AuthContext } from '../context/auth-context'
  *   login: (c: { email: string, password: string, remember: boolean }) => Promise<object>,
  *   register: (d: object) => Promise<object>, logout: () => Promise<void>,
  *   requestPasswordReset: (email: string) => Promise<void>,
+ *   updateProfile: (d: { firstName: string, lastName: string, preferredSize: 'S'|'M'|'L'|null, marketingOptIn: boolean }) => Promise<object>,
+ *   changePassword: (d: { currentPassword: string, newPassword: string }) => Promise<void>,
  * }}
  */
 export function useAuth() {

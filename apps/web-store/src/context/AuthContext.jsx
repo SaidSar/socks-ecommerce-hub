@@ -60,6 +60,15 @@ export function AuthProvider({ children }) {
 
   const resetPassword = useCallback((data) => run(() => authService.resetPassword(data)), [run])
 
+  // Sin `run`: los formularios del perfil llevan su propio estado de guardado.
+  const updateProfile = useCallback(async (data) => {
+    const { user: next } = await authService.updateProfile(data)
+    setUser(next)
+    return next
+  }, [])
+
+  const changePassword = useCallback((data) => authService.changePassword(data), [])
+
   const logout = useCallback(async () => {
     await authService.logout()
     setUser(null)
@@ -77,8 +86,10 @@ export function AuthProvider({ children }) {
       logout,
       requestPasswordReset,
       resetPassword,
+      updateProfile,
+      changePassword,
     }
-  }, [user, status, login, register, logout, requestPasswordReset, resetPassword])
+  }, [user, status, login, register, logout, requestPasswordReset, resetPassword, updateProfile, changePassword])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

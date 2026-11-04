@@ -35,7 +35,7 @@ const SEED = [
 ]
 
 export class AuthError extends Error {
-  /** @param {'INVALID_CREDENTIALS' | 'EMAIL_TAKEN' | 'INVALID_RESET_TOKEN'} code */
+  /** @param {'INVALID_CREDENTIALS' | 'EMAIL_TAKEN' | 'INVALID_RESET_TOKEN' | 'WRONG_PASSWORD' | 'SESSION_EXPIRED'} code */
   constructor(code) {
     super(code)
     this.name = 'AuthError'
@@ -227,6 +227,57 @@ export async function resetPassword({ token, newPassword }) {
   }
   await latency()
   if (!token) throw new AuthError('INVALID_RESET_TOKEN')
+}
+
+/** Sesión guardada en localStorage (recordarme) o solo en la pestaña: un cambio de perfil la conserva donde estaba. */
+const isRemembered = () => readJSON('localStorage', SESSION_KEY) !== null
+
+/** Mi perfil: nombre, apellido, talla y boletín. El correo no cambia aquí. @returns {Promise<{ user: object }>} */
+export async function updateProfile({ firstName, lastName, preferredSize = null, marketingOptIn = false }) {
+  const changes = { firstName: String(firstName).trim(), lastName: String(lastName).trim(), preferredSize: preferredSize || null, marketingOptIn: Boolean(marketingOptIn) }
+  if (USE_API) {
+    const response = await authFetch('/api/auth/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes) })
+    if (response.status === 401) throw new AuthError('SESSION_EXPIRED')
+    if (!response.ok) throw new Error(`API respondió ${response.status}`)
+    const { user } = await response.json()
+    saveSession(user, isRemembered())
+    return { user }
+  }
+  await latency()
+  const session = getSession()
+  if (!session) throw new AuthError('SESSION_EXPIRED')
+  const users = await loadUsers()
+  const record = { ...users.find((u) => u.email === session.email), ...changes }
+  saveUsers(users.map((u) => (u.email === session.email ? record : u)))
+  const user = toPublicUser(record)
+  saveSession(user, isRemembered())
+  return { user }
+}
+
+/** Cambia la contraseña de la sesión. La actual equivocada lanza WRONG_PASSWORD. */
+export async function changePassword({ currentPassword, newPassword }) {
+  if (USE_API) {
+    const response = await authFetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+    if (response.status === 401) throw new AuthError('SESSION_EXPIRED')
+    if (response.status === 400) {
+      const body = await response.json().catch(() => ({}))
+      if (body.errors?.CurrentPassword) throw new AuthError('WRONG_PASSWORD')
+    }
+    if (!response.ok) throw new Error(`API respondió ${response.status}`)
+    return
+  }
+  await latency()
+  const session = getSession()
+  if (!session) throw new AuthError('SESSION_EXPIRED')
+  const users = await loadUsers()
+  const record = users.find((u) => u.email === session.email)
+  if (!record || record.passwordHash !== (await hashPassword(String(currentPassword ?? '')))) throw new AuthError('WRONG_PASSWORD')
+  const passwordHash = await hashPassword(newPassword)
+  saveUsers(users.map((u) => (u.email === session.email ? { ...u, passwordHash } : u)))
 }
 
 export async function logout() {
