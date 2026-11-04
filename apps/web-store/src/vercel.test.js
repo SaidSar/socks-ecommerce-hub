@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const config = JSON.parse(readFileSync('vercel.json', 'utf8'))
@@ -8,6 +8,16 @@ describe('vercel.json', () => {
   it('todas las rutas de React caen en index.html', () => {
     expect(config.rewrites).toEqual([{ source: '/(.*)', destination: '/index.html' }])
   })
+
+  // Vercel sirve primero los archivos estáticos: una ruta de React no puede chocar con uno de public/.
+  it.each(['/nosotros', '/contacto', '/preguntas-frecuentes', '/envios', '/privacidad', '/terminos', '/devoluciones'])(
+    '%s recarga en index.html',
+    (route) => {
+      const [{ source }] = config.rewrites
+      expect(new RegExp(`^${source}$`).test(route)).toBe(true)
+      expect(existsSync(`public${route}`) || existsSync(`public${route}.html`)).toBe(false)
+    },
+  )
 
   it('lleva los encabezados de seguridad y la CSP no abre scripts', () => {
     expect(headers['X-Content-Type-Options']).toBe('nosniff')

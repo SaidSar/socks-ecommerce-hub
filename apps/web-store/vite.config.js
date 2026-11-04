@@ -13,6 +13,6 @@ export default defineConfig({
     environment: 'node',
     // Los tests usan el mock aunque exista un .env con VITE_API_URL.
     env: { VITE_USE_MOCKS: 'true' },
-    include: ['src/**/*.test.js'],
+    include: ['src/**/*.test.{js,jsx}'],
   },
 })
