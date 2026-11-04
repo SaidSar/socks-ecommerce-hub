@@ -60,6 +60,7 @@ public class OrdersApiTests(OrdersApiFactory factory) : IClassFixture<OrdersApiF
         var db = scope.ServiceProvider.GetRequiredService<SokkoDbContext>();
         var variantIds = await db.ProductVariants.Where(v => _productIds.Contains(v.ProductId)).Select(v => v.Id).ToListAsync();
         var orderIds = await db.OrderItems.Where(i => variantIds.Contains(i.VariantId)).Select(i => i.OrderId).Distinct().ToListAsync();
+        await db.Shipments.Where(s => orderIds.Contains(s.OrderId)).ExecuteDeleteAsync();
         await db.OrderStatusHistory.Where(h => orderIds.Contains(h.OrderId)).ExecuteDeleteAsync();
         await db.OrderItems.Where(i => orderIds.Contains(i.OrderId)).ExecuteDeleteAsync();
         await db.Orders.Where(o => orderIds.Contains(o.Id)).ExecuteDeleteAsync();
@@ -440,6 +441,42 @@ public class OrdersApiTests(OrdersApiFactory factory) : IClassFixture<OrdersApiF
         var others = await Json(await Get("/api/orders/mine", daniel));
         Assert.DoesNotContain(folio, others.EnumerateArray().Select(o => o.GetProperty("folio").GetString()));
         Assert.Equal(HttpStatusCode.Unauthorized, (await Get("/api/orders/mine", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Customer_order_shows_its_shipment_in_detail_and_in_mine()
+    {
+        var product = await CreateProduct(stock: 2);
+        var nexus = await TokenFor("nexus@sokko.mx", "NexusCode2026");
+        var created = await Json(await Post(Body(product.Sku, email: "nexus@sokko.mx"), bearer: nexus));
+        var folio = created.GetProperty("folio").GetString()!;
+        Assert.Equal(JsonValueKind.Null, created.GetProperty("shipment").ValueKind);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SokkoDbContext>();
+            var orderId = await db.Orders.Where(o => o.Folio == folio).Select(o => o.Id).SingleAsync(Ct);
+            db.Shipments.Add(new Shipment
+            {
+                OrderId = orderId, DeliveryMethod = DeliveryMethod.Paqueteria, Carrier = Carrier.DHLExpress, TrackingNumber = "1234567890", ShippedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        async Task<string> Get(string url)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", nexus);
+            return await (await _client.SendAsync(request, Ct)).Content.ReadAsStringAsync(Ct);
+        }
+
+        var detail = JsonDocument.Parse(await Get($"/api/orders/{folio}")).RootElement.GetProperty("shipment");
+        Assert.Equal("dhl_express", detail.GetProperty("carrier").GetString());
+        Assert.Equal("1234567890", detail.GetProperty("trackingNumber").GetString());
+        Assert.Equal(JsonValueKind.Null, detail.GetProperty("deliveredAt").ValueKind);
+
+        var mine = JsonDocument.Parse(await Get("/api/orders/mine")).RootElement.EnumerateArray().Single(o => o.GetProperty("folio").GetString() == folio);
+        Assert.Equal("1234567890", mine.GetProperty("shipment").GetProperty("trackingNumber").GetString());
     }
 
     [Fact]

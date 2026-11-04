@@ -106,6 +106,13 @@ public record OrderItemDto(string Sku, string Name, string Color, string Size, i
 
 public record OrderTimelineDto(OrderStatus Status, DateTime At);
 
+/// <summary>Salida del pedido para el cliente. <c>Carrier</c> usa los códigos de <see cref="CarrierCodes"/>; nunca lleva el repartidor interno.</summary>
+public record OrderShipmentDto(string? Carrier, string? TrackingNumber, string? CourierName, DateTime ShippedAt, DateTime? DeliveredAt)
+{
+    public static OrderShipmentDto From(Shipment s) =>
+        new(s.Carrier is { } carrier ? CarrierCodes.ToCode(carrier) : null, s.TrackingNumber, s.CourierName, s.ShippedAt, s.DeliveredAt);
+}
+
 /// <summary>Pedido para el cliente (DESIGN_CHECKOUT §6.2). Nunca lleva la nota interna ni costos.</summary>
 public record OrderDto(
     string Folio,
@@ -134,7 +141,9 @@ public record OrderDto(
     decimal TaxIncluded,
     DateTime CreatedAt,
     IReadOnlyList<OrderItemDto> Items,
-    IReadOnlyList<OrderTimelineDto> Timeline)
+    IReadOnlyList<OrderTimelineDto> Timeline,
+    /// <summary><c>null</c> mientras el pedido no sale del atelier.</summary>
+    OrderShipmentDto? Shipment)
 {
     public static OrderDto From(Order o, TimeSpan oxxoLifetime) => new(
         o.Folio,
@@ -165,5 +174,6 @@ public record OrderDto(
         o.TaxIncluded,
         o.CreatedAt,
         o.Items.OrderBy(i => i.Id).Select(i => new OrderItemDto(i.SkuSnapshot, i.ProductNameSnapshot, i.ToneNameSnapshot, i.SizeCodeSnapshot, i.Quantity, i.UnitPrice, i.LineTotal)).ToList(),
-        o.StatusHistory.OrderBy(h => h.ChangedAt).ThenBy(h => h.Id).Select(h => new OrderTimelineDto(h.Status, h.ChangedAt)).ToList());
+        o.StatusHistory.OrderBy(h => h.ChangedAt).ThenBy(h => h.Id).Select(h => new OrderTimelineDto(h.Status, h.ChangedAt)).ToList(),
+        o.Shipment is null ? null : OrderShipmentDto.From(o.Shipment));
 }
