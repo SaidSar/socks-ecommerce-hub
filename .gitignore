@@ -60,3 +60,7 @@ desktop.ini
 
 # ---------- Fotos subidas en Development (LocalImageStorage) ----------
 apps/api-service/wwwroot/uploads/
+
+# ---------- Entrega: datos personales y archivos generados (fuera del repo público) ----------
+docs/entrega/datos_equipo.local.json
+docs/entrega/salida/
