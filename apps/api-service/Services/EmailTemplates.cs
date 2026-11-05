@@ -54,6 +54,15 @@ public static class EmailTemplates
             $"""<tr><td style="padding:6px 0">{l.Quantity} × {E(l.Name)}<br><small>{E(l.Tone)} · Talla {E(l.Size)}</small></td><td style="text-align:right">{Money(l.LineTotal)}</td></tr>"""));
         var textLines = string.Join('\n', order.Lines.Select(l => $"{l.Quantity} × {l.Name} ({l.Tone}, talla {l.Size}): {Money(l.LineTotal)}"));
 
+        // D-40: el descuento se ve aparte, como en la tienda.
+        var label = order.CouponCode is { } code ? $"Descuento ({code})" : "Descuento";
+        var shipping = order.ShippingCost == 0 ? "Cortesía" : Money(order.ShippingCost);
+        var discountHtml = order.DiscountAmount > 0
+            ? $"""<tr><td style="padding:6px 0;color:#5A6654">{E(label)}</td><td style="text-align:right;color:#5A6654">−{Money(order.DiscountAmount)}</td></tr>"""
+            : "";
+        var shippingHtml = $"""<tr><td style="padding:6px 0">Envío</td><td style="text-align:right">{shipping}</td></tr>""";
+        var extraText = (order.DiscountAmount > 0 ? $"\n{label}: −{Money(order.DiscountAmount)}" : "") + $"\nEnvío: {shipping}";
+
         string payHtml;
         string payText;
         if (order.OxxoReference is { } reference)
@@ -75,13 +84,13 @@ public static class EmailTemplates
         var body = $"""
             <p>Recibimos su pedido <b>{E(order.Folio)}</b>.</p>
             {payHtml}
-            <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px">{lines}
+            <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px">{lines}{discountHtml}{shippingHtml}
             <tr><td style="padding-top:12px;border-top:1px solid #DDD5CA"><b>Total, IVA incluido</b></td><td style="padding-top:12px;border-top:1px solid #DDD5CA;text-align:right"><b>{Money(order.Total)}</b></td></tr></table>
             """;
         return new EmailContentParts(
             $"Pedido {order.Folio} confirmado",
             Shell(title, body),
-            $"{title}\n\nRecibimos su pedido {order.Folio}.\n\n{payText}\n\n{textLines}\nTotal, IVA incluido: {Money(order.Total)}");
+            $"{title}\n\nRecibimos su pedido {order.Folio}.\n\n{payText}\n\n{textLines}{extraText}\nTotal, IVA incluido: {Money(order.Total)}");
     }
 
     public static EmailContentParts ContactNotification(ContactNotificationEmail message)

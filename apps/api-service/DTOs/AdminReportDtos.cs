@@ -10,7 +10,9 @@ public record SalesReportKpisDto(
     DashboardMoneyDto TaxIncluded,
     DashboardMoneyDto Shipping,
     DashboardCountDto Cancelled,
-    DashboardCountDto Units);
+    DashboardCountDto Units,
+    /// <summary>Descuentos de cupón de las ventas. Las ventas ya son el total cobrado, neto de descuento.</summary>
+    DashboardMoneyDto Discounts);
 
 /// <summary>Un día local: <c>Date</c> es su mediodía en UTC. <c>Prev</c> es el día equivalente del periodo anterior.</summary>
 public record SalesReportDayDto(DateTime Date, decimal V, int Orders, decimal Prev, int PrevOrders);

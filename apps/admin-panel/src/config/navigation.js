@@ -35,8 +35,7 @@ export const NAV = [
     to: '/promociones',
     icon: 'tag',
     perm: 'promotions.manage',
-    ready: false,
-    soon: ['Cupones con vigencia', 'Packs y precios especiales'],
+    ready: true,
   },
   { key: 'configuracion', label: 'Configuración', to: '/configuracion', icon: 'gear', perm: 'settings.manage', ready: true },
 ]

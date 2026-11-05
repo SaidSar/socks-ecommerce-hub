@@ -58,6 +58,11 @@ export default function MyOrders() {
             <p className="mt-2 text-[13px] text-ink-soft">
               {formatDate(order.createdAt)} · {pieces} {pieces === 1 ? 'pieza' : 'piezas'}
             </p>
+            {order.discountAmount > 0 && (
+              <p className="tnum mt-1 text-[13px] text-matcha">
+                Descuento{order.couponCode ? ` (${order.couponCode})` : ''} −{formatMXN(order.discountAmount, 2)}
+              </p>
+            )}
             <div className="mt-1 flex items-center justify-between gap-4">
               <p className="text-[13.5px]">{orderStatusLabel(order)}</p>
               <Link to={`/cuenta/pedidos/${order.folio}`} className="inline-flex min-h-11 items-center text-[13px] underline decoration-ink/25 underline-offset-4">

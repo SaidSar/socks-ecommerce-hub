@@ -17,6 +17,7 @@ export default defineConfig({
     environment: 'node',
     // Los tests usan el mock aunque exista un .env con VITE_API_URL.
     env: { VITE_USE_MOCKS: 'true' },
-    include: ['src/**/*.test.js'],
+    // Las pantallas (.test.jsx) piden jsdom en su primera línea; el resto corre en node.
+    include: ['src/**/*.test.js', 'src/**/*.test.jsx'],
   },
 })

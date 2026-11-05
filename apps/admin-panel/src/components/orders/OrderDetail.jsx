@@ -86,9 +86,18 @@ function OrderBody({ order, showMoney, now, couriers }) {
       )}
 
       <section aria-labelledby="items-title">
-        <h3 id="items-title" className="text-[12px] uppercase tracking-[.12em] text-ink-soft mb-2">
-          Piezas
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <h3 id="items-title" className="text-[12px] uppercase tracking-[.12em] text-ink-soft">
+            Piezas
+          </h3>
+          {order.couponCode && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-ok-bg text-ok-ink px-2.5 py-0.5 text-[12px] font-medium tnum" title="Cupón aplicado">
+              <Icon name="tag" className="w-3.5 h-3.5" />
+              <span className="sr-only">Cupón </span>
+              {order.couponCode}
+            </span>
+          )}
+        </div>
         <ul className="divide-y divide-line border-y border-line">
           {order.items.map((it) => (
             <li key={it.sku} className="py-3 flex items-center gap-3">
@@ -117,6 +126,12 @@ function OrderBody({ order, showMoney, now, couriers }) {
               <dt className="text-ink-soft">Subtotal</dt>
               <dd>{formatMXN(order.subtotal, 2)}</dd>
             </div>
+            {order.discountAmount > 0 && (
+              <div className="flex justify-between text-matcha">
+                <dt>Descuento{order.couponCode ? ` (${order.couponCode})` : ''}</dt>
+                <dd>−{formatMXN(order.discountAmount, 2)}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="text-ink-soft">Envío</dt>
               <dd>{order.shipping ? formatMXN(order.shipping, 2) : 'Gratis'}</dd>

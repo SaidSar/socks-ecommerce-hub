@@ -25,7 +25,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             t.HasCheckConstraint("CK_Orders_PaidAt", "[PaymentStatus] = 'Pendiente' OR [PaidAt] IS NOT NULL");
             t.HasCheckConstraint("CK_Orders_Subtotal", "[Subtotal] >= 0");
             t.HasCheckConstraint("CK_Orders_ShippingCost", "[ShippingCost] >= 0");
-            t.HasCheckConstraint("CK_Orders_Total", "[Total] = [Subtotal] + [ShippingCost]");
+            // D-40: el descuento sale de la mercancía, nunca del envío, y no la deja en negativo.
+            t.HasCheckConstraint("CK_Orders_DiscountAmount", "[DiscountAmount] >= 0 AND [DiscountAmount] <= [Subtotal]");
+            t.HasCheckConstraint("CK_Orders_Total", "[Total] = [Subtotal] - [DiscountAmount] + [ShippingCost]");
             t.HasCheckConstraint("CK_Orders_TaxRate", "[TaxRate] BETWEEN 0 AND 1");
             t.HasCheckConstraint("CK_Orders_StatusMatchesDelivery",
                 "NOT ([Status] = 'Enviado' AND [DeliveryMethod] = 'Local') AND NOT ([Status] = 'EnRuta' AND [DeliveryMethod] = 'Paqueteria')");
@@ -54,6 +56,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         b.Property(o => o.PaymentMethod).HasEnumColumn(10);
         b.Property(o => o.PaymentStatus).HasEnumColumn(12).HasDbDefault(PaymentStatus.Pendiente);
         b.Property(o => o.PaymentReference).HasMaxLength(100);
+        b.Property(o => o.CouponCode).HasMaxLength(30).IsUnicode(false);
+        b.Property(o => o.DiscountAmount).HasDbDefault(0m);
         b.Property(o => o.TaxRate).HasPrecision(5, 4);
         b.Property(o => o.TaxIncluded)
             .HasComputedColumnSql("CAST(ROUND([Total] - [Total] / (1 + [TaxRate]), 2) AS DECIMAL(10, 2))", stored: true);
@@ -84,6 +88,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasDatabaseName("IX_Orders_UserId_CreatedAt")
             .HasFilter("[UserId] IS NOT NULL");
         b.HasIndex(o => o.CustomerEmail).HasDatabaseName("IX_Orders_CustomerEmail");
+        b.HasIndex(o => o.CouponCode)
+            .HasDatabaseName("IX_Orders_CouponCode")
+            .HasFilter("[CouponCode] IS NOT NULL");
 
         b.HasOne(o => o.User).WithMany(u => u.Orders)
             .HasForeignKey(o => o.UserId)

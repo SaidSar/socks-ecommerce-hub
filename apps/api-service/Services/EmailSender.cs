@@ -14,7 +14,10 @@ public record OrderConfirmationEmail(
     decimal Total,
     string? OxxoReference,
     DateTime? OxxoExpiresAt,
-    IReadOnlyList<OrderEmailLine> Lines);
+    IReadOnlyList<OrderEmailLine> Lines,
+    string? CouponCode = null,
+    decimal DiscountAmount = 0,
+    decimal ShippingCost = 0);
 
 /// <summary>Aviso a la tienda de un mensaje del formulario de contacto.</summary>
 public record ContactNotificationEmail(string To, string Name, string Email, string Subject, string Message);

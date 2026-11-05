@@ -14,6 +14,7 @@ import Messages from './pages/Messages'
 import NotFound from './pages/NotFound'
 import Orders from './pages/Orders'
 import Products from './pages/Products'
+import Promotions from './pages/Promotions'
 import ProductTypes from './pages/ProductTypes'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
@@ -46,6 +47,7 @@ const router = createBrowserRouter([
       { path: 'reportes', element: guard('finanzas', <Reports />) },
       { path: 'finanzas', element: <ToReports /> },
       { path: 'mensajes', element: guard('mensajes', <Messages />) },
+      { path: 'promociones', element: guard('promociones', <Promotions />) },
       { path: 'catalogo/productos', element: guard('productos', <Products />) },
       { path: 'catalogo/marcas', element: guard('marcas', <Brands />) },
       { path: 'catalogo/colecciones', element: guard('colecciones', <Collections />) },

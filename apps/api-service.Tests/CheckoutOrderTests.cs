@@ -93,6 +93,38 @@ public class CheckoutOrderTests
         public Task<bool> ConfirmOxxoPaymentAsync(string folio, DateTime at, CancellationToken cancellationToken = default) => Task.FromResult(false);
     }
 
+    /// <summary>Cupones en memoria con las mismas reglas que <see cref="CouponService"/>.</summary>
+    internal sealed class FakeCoupons(IClock clock, params Coupon[] coupons) : ICouponService
+    {
+        public List<(int CouponId, int OrderId, string Email, decimal Discount)> Redeemed { get; } = [];
+
+        public Task<CouponLookup> FindApplicableAsync(string? code, decimal subtotal, string? email, bool forCheckout, CancellationToken cancellationToken = default)
+        {
+            var coupon = coupons.FirstOrDefault(c => c.Code == CouponRules.Normalize(code));
+            if (coupon is null)
+            {
+                return Task.FromResult(CouponLookup.Rejected(CouponRules.NotFoundRejection));
+            }
+            var mine = email is null ? (bool?)null : Redeemed.Any(r => r.CouponId == coupon.Id && r.Email == UserService.NormalizeEmail(email));
+            var rejection = CouponRules.Check(coupon, clock.Today, subtotal, Redeemed.Count(r => r.CouponId == coupon.Id), mine);
+            return Task.FromResult(rejection is null ? CouponLookup.Applies(coupon) : CouponLookup.Rejected(rejection));
+        }
+
+        public Task RedeemAsync(int couponId, int orderId, string email, decimal discount, DateTime at, CancellationToken cancellationToken = default)
+        {
+            Redeemed.Add((couponId, orderId, email, discount));
+            return Task.CompletedTask;
+        }
+
+        public Task ReleaseAsync(int orderId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<AdminCouponDto>> ListAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AdminCouponDto?> GetAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AdminResult<AdminCouponDto>> CreateAsync(AdminCouponRequestDto request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AdminResult<AdminCouponDto>> UpdateAsync(int id, AdminCouponRequestDto request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AdminResult<AdminCouponDto>> SetActiveAsync(int id, bool active, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AdminResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
     private sealed class SpyConfirmation : IOrderConfirmation
     {
         public List<string> Sent { get; } = [];
@@ -137,9 +169,9 @@ public class CheckoutOrderTests
         Size = new Size { Code = "M" },
     };
 
-    private sealed record Sut(CheckoutOrder Checkout, FakeUnitOfWork Work, FakeInventory Inventory, FakeOrders Orders, SpyGateway Gateway, SpyConfirmation Confirmation);
+    private sealed record Sut(CheckoutOrder Checkout, FakeUnitOfWork Work, FakeInventory Inventory, FakeOrders Orders, SpyGateway Gateway, SpyConfirmation Confirmation, FakeCoupons Coupons);
 
-    private static Sut Build(ProductVariant variant, DateOnly? today = null, FakeUnitOfWork? work = null, FakeInventory? inventory = null, FakeOrders? orders = null)
+    private static Sut Build(ProductVariant variant, DateOnly? today = null, FakeUnitOfWork? work = null, FakeInventory? inventory = null, FakeOrders? orders = null, FakeCoupons? coupons = null)
     {
         work ??= new FakeUnitOfWork();
         inventory ??= new FakeInventory(variant);
@@ -149,14 +181,16 @@ public class CheckoutOrderTests
         var settings = new FakeSettingsService(new ConfigDto(799m, 99m, 49m, true, 4, 0.16m), LocalCp);
         var catalog = new CatalogService(TestDbContext.Create(), new CollectionService(TestDbContext.Create(), new FakeClock(new DateOnly(2026, 10, 26))), settings, clock);
         var confirmation = new SpyConfirmation();
-        return new Sut(new CheckoutOrder(work, inventory, orders, catalog, settings, new QuoteShipping(settings), gateway, confirmation, clock), work, inventory, orders, gateway, confirmation);
+        coupons ??= new FakeCoupons(clock);
+        var quote = new QuoteOrder(new QuoteShipping(settings), settings);
+        return new Sut(new CheckoutOrder(work, inventory, orders, catalog, settings, quote, coupons, gateway, confirmation, clock), work, inventory, orders, gateway, confirmation, coupons);
     }
 
     private static CheckoutCommand Command(
         int quantity = 1, string postalCode = OtherCp, PaymentMethod method = PaymentMethod.Tarjeta,
-        string? token = FakePaymentGateway.ApprovedToken, decimal? expectedTotal = null, string? key = null) =>
+        string? token = FakePaymentGateway.ApprovedToken, decimal? expectedTotal = null, string? key = null, string? coupon = null) =>
         new(null, " Ana ", "López", " ANA@correo.mx ", "6681234567", "Calle 1", "Centro", "Los Mochis", "Sinaloa", postalCode, "  ", true,
-            method, token, expectedTotal, [new CheckoutLine(Sku, quantity)], key);
+            method, token, expectedTotal, [new CheckoutLine(Sku, quantity)], key, coupon);
 
     [Fact]
     public async Task Off_season_line_is_charged_at_the_discounted_price_from_the_server()
@@ -328,5 +362,130 @@ public class CheckoutOrderTests
         var other = Build(Variant(400m), orders: new FakeOrders { Existing = previous });
         Assert.IsType<CheckoutResult.IdempotencyConflict>(await other.Checkout.PlaceAsync(Command(2, key: "llave"), Ct));
         Assert.Empty(other.Gateway.Charges);
+    }
+
+    // --- Cupones (D-40) ---
+
+    private static Coupon CouponOf(string code, CouponType type, decimal value, int id = 1) =>
+        new() { Id = id, Code = code, Type = type, Value = value, IsActive = true };
+
+    private static Sut BuildWith(ProductVariant variant, params Coupon[] coupons)
+    {
+        var clock = new FakeClock(new DateOnly(2026, 12, 15));
+        return Build(variant, coupons: new FakeCoupons(clock, coupons));
+    }
+
+    [Fact]
+    public async Task Percent_coupon_discounts_the_merchandise_and_is_charged_and_redeemed()
+    {
+        var sut = BuildWith(Variant(559m), CouponOf("BIENVENIDA10", CouponType.Percent, 10));
+
+        var result = await sut.Checkout.PlaceAsync(Command(coupon: "BIENVENIDA10"), Ct);
+
+        Assert.IsType<CheckoutResult.Created>(result);
+        var order = sut.Orders.Created!;
+        Assert.Equal("BIENVENIDA10", order.CouponCode);
+        Assert.Equal(559m, order.Subtotal);
+        Assert.Equal(55.90m, order.DiscountAmount);
+        Assert.Equal(99m, order.ShippingCost);
+        Assert.Equal(602.10m, order.Total);
+        Assert.Equal(order.Subtotal - order.DiscountAmount + order.ShippingCost, order.Total);
+        Assert.Equal(602.10m, sut.Gateway.Charges.Single().Amount);
+        Assert.Equal((1, order.Id, "ana@correo.mx", 55.90m), sut.Coupons.Redeemed.Single());
+    }
+
+    [Fact]
+    public async Task Courtesy_shipping_threshold_is_checked_after_the_discount()
+    {
+        // 2 × $400 = $800 llega al umbral de $799, pero con 10 % quedan $720: se cobra el envío.
+        var sut = BuildWith(Variant(400m), CouponOf("DIEZ", CouponType.Percent, 10));
+
+        await sut.Checkout.PlaceAsync(Command(2, coupon: "DIEZ"), Ct);
+
+        Assert.Equal(80m, sut.Orders.Created!.DiscountAmount);
+        Assert.Equal(99m, sut.Orders.Created.ShippingCost);
+        Assert.Equal(819m, sut.Orders.Created.Total);
+    }
+
+    [Fact]
+    public async Task Fixed_coupon_larger_than_the_subtotal_leaves_merchandise_at_zero_but_keeps_shipping()
+    {
+        var sut = BuildWith(Variant(400m), CouponOf("MIL", CouponType.Fixed, 1000));
+
+        await sut.Checkout.PlaceAsync(Command(coupon: "MIL"), Ct);
+
+        Assert.Equal(400m, sut.Orders.Created!.DiscountAmount);
+        Assert.Equal(99m, sut.Orders.Created.ShippingCost);
+        Assert.Equal(99m, sut.Orders.Created.Total);
+    }
+
+    [Theory]
+    [InlineData(LocalCp, DeliveryMethod.Local)]
+    [InlineData(OtherCp, DeliveryMethod.Paqueteria)]
+    public async Task Free_shipping_coupon_zeroes_local_and_parcel_shipping(string postalCode, DeliveryMethod method)
+    {
+        var sut = BuildWith(Variant(100m), CouponOf("ENVIOGRATIS", CouponType.FreeShipping, 0));
+
+        await sut.Checkout.PlaceAsync(Command(postalCode: postalCode, coupon: "envio gratis"), Ct);
+
+        Assert.Equal(method, sut.Orders.Created!.DeliveryMethod);
+        Assert.Equal(0m, sut.Orders.Created.ShippingCost);
+        Assert.Equal(0m, sut.Orders.Created.DiscountAmount);
+        Assert.Equal(100m, sut.Orders.Created.Total);
+    }
+
+    [Fact]
+    public async Task Percent_discount_rounds_half_away_from_zero()
+    {
+        // 15 % de $333.30 = $49.995 → $50.00.
+        var sut = BuildWith(Variant(333.30m), CouponOf("QUINCE", CouponType.Percent, 15));
+
+        await sut.Checkout.PlaceAsync(Command(coupon: "QUINCE"), Ct);
+
+        Assert.Equal(50.00m, sut.Orders.Created!.DiscountAmount);
+    }
+
+    [Fact]
+    public async Task Coupon_that_stopped_applying_is_rejected_with_the_total_without_it_and_nothing_is_charged()
+    {
+        var expired = CouponOf("NOVIEMBRE", CouponType.Percent, 10);
+        expired.EndsOn = new DateOnly(2026, 11, 30);
+        var sut = BuildWith(Variant(400m), expired);
+
+        var result = await sut.Checkout.PlaceAsync(Command(coupon: "NOVIEMBRE", expectedTotal: 459m), Ct);
+
+        var invalid = Assert.IsType<CheckoutResult.CouponInvalid>(result);
+        Assert.Equal(CouponRules.Expired, invalid.Reason);
+        Assert.Equal("Este código venció el 30 de noviembre.", invalid.Message);
+        Assert.Equal(499m, invalid.Total);
+        Assert.Empty(sut.Gateway.Charges);
+        Assert.Equal(1, sut.Work.Rollbacks);
+        Assert.Empty(sut.Coupons.Redeemed);
+    }
+
+    [Fact]
+    public async Task Expected_total_must_include_the_discount()
+    {
+        var withCoupon = BuildWith(Variant(400m), CouponOf("DIEZ", CouponType.Percent, 10));
+        Assert.IsType<CheckoutResult.Created>(await withCoupon.Checkout.PlaceAsync(Command(coupon: "DIEZ", expectedTotal: 459m), Ct));
+
+        var stale = BuildWith(Variant(400m), CouponOf("DIEZ", CouponType.Percent, 10));
+        Assert.Equal(459m, Assert.IsType<CheckoutResult.PriceChanged>(await stale.Checkout.PlaceAsync(Command(coupon: "DIEZ", expectedTotal: 499m), Ct)).Total);
+        Assert.Empty(stale.Gateway.Charges);
+    }
+
+    [Fact]
+    public async Task Coupon_code_is_part_of_the_idempotency_hash()
+    {
+        var first = BuildWith(Variant(400m), CouponOf("DIEZ", CouponType.Percent, 10));
+        await first.Checkout.PlaceAsync(Command(key: "llave", coupon: "DIEZ"), Ct);
+        var previous = first.Orders.Created!;
+
+        var replay = Build(Variant(400m), orders: new FakeOrders { Existing = previous });
+        Assert.True(Assert.IsType<CheckoutResult.Created>(await replay.Checkout.PlaceAsync(Command(key: "llave", coupon: " diez "), Ct)).Replayed);
+
+        var withoutCoupon = Build(Variant(400m), orders: new FakeOrders { Existing = previous });
+        Assert.IsType<CheckoutResult.IdempotencyConflict>(await withoutCoupon.Checkout.PlaceAsync(Command(key: "llave"), Ct));
+        Assert.Empty(withoutCoupon.Gateway.Charges);
     }
 }

@@ -30,7 +30,10 @@ public class OrderConfirmation(IOrderService orders, IEmailSender email, IExpire
                     order.Total,
                     unpaidOxxo ? order.PaymentReference : null,
                     unpaidOxxo ? order.CreatedAt + expiry.Lifetime : null,
-                    order.Items.OrderBy(i => i.Id).Select(i => new OrderEmailLine(i.ProductNameSnapshot, i.ToneNameSnapshot, i.SizeCodeSnapshot, i.Quantity, i.Quantity * i.UnitPrice)).ToList()),
+                    order.Items.OrderBy(i => i.Id).Select(i => new OrderEmailLine(i.ProductNameSnapshot, i.ToneNameSnapshot, i.SizeCodeSnapshot, i.Quantity, i.Quantity * i.UnitPrice)).ToList(),
+                    order.CouponCode,
+                    order.DiscountAmount,
+                    order.ShippingCost),
                 CancellationToken.None);
         }
         catch (Exception ex)

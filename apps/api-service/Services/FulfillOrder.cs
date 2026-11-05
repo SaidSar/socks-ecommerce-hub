@@ -18,6 +18,7 @@ public class FulfillOrder(
     IUnitOfWork unitOfWork,
     IOrderAdminService orders,
     IInventoryService inventory,
+    ICouponService coupons,
     IPaymentGateway gateway,
     IClock clock,
     ILogger<FulfillOrder> logger) : IFulfillOrder
@@ -120,6 +121,8 @@ public class FulfillOrder(
 
             refund = order.PaymentStatus == PaymentStatus.Pagado ? order.PaymentReference : null;
             await orders.ApplyStatusAsync(order, OrderStatus.Cancelado, rowVersion!, null, note, actor, clock.UtcNow, ct);
+            // D-40: el uso del cupón vuelve a estar disponible; el pedido conserva el código y el descuento.
+            await coupons.ReleaseAsync(order.Id, ct);
             return ((AdminResult<AdminOrderView>?)null, true);
         }, cancellationToken);
 

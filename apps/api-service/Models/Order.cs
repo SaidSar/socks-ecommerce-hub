@@ -28,7 +28,12 @@ public class Order
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pendiente;
     public string? PaymentReference { get; set; }
     public DateTime? PaidAt { get; set; }
+    /// <summary>Mercancía con precios de oferta, antes del descuento.</summary>
     public decimal Subtotal { get; set; }
+    /// <summary>Copia del código del cupón aplicado; se conserva aunque el pedido se cancele (D-40).</summary>
+    public string? CouponCode { get; set; }
+    /// <summary>Descuento del cupón sobre el subtotal. <c>Total = Subtotal − DiscountAmount + ShippingCost</c>.</summary>
+    public decimal DiscountAmount { get; set; }
     /// <summary>Tarifa congelada al comprar.</summary>
     public decimal ShippingCost { get; set; }
     public decimal Total { get; set; }

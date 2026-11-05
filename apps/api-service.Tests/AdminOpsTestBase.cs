@@ -20,6 +20,9 @@ public abstract class AdminOpsTestBase(AdminApiFactory factory) : AdminApiTestBa
 
     private readonly List<int> _productIds = [];
 
+    /// <summary>Cupones que crea la prueba; se borran al terminar.</summary>
+    protected List<int> CouponIds { get; } = [];
+
     protected sealed record TestProduct(int Id, int VariantId, string Sku);
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
@@ -34,7 +37,9 @@ public abstract class AdminOpsTestBase(AdminApiFactory factory) : AdminApiTestBa
         await db.Shipments.Where(s => orderIds.Contains(s.OrderId)).ExecuteDeleteAsync();
         await db.OrderStatusHistory.Where(h => orderIds.Contains(h.OrderId)).ExecuteDeleteAsync();
         await db.OrderItems.Where(i => orderIds.Contains(i.OrderId)).ExecuteDeleteAsync();
+        await db.CouponRedemptions.Where(r => orderIds.Contains(r.OrderId) || CouponIds.Contains(r.CouponId)).ExecuteDeleteAsync();
         await db.Orders.Where(o => orderIds.Contains(o.Id)).ExecuteDeleteAsync();
+        await db.Coupons.Where(c => CouponIds.Contains(c.Id)).ExecuteDeleteAsync();
         await db.ProductVariants.Where(v => variantIds.Contains(v.Id)).ExecuteDeleteAsync();
         await db.Products.Where(p => _productIds.Contains(p.Id)).ExecuteDeleteAsync();
         GC.SuppressFinalize(this);

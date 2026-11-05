@@ -51,7 +51,9 @@ public record OperationsOrderDto(
     string Courier,
     string Note,
     IReadOnlyList<AdminOrderHistoryDto> History,
-    byte[] RowVersion);
+    byte[] RowVersion,
+    /// <summary>Solo el código: el monto descontado es un importe (R-24).</summary>
+    string? CouponCode);
 
 /// <summary>Pedido para el Dueño: lo mismo que Operaciones, más los importes (R-24).</summary>
 public record OwnerOrderDto(
@@ -75,7 +77,9 @@ public record OwnerOrderDto(
     decimal Subtotal,
     decimal Shipping,
     decimal Total,
-    decimal TaxIncluded);
+    decimal TaxIncluded,
+    string? CouponCode,
+    decimal DiscountAmount);
 
 /// <summary>Lista de la vista Pedidos. <c>Counts</c> son los contadores de las pestañas, sin la búsqueda.</summary>
 public record AdminOrderListDto<TOrder>(IReadOnlyList<TOrder> Orders, IReadOnlyDictionary<string, int> Counts, int Count, DateTime Now);
