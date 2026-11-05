@@ -59,6 +59,7 @@ public sealed class BootstrapFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+        builder.UseTestDatabase();
         builder.ConfigureLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace));
     }
 }

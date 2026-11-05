@@ -21,6 +21,7 @@ public sealed class AdminApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.UseSetting("RateLimiting:AuthPermitLimit", "10000");
         builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+        builder.UseTestDatabase();
         builder.ConfigureTestServices(services =>
         {
             services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email));

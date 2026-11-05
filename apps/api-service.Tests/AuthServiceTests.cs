@@ -119,7 +119,7 @@ public class AuthTaskTests
         public Task<PasswordChangeResult> ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken cancellationToken = default) =>
             Task.FromResult(PasswordChangeResult.Changed);
 
-        public Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default)
+        public Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime createdAt, DateTime expiresAt, CancellationToken cancellationToken = default)
         {
             Saved = (userId, tokenHash, expiresAt);
             return Task.CompletedTask;

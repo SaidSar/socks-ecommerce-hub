@@ -50,8 +50,11 @@ public interface IUserService
     /// <summary>Cambia la contraseña si la actual coincide.</summary>
     Task<PasswordChangeResult> ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken cancellationToken = default);
 
-    /// <summary>Guarda el hash del token e invalida los anteriores del usuario.</summary>
-    Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Guarda el hash del token e invalida los anteriores del usuario. <paramref name="createdAt"/> y <paramref name="expiresAt"/>
+    /// salen del mismo instante: el token dura exactamente lo prometido, también tras redondear a <c>datetime2(3)</c>.
+    /// </summary>
+    Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime createdAt, DateTime expiresAt, CancellationToken cancellationToken = default);
 
     /// <summary><c>false</c> si el token no existe, venció o ya se usó.</summary>
     Task<bool> ResetPasswordAsync(byte[] tokenHash, string newPassword, CancellationToken cancellationToken = default);
@@ -240,13 +243,12 @@ public class UserService(SokkoDbContext db, IAuthService auth, IClock clock) : I
         return user;
     }
 
-    public async Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime expiresAt, CancellationToken cancellationToken = default)
+    public async Task AddResetTokenAsync(int userId, byte[] tokenHash, DateTime createdAt, DateTime expiresAt, CancellationToken cancellationToken = default)
     {
-        var now = clock.UtcNow;
         await db.PasswordResetTokens
             .Where(t => t.UserId == userId && t.UsedAt == null)
-            .ExecuteUpdateAsync(u => u.SetProperty(t => t.UsedAt, now), cancellationToken);
-        db.PasswordResetTokens.Add(new PasswordResetToken { UserId = userId, TokenHash = tokenHash, CreatedAt = now, ExpiresAt = expiresAt });
+            .ExecuteUpdateAsync(u => u.SetProperty(t => t.UsedAt, createdAt), cancellationToken);
+        db.PasswordResetTokens.Add(new PasswordResetToken { UserId = userId, TokenHash = tokenHash, CreatedAt = createdAt, ExpiresAt = expiresAt });
         await db.SaveChangesAsync(cancellationToken);
     }
 

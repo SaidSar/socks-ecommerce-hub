@@ -35,7 +35,8 @@ public class InviteUser(IUserService users, IAuthService auth, IEmailSender emai
 
         var token = auth.CreateResetToken();
         var lifetime = TimeSpan.FromHours(configuration.GetValue("Users:InvitationHours", 72));
-        await users.AddResetTokenAsync(user.Id, token.Hash, clock.UtcNow.Add(lifetime), cancellationToken);
+        var now = clock.UtcNow;
+        await users.AddResetTokenAsync(user.Id, token.Hash, now, now.Add(lifetime), cancellationToken);
         var url = $"{link.WebStoreUrl.TrimEnd('/')}/cuenta/restablecer?token={Uri.EscapeDataString(token.Value)}";
         await email.SendInvitationAsync(user.Email, url, cancellationToken);
         return user;
@@ -73,7 +74,8 @@ public class ResetPassword(IUserService users, IAuthService auth, IEmailSender e
         }
 
         var token = auth.CreateResetToken();
-        await users.AddResetTokenAsync(user.Id, token.Hash, clock.UtcNow.Add(TokenLifetime), cancellationToken);
+        var now = clock.UtcNow;
+        await users.AddResetTokenAsync(user.Id, token.Hash, now, now.Add(TokenLifetime), cancellationToken);
         var url = $"{link.WebStoreUrl.TrimEnd('/')}/cuenta/restablecer?token={Uri.EscapeDataString(token.Value)}";
         await email.SendPasswordResetAsync(user.Email, url, cancellationToken);
     }

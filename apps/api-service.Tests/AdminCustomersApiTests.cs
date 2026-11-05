@@ -184,4 +184,51 @@ public class AdminCustomersApiTests(AdminApiFactory factory) : AdminOpsTestBase(
         Assert.StartsWith("﻿Nombre,Correo,Talla preferida,Cliente desde\r\n", marketing);
         Assert.DoesNotContain(Email("ana"), marketing);
     }
+
+    [Fact]
+    public async Task Guest_who_later_opens_an_account_appears_once_as_an_account()
+    {
+        var product = await CreateProduct(5, price: 150m);
+        var email = Email("luz");
+        // Compró como invitada (con otras mayúsculas) y después abrió su cuenta con el mismo correo.
+        var asGuest = await Buy(product.Sku, email: email.ToUpperInvariant());
+        var register = await Post("/api/auth/register", null, new { firstName = "Luz", lastName = "Prueba", email, password = "Prueba2026x", acceptedTerms = true });
+        Assert.Equal(HttpStatusCode.Created, register.StatusCode);
+        var withAccount = await Buy(product.Sku, 2, email: email);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SokkoDbContext>();
+        var userId = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync(Ct);
+        await db.Orders.Where(o => o.Folio == withAccount).ExecuteUpdateAsync(u => u.SetProperty(o => o.UserId, userId), Ct);
+        try
+        {
+            var totals = await db.Orders.AsNoTracking().Where(o => o.Folio == asGuest || o.Folio == withAccount).ToDictionaryAsync(o => o.Folio, Ct);
+
+            var row = Assert.Single(await Rows($"q={_token}"));
+            Assert.Equal("cuenta", row.GetProperty("kind").GetString());
+            Assert.Equal(userId, row.GetProperty("id").GetInt32());
+            Assert.Equal(2, row.GetProperty("orders").GetInt32());
+            Assert.Equal(totals[asGuest].Total + totals[withAccount].Total, row.GetProperty("spent").GetDecimal());
+            Assert.Equal(totals.Values.Max(o => o.CreatedAt), row.GetProperty("lastOrderAt").GetDateTime(), TimeSpan.FromMilliseconds(1));
+            Assert.Empty(await Rows($"type=invitados&q={_token}"));
+
+            var detail = await Json(await Get($"{Url}/{userId}", Owner));
+            var orders = detail.GetProperty("orders").EnumerateArray().ToDictionary(o => o.GetProperty("folio").GetString()!, o => o.GetProperty("asGuest").GetBoolean());
+            Assert.Equal(new Dictionary<string, bool> { [asGuest] = true, [withAccount] = false }, orders);
+
+            // Un enlace viejo de invitado lleva a la cuenta.
+            var guestLink = await Json(await Get($"{Url}/guest?email={Uri.EscapeDataString(email.ToUpperInvariant())}", Owner));
+            Assert.Equal("cuenta", guestLink.GetProperty("customer").GetProperty("kind").GetString());
+
+            var csv = Encoding.UTF8.GetString(await (await Get($"{Url}/export.csv?q={_token}", Owner)).Content.ReadAsByteArrayAsync(Ct));
+            var lines = csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+            Assert.Equal(2, lines.Length);
+            Assert.Contains(",Con cuenta,2,", lines[1]);
+        }
+        finally
+        {
+            await db.Orders.Where(o => o.UserId == userId).ExecuteUpdateAsync(u => u.SetProperty(o => o.UserId, (int?)null), Ct);
+            await db.Users.Where(u => u.Id == userId).ExecuteDeleteAsync(Ct);
+        }
+    }
 }

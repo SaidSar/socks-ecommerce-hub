@@ -26,12 +26,15 @@ const isSale = (o) => o.status !== 'cancelado' && o.paymentStatus === 'pagado'
 /**
  * Filas de clientes a partir de los pedidos. `accounts`: [{ id, name, email, preferredSize, marketingOptIn, createdAt }].
  * Los pedidos con `customer.userId` son de una cuenta; los demás se agrupan por correo normalizado como invitados.
+ * Un invitado cuyo correo ya tiene cuenta es esa cuenta: sus pedidos se le suman y no aparece en "Invitados".
  */
 export function buildCustomers(orders, accounts) {
   const byUser = new Map(accounts.map((a) => [a.id, []]))
+  const accountByEmail = new Map(accounts.map((a) => [normalizeEmail(a.email), a.id]))
   const guests = new Map()
   for (const o of orders) {
-    if (o.customer.userId != null && byUser.has(o.customer.userId)) byUser.get(o.customer.userId).push(o)
+    const owner = o.customer.userId ?? accountByEmail.get(normalizeEmail(o.customer.email))
+    if (owner != null && byUser.has(owner)) byUser.get(owner).push(o)
     else {
       const key = normalizeEmail(o.customer.email)
       guests.set(key, [...(guests.get(key) ?? []), o])

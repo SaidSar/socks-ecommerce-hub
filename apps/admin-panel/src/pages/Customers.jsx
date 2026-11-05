@@ -132,6 +132,9 @@ function CustomerDetail({ selected, onClose, returnFocus }) {
                       <span className="ml-auto tnum text-[13px]">{formatMXN(o.total)}</span>
                       <span className="basis-full flex flex-wrap items-center gap-2">
                         <StatusChip status={o.status} />
+                        {o.asGuest && data.customer.kind === 'cuenta' && (
+                          <span className="inline-flex items-center rounded-full bg-sand px-2 py-0.5 text-[12px] text-ink-soft">Como invitado</span>
+                        )}
                         {o.paymentStatus !== 'pagado' && <span className="text-[12px] text-ink-soft">{label(PAYMENT_STATUS_LABELS, o.paymentStatus)}</span>}
                       </span>
                     </Link>

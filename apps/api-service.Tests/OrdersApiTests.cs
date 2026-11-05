@@ -33,6 +33,7 @@ public sealed class OrdersApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.UseSetting("RateLimiting:AuthPermitLimit", "10000");
         builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+        builder.UseTestDatabase();
         builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IClock>(Clock)));
     }
 }

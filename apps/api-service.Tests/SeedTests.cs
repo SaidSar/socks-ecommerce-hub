@@ -54,17 +54,11 @@ public partial class SeedTests
         });
     }
 
+    /// <summary>Desde la raíz del repo (<see cref="RepoRoot"/>), no desde la carpeta de compilación.</summary>
     private static string FindStoreSeed()
     {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var path = Path.Combine(dir.FullName, "apps", "web-store", "src", "data", "catalogSeed.js");
-            if (File.Exists(path))
-            {
-                return path;
-            }
-        }
-        throw new FileNotFoundException("No se encontró apps/web-store/src/data/catalogSeed.js.");
+        var path = RepoRoot.Path("apps", "web-store", "src", "data", "catalogSeed.js");
+        return File.Exists(path) ? path : throw new FileNotFoundException("No se encontró apps/web-store/src/data/catalogSeed.js.", path);
     }
 
     [Fact]

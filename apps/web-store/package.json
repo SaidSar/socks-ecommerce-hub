@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:mocks": "vite build --mode mocks --outDir dist-e2e",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "lucide-react": "^1.57.0",
@@ -17,6 +19,7 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",

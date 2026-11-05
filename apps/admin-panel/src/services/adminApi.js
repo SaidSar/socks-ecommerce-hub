@@ -688,18 +688,22 @@ export async function getCustomer(key, user) {
   await latency()
   forbidden(user, 'customers.view', 'Solo el Dueño ve los clientes.')
   const email = String(key.email ?? '').trim().toLowerCase()
-  const row = customerRows().find((r) => (key.id != null ? r.id === key.id : r.kind === 'invitado' && r.email === email))
+  const rows = customerRows()
+  // Un enlace de invitado cuyo correo ya tiene cuenta lleva a la cuenta.
+  const row = rows.find((r) => (key.id != null ? r.id === key.id : r.email === email && r.kind === 'invitado')) ?? rows.find((r) => key.id == null && r.email === email)
   if (!row) throw new ApiError('No encontramos ese cliente.', 404)
   const { orders, accounts } = db()
   const account = accounts.find((a) => a.id === row.id)
+  // Una cuenta incluye lo que compró como invitado con el mismo correo (se marca "Como invitado").
+  const mine = (o) => o.customer.userId === row.id || (o.customer.userId == null && o.customer.email.toLowerCase() === row.email)
   const own = orders
-    .filter((o) => (row.id != null ? o.customer.userId === row.id : o.customer.userId == null && o.customer.email.toLowerCase() === row.email))
+    .filter((o) => (row.id != null ? mine(o) : o.customer.userId == null && o.customer.email.toLowerCase() === row.email))
     .sort((a, b) => (a.created < b.created ? 1 : -1))
   const last = own[0]
   return copy({
     customer: row,
     phone: account?.phone ?? (last ? '6681234567' : null),
-    orders: own.map((o) => ({ folio: o.id, createdAt: o.created, status: o.status, paymentStatus: o.paymentStatus, total: o.total })),
+    orders: own.map((o) => ({ folio: o.id, createdAt: o.created, status: o.status, paymentStatus: o.paymentStatus, total: o.total, asGuest: o.customer.userId == null })),
     favorites: row.id != null ? (account?.favorites ?? 0) : null,
     lastAddress: last
       ? { street: 'Calle demo 123', neighborhood: 'Centro', city: last.customer.city, state: 'Sinaloa', postalCode: last.customer.postalCode, references: null }

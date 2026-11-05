@@ -22,6 +22,13 @@ describe('clientes', () => {
   ]
   const rows = buildCustomers(orders, accounts)
 
+  it('un invitado que después abrió cuenta con el mismo correo aparece una sola vez, como cuenta', () => {
+    const merged = buildCustomers([...orders, order('BETO@correo.mx', { created: '2026-11-05T18:00:00Z', total: 300 })], accounts)
+    expect(merged.filter((r) => r.email === 'beto@correo.mx')).toHaveLength(1)
+    expect(merged.find((r) => r.email === 'beto@correo.mx')).toMatchObject({ kind: 'cuenta', orders: 2, spent: 1500, lastOrderAt: '2026-11-05T18:00:00Z' })
+    expect(queryCustomers(merged, { type: 'invitados' }).customers.map((r) => r.email)).toEqual(['ana@correo.mx'])
+  })
+
   it('invitados agrupados por correo sin importar mayúsculas; totales sin cancelados', () => {
     const ana = rows.find((r) => r.kind === 'invitado')
     expect(rows).toHaveLength(2)

@@ -21,7 +21,7 @@ public class ProductionApiFactory : WebApplicationFactory<Program>
 {
     public virtual Dictionary<string, string?> Settings => new()
     {
-        ["ConnectionStrings:Sokko"] = Environment.GetEnvironmentVariable("ConnectionStrings__Sokko") ?? "Server=localhost;Database=Sokko;Trusted_Connection=True;TrustServerCertificate=True",
+        ["ConnectionStrings:Sokko"] = TestDatabase.ConnectionString,
         ["Jwt:SigningKey"] = new string('k', 64),
         ["Frontend:WebStoreUrl"] = "https://tienda.example.com/",
         ["Frontend:AdminPanelUrl"] = "https://panel.example.com, https://panel2.example.com",
@@ -160,6 +160,7 @@ public class HealthApiTests
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+            builder.UseTestDatabase();
             builder.ConfigureTestServices(services => services.AddHealthChecks().AddCheck("bd-caida", () => HealthCheckResult.Unhealthy("detalle interno")));
         }
     }
@@ -170,6 +171,7 @@ public class HealthApiTests
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+            builder.UseTestDatabase();
         }
     }
 
