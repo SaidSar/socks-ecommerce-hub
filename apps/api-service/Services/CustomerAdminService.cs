@@ -64,18 +64,38 @@ public class CustomerAdminService(SokkoDbContext db, IClock clock) : ICustomerAd
             })
             .ToListAsync(cancellationToken);
 
-        var rows = accounts.Select(u => new AdminCustomerRowDto(
-            u.Id, Account, $"{u.FirstName} {u.LastName}".Trim(), u.Email, u.Orders, u.Spent, u.Last is { } last ? Utc(last) : null, u.Size, u.MarketingOptIn, Utc(u.CreatedAt)))
-            .ToList();
-
-        var guestOrders = await db.Orders
+        var guestOrders = (await db.Orders
             .AsNoTracking()
             .Where(o => o.UserId == null)
             .Select(o => new { o.CustomerEmail, o.CustomerFirstName, o.CustomerLastName, o.CreatedAt, o.Status, o.PaymentStatus, o.Total })
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken))
+            .GroupBy(o => NormalizeEmail(o.CustomerEmail))
+            .ToList();
+
+        // Quien compró como invitado y después abrió cuenta con el mismo correo es una sola persona: sus pedidos de invitado
+        // se suman a la cuenta (pedidos, total gastado y última compra) y ya no aparece en "Invitados".
+        var byEmail = guestOrders.ToDictionary(g => g.Key);
+        var accountEmails = accounts.Select(u => NormalizeEmail(u.Email)).ToHashSet();
+        var rows = accounts.Select(u =>
+        {
+            var asGuest = byEmail.GetValueOrDefault(NormalizeEmail(u.Email))?.ToList() ?? [];
+            var guestCounted = asGuest.Where(o => Counts(o.Status)).ToList();
+            var last = guestCounted.Select(o => (DateTime?)o.CreatedAt).Append(u.Last).Max();
+            return new AdminCustomerRowDto(
+                u.Id,
+                Account,
+                $"{u.FirstName} {u.LastName}".Trim(),
+                u.Email,
+                u.Orders + guestCounted.Count,
+                u.Spent + asGuest.Where(o => IsSale(o.Status, o.PaymentStatus)).Sum(o => o.Total),
+                last is { } value ? Utc(value) : null,
+                u.Size,
+                u.MarketingOptIn,
+                Utc(u.CreatedAt));
+        }).ToList();
 
         rows.AddRange(guestOrders
-            .GroupBy(o => NormalizeEmail(o.CustomerEmail))
+            .Where(g => !accountEmails.Contains(g.Key))
             .Select(g =>
             {
                 var latest = g.MaxBy(o => o.CreatedAt)!;
@@ -151,19 +171,25 @@ public class CustomerAdminService(SokkoDbContext db, IClock clock) : ICustomerAd
     }
 
     private static List<AdminCustomerOrderDto> OrdersOf(IEnumerable<Order> orders) =>
-        orders.Select(o => new AdminCustomerOrderDto(o.Folio, o.CreatedAt, o.Status, o.PaymentStatus, o.Total)).ToList();
+        orders.Select(o => new AdminCustomerOrderDto(o.Folio, o.CreatedAt, o.Status, o.PaymentStatus, o.Total, o.UserId is null)).ToList();
 
     private static AdminCustomerAddressDto? AddressOf(Order? o) =>
         o is null ? null : new AdminCustomerAddressDto(o.ShipStreet, o.ShipNeighborhood, o.ShipCity, o.ShipState, o.ShipPostalCode, o.ShipReferences);
 
     public async Task<AdminCustomerDetailDto?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        if (!await db.Users.AnyAsync(u => u.Id == id && u.Role == UserRole.Customer, cancellationToken))
+        var email = await db.Users.Where(u => u.Id == id && u.Role == UserRole.Customer).Select(u => u.Email).FirstOrDefaultAsync(cancellationToken);
+        if (email is null)
         {
             return null;
         }
         var row = (await AllAsync(cancellationToken)).Single(r => r.Id == id);
-        var orders = await db.Orders.AsNoTracking().Where(o => o.UserId == id).OrderByDescending(o => o.CreatedAt).ToListAsync(cancellationToken);
+        // Sus pedidos con cuenta y los que hizo como invitado con el mismo correo (marcados con AsGuest).
+        var key = NormalizeEmail(email);
+        var orders = await db.Orders.AsNoTracking()
+            .Where(o => o.UserId == id || (o.UserId == null && o.CustomerEmail.Trim().ToLower() == key))
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync(cancellationToken);
         var favorites = await db.WishlistItems.CountAsync(w => w.UserId == id, cancellationToken);
         return new AdminCustomerDetailDto(row, orders.FirstOrDefault()?.CustomerPhone, OrdersOf(orders), favorites, AddressOf(orders.FirstOrDefault()));
     }
@@ -175,6 +201,12 @@ public class CustomerAdminService(SokkoDbContext db, IClock clock) : ICustomerAd
             return null;
         }
         var key = NormalizeEmail(email);
+        // Si ese correo ya tiene cuenta, el cliente es la cuenta (los enlaces viejos de invitado siguen sirviendo).
+        var accountId = await db.Users.Where(u => u.Role == UserRole.Customer && u.Email.Trim().ToLower() == key).Select(u => (int?)u.Id).FirstOrDefaultAsync(cancellationToken);
+        if (accountId is { } id)
+        {
+            return await GetAsync(id, cancellationToken);
+        }
         var orders = await db.Orders.AsNoTracking()
             .Where(o => o.UserId == null && o.CustomerEmail.Trim().ToLower() == key)
             .OrderByDescending(o => o.CreatedAt)

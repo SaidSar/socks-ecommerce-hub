@@ -1,26 +1,44 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom'
 import { ProtectedLayout, RequirePermission } from './components/layout/Guards'
 import { NAV } from './config/navigation'
 import { AdminAuthProvider } from './context/AdminAuthContext'
 import { ToastProvider } from './context/ToastContext'
-import Brands from './pages/Brands'
-import Collections from './pages/Collections'
+import Card from './components/ui/Card'
+import { SkeletonRows } from './components/ui/Skeleton'
 import ComingSoon from './pages/ComingSoon'
-import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
-import Inventory from './pages/Inventory'
 import Login from './pages/Login'
-import Messages from './pages/Messages'
 import NotFound from './pages/NotFound'
-import Orders from './pages/Orders'
-import Products from './pages/Products'
-import Promotions from './pages/Promotions'
-import ProductTypes from './pages/ProductTypes'
-import Reports from './pages/Reports'
-import Settings from './pages/Settings'
-import Shipments from './pages/Shipments'
 
-const guard = (section, element) => <RequirePermission section={section}>{element}</RequirePermission>
+// Login y Dashboard van en el bundle inicial; cada sección se descarga al abrirla (el bundle pasaba de 500 kB).
+const Brands = lazy(() => import('./pages/Brands'))
+const Collections = lazy(() => import('./pages/Collections'))
+const Customers = lazy(() => import('./pages/Customers'))
+const Inventory = lazy(() => import('./pages/Inventory'))
+const Messages = lazy(() => import('./pages/Messages'))
+const Orders = lazy(() => import('./pages/Orders'))
+const Products = lazy(() => import('./pages/Products'))
+const ProductTypes = lazy(() => import('./pages/ProductTypes'))
+const Promotions = lazy(() => import('./pages/Promotions'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Shipments = lazy(() => import('./pages/Shipments'))
+
+/** Mientras llega el código de la sección: el mismo esqueleto que muestran las pantallas al cargar datos. */
+function SectionLoading() {
+  return (
+    <Card>
+      <SkeletonRows label="Cargando sección…" rows={5} />
+    </Card>
+  )
+}
+
+const guard = (section, element) => (
+  <RequirePermission section={section}>
+    <Suspense fallback={<SectionLoading />}>{element}</Suspense>
+  </RequirePermission>
+)
 
 /** La sección se llamaba Finanzas: los enlaces viejos llegan a Reportes con el mismo periodo. */
 function ToReports() {

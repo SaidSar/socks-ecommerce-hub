@@ -80,6 +80,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+        builder.UseTestDatabase();
         builder.UseSetting("RateLimiting:AuthPermitLimit", PermitLimit);
         builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email)));
     }

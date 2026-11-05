@@ -21,7 +21,8 @@ public record AdminCustomerRowDto(
 /// <summary><c>Counts</c> por tipo (todos, cuenta, invitados) con la búsqueda aplicada.</summary>
 public record AdminCustomerListDto(IReadOnlyList<AdminCustomerRowDto> Customers, IReadOnlyDictionary<string, int> Counts, int Total, int Page, int PageSize);
 
-public record AdminCustomerOrderDto(string Folio, DateTime CreatedAt, OrderStatus Status, PaymentStatus PaymentStatus, decimal Total);
+/// <summary><c>AsGuest</c>: el pedido se hizo sin sesión, antes o sin usar la cuenta con ese correo ("Como invitado").</summary>
+public record AdminCustomerOrderDto(string Folio, DateTime CreatedAt, OrderStatus Status, PaymentStatus PaymentStatus, decimal Total, bool AsGuest = false);
 
 public record AdminCustomerAddressDto(string Street, string Neighborhood, string City, string State, string PostalCode, string? References);
 

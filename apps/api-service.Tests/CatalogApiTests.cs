@@ -23,6 +23,7 @@ public sealed class CatalogApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("Orders:OxxoExpiryJobEnabled", "false");
+        builder.UseTestDatabase();
         builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton<IClock>(Clock)));
     }
 }

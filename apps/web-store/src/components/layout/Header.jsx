@@ -33,7 +33,8 @@ function LineLink({ line, compact = false }) {
 
 /**
  * Encabezado de la tienda (DESIGN_CATALOG_UI.md §3.2): las cuatro líneas, SOKKO primero.
- * En móvil las líneas van en una segunda fila deslizable, sin hamburguesa.
+ * Hasta 1023 px las líneas van en una segunda fila deslizable, sin hamburguesa: a 768 px no caben junto al logo,
+ * la búsqueda, favoritos, la cuenta y la bolsa.
  */
 export default function Header() {
   const { count, open: openCart } = useCart()
@@ -44,12 +45,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-ink/10 bg-linen/95 backdrop-blur">
-      <div className="gutter mx-auto flex h-[68px] max-w-7xl items-center justify-between gap-4">
+      <div className="gutter mx-auto flex h-[68px] max-w-7xl items-center justify-between gap-2 sm:gap-4">
         <Link to="/" aria-label="SOKKO, inicio" className="inline-flex shrink-0 items-center">
-          <Logo variant="horizontal" className="h-9 md:h-11" />
+          <Logo variant="horizontal" className="h-9 lg:h-11" />
         </Link>
 
-        <nav aria-label="Líneas" className="hidden items-center gap-8 md:flex">
+        <nav aria-label="Líneas" className="hidden items-center gap-8 lg:flex">
           {LINES.map((line) => (
             <LineLink key={line} line={line} />
           ))}
@@ -82,7 +83,7 @@ export default function Header() {
             type="button"
             onClick={openCart}
             aria-label={`Bolsa, ${count} ${count === 1 ? 'artículo' : 'artículos'}`}
-            className="relative flex min-h-11 items-center gap-2 px-1 text-ink transition-colors hover:text-laca"
+            className="relative flex min-h-11 items-center gap-1.5 text-ink transition-colors hover:text-laca sm:gap-2 sm:px-1"
           >
             <BagIcon className="h-[22px] w-[22px]" />
             <span key={count} className="tnum animate-fade font-serif text-[17px]" aria-hidden="true">
@@ -92,7 +93,7 @@ export default function Header() {
         </div>
       </div>
 
-      <nav aria-label="Líneas" className="gutter flex gap-6 overflow-x-auto border-t border-ink/10 [scrollbar-width:none] md:hidden">
+      <nav aria-label="Líneas" className="gutter flex gap-6 overflow-x-auto border-t border-ink/10 [scrollbar-width:none] lg:hidden">
         {LINES.map((line) => (
           <LineLink key={line} line={line} compact />
         ))}

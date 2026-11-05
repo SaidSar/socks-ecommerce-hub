@@ -63,7 +63,7 @@ export default function ProductCard({ product, showLine = false }) {
             {product.fewUnits && <span className="shrink-0 text-[10.5px] font-medium tracking-[.14em] text-laca uppercase">Quedan {product.stock}</span>}
           </div>
           <span className={isSokko ? 'font-serif text-[21px] leading-tight' : 'text-[15px] leading-snug font-normal'}>{product.name}</span>
-          <span className="flex items-baseline justify-between gap-2">
+          <span className="flex flex-wrap items-baseline justify-between gap-x-2">
             <Price product={product} />
             <span className="shrink-0 text-[12px] text-ink-soft">{unitText(product.type.unit, product.unitsPerPack)}</span>
           </span>
